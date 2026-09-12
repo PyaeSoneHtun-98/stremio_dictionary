@@ -129,7 +129,7 @@ export function PlaybackProof(): React.JSX.Element {
         <span className={`status-pill status-${state.status}`}>{state.status}</span>
       </div>
 
-      <div className="video-dropzone" aria-label="Drop an MKV file here">
+      <div className="video-dropzone">
         <div>
           <strong>{dragActive ? 'Drop the MKV to open it' : 'Drag an MKV anywhere onto this panel'}</strong>
           <span>or choose a local file with the picker</span>
