@@ -202,11 +202,7 @@ export class MpvController {
       }
 
       const detail = code !== null ? ` with exit code ${code}` : signal ? ` after signal ${signal}` : ''
-      this.patchState({
-        status: 'error',
-        currentTime: null,
-        error: `mpv exited unexpectedly${detail}. Reopen the video to retry.`
-      })
+      this.failPlayback(`mpv exited unexpectedly${detail}. Reopen the video to retry.`)
     })
 
     let socket: Socket
@@ -260,7 +256,7 @@ export class MpvController {
       }
     }
 
-    this.patchState({ status: 'error', currentTime: null, error: `${message} Reopen the video to retry.` })
+    this.failPlayback(`${message} Reopen the video to retry.`)
   }
 
   private handleChunk(chunk: string): void {
@@ -299,11 +295,7 @@ export class MpvController {
 
       if (message.reason === 'error') {
         const detail = message.error ? ` (${message.error})` : ''
-        this.patchState({
-          status: 'error',
-          currentTime: null,
-          error: `This video could not be played${detail}. Try another MKV file.`
-        })
+        this.failPlayback(`This video could not be played${detail}. Try another MKV file.`)
         return
       }
 
@@ -449,6 +441,26 @@ export class MpvController {
         }
       })
     }
+  }
+
+  private failPlayback(message: string): void {
+    const subtitle = { ...this.state.subtitle, activeCue: null }
+    const subtitleWasActive = subtitle.status === 'extracting' || subtitle.status === 'ready'
+
+    this.resetSubtitleExtraction()
+
+    if (subtitleWasActive) {
+      subtitle.status = 'error'
+      subtitle.cueCount = 0
+      subtitle.error = 'Subtitle processing stopped because playback failed.'
+    }
+
+    this.patchState({
+      status: 'error',
+      currentTime: null,
+      subtitle,
+      error: message
+    })
   }
 
   private resetSubtitleExtraction(): void {
