@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { OpenVideoResult, PlaybackSnapshot } from '../../../../shared/media'
+import { createEmptySubtitleModel } from '../../../../shared/media'
 import './PlaybackProof.css'
 
 const EMPTY_STATE: PlaybackSnapshot = {
@@ -11,6 +12,7 @@ const EMPTY_STATE: PlaybackSnapshot = {
   volume: 100,
   speed: 1,
   tracks: [],
+  subtitle: createEmptySubtitleModel(),
   error: null
 }
 
@@ -123,8 +125,8 @@ export function PlaybackProof(): React.JSX.Element {
     >
       <div className="playback-proof-header">
         <div>
-          <span className="eyebrow">Issue #3 player workflow</span>
-          <h2 id="playback-proof-title">Open a local MKV and control playback</h2>
+          <span className="eyebrow">Issue #4 subtitle cue pipeline</span>
+          <h2 id="playback-proof-title">Extract and normalize embedded text subtitles</h2>
         </div>
         <span className={`status-pill status-${state.status}`}>{state.status}</span>
       </div>
@@ -140,8 +142,10 @@ export function PlaybackProof(): React.JSX.Element {
       </div>
 
       <p className="playback-help">
-        Playback controls live on the video surface: play/pause, seek, volume, speed, and fullscreen.
-        Opening another MKV safely resets its position, duration, tracks, and subtitle test state.
+        Playback controls remain on the video surface. Issue #4 automatically picks a supported
+        embedded English text subtitle track when available, extracts it with FFmpeg, and keeps a
+        normalized cue model synchronized to playback time. Set <code>FFMPEG_PATH</code> if ffmpeg is
+        not on PATH.
       </p>
 
       {state.error || localError ? <div className="media-error">{localError ?? state.error}</div> : null}
@@ -151,8 +155,45 @@ export function PlaybackProof(): React.JSX.Element {
         <Metric label="Position" value={formatTime(state.currentTime)} />
         <Metric label="Duration" value={formatTime(state.duration)} />
         <Metric label="Tracks" value={String(state.tracks.length)} />
-        <Metric label="Volume" value={`${Math.round(state.volume)}%`} />
-        <Metric label="Speed" value={`${state.speed}×`} />
+        <Metric label="Subtitle cues" value={String(state.subtitle.cueCount)} />
+        <Metric label="Subtitle state" value={state.subtitle.status} />
+      </div>
+
+      <div className="subtitle-diagnostic" aria-live="polite">
+        <div className="subtitle-diagnostic-header">
+          <div>
+            <span className="eyebrow">Normalized cue model</span>
+            <strong>{subtitleTrackLabel(state)}</strong>
+          </div>
+          <span className={`status-pill subtitle-status-${state.subtitle.status}`}>
+            {state.subtitle.status}
+          </span>
+        </div>
+
+        {state.subtitle.error ? <div className="media-error">{state.subtitle.error}</div> : null}
+
+        {state.subtitle.activeCue ? (
+          <div className="active-cue-card">
+            <div className="active-cue-time">
+              {formatTime(state.subtitle.activeCue.startTime)} → {formatTime(state.subtitle.activeCue.endTime)}
+            </div>
+            <div className="active-cue-text">{state.subtitle.activeCue.text}</div>
+            <div className="token-preview">
+              {state.subtitle.activeCue.tokens.map((token) => (
+                <span className="token-chip" key={`${token.start}-${token.end}`}>
+                  <strong>{token.text}</strong>
+                  <small>{token.lookupTerm}</small>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="empty-subtitle-state">
+            {state.subtitle.status === 'ready'
+              ? 'No subtitle cue is active at the current playback position.'
+              : 'Open an MKV with an embedded SRT, ASS, or SSA text subtitle track.'}
+          </div>
+        )}
       </div>
 
       <div className="track-table-wrap">
@@ -165,6 +206,7 @@ export function PlaybackProof(): React.JSX.Element {
               <th>Title</th>
               <th>Codec</th>
               <th>Subtitle mode</th>
+              <th>FFmpeg index</th>
             </tr>
           </thead>
           <tbody>
@@ -177,11 +219,12 @@ export function PlaybackProof(): React.JSX.Element {
                   <td>{track.title ?? '—'}</td>
                   <td>{track.codec ?? 'unknown'}</td>
                   <td>{track.subtitleKind ?? '—'}</td>
+                  <td>{track.ffIndex ?? '—'}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="empty-table-cell">
+                <td colSpan={7} className="empty-table-cell">
                   Open an MKV file to inspect its embedded tracks.
                 </td>
               </tr>
@@ -200,6 +243,21 @@ function Metric({ label, value }: { label: string; value: string }): React.JSX.E
       <strong title={value}>{value}</strong>
     </div>
   )
+}
+
+function subtitleTrackLabel(state: PlaybackSnapshot): string {
+  if (state.subtitle.trackId === null) {
+    return 'No text subtitle track selected'
+  }
+
+  const parts = [
+    `Track ${state.subtitle.trackId}`,
+    state.subtitle.trackLanguage,
+    state.subtitle.trackTitle,
+    state.subtitle.trackCodec
+  ].filter((value): value is string => Boolean(value))
+
+  return parts.join(' · ')
 }
 
 function formatTime(seconds: number | null): string {

@@ -9,6 +9,7 @@ export type PlaybackStatus =
 
 export type MediaTrackType = 'video' | 'audio' | 'subtitle'
 export type SubtitleTrackKind = 'text' | 'image' | 'unknown'
+export type SubtitleModelStatus = 'idle' | 'extracting' | 'ready' | 'unsupported' | 'error'
 
 export interface MediaTrack {
   id: number
@@ -18,6 +19,34 @@ export interface MediaTrack {
   title: string | null
   selected: boolean
   subtitleKind: SubtitleTrackKind | null
+  ffIndex: number | null
+}
+
+export interface SubtitleToken {
+  text: string
+  lookupTerm: string
+  start: number
+  end: number
+}
+
+export interface SubtitleCue {
+  id: string
+  startTime: number
+  endTime: number
+  text: string
+  lines: string[]
+  tokens: SubtitleToken[]
+}
+
+export interface SubtitleModelSnapshot {
+  status: SubtitleModelStatus
+  trackId: number | null
+  trackLanguage: string | null
+  trackTitle: string | null
+  trackCodec: string | null
+  cueCount: number
+  activeCue: SubtitleCue | null
+  error: string | null
 }
 
 export interface PlaybackSnapshot {
@@ -29,6 +58,7 @@ export interface PlaybackSnapshot {
   volume: number
   speed: number
   tracks: MediaTrack[]
+  subtitle: SubtitleModelSnapshot
   error: string | null
 }
 
@@ -72,6 +102,19 @@ const IMAGE_SUBTITLE_CODECS = new Set([
   'xsub'
 ])
 
+export function createEmptySubtitleModel(): SubtitleModelSnapshot {
+  return {
+    status: 'idle',
+    trackId: null,
+    trackLanguage: null,
+    trackTitle: null,
+    trackCodec: null,
+    cueCount: 0,
+    activeCue: null,
+    error: null
+  }
+}
+
 export function classifySubtitleCodec(codec: string | null | undefined): SubtitleTrackKind {
   if (!codec) {
     return 'unknown'
@@ -97,6 +140,7 @@ interface MpvTrackLike {
   lang?: unknown
   title?: unknown
   selected?: unknown
+  'ff-index'?: unknown
 }
 
 export function normalizeMpvTracks(value: unknown): MediaTrack[] {
@@ -127,7 +171,8 @@ export function normalizeMpvTracks(value: unknown): MediaTrack[] {
         language: typeof track.lang === 'string' ? track.lang : null,
         title: typeof track.title === 'string' ? track.title : null,
         selected: track.selected === true,
-        subtitleKind: type === 'subtitle' ? classifySubtitleCodec(codec) : null
+        subtitleKind: type === 'subtitle' ? classifySubtitleCodec(codec) : null,
+        ffIndex: typeof track['ff-index'] === 'number' ? track['ff-index'] : null
       }
     ]
   })

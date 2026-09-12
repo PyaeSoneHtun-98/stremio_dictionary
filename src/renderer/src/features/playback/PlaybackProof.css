@@ -16,7 +16,8 @@
   transform: translateY(-2px);
 }
 
-.playback-proof-header {
+.playback-proof-header,
+.subtitle-diagnostic-header {
   display: flex;
   gap: 20px;
   align-items: center;
@@ -41,16 +42,20 @@
   text-transform: uppercase;
 }
 
-.status-playing {
+.status-playing,
+.subtitle-status-ready {
   color: #9de6b0;
 }
 
-.status-paused {
+.status-paused,
+.subtitle-status-extracting {
   color: #f2d59b;
 }
 
 .status-error,
-.status-unavailable {
+.status-unavailable,
+.subtitle-status-error,
+.subtitle-status-unsupported {
   color: #ffaaa8;
 }
 
@@ -93,6 +98,10 @@
   color: #8f96a7;
   font-size: 0.84rem;
   line-height: 1.6;
+}
+
+.playback-help code {
+  color: #c9c0ff;
 }
 
 .media-error {
@@ -140,6 +149,76 @@
   font-size: 0.9rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.subtitle-diagnostic {
+  margin-top: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.subtitle-diagnostic-header strong {
+  display: block;
+  margin-top: 7px;
+  color: #f5f7fb;
+  font-size: 0.9rem;
+}
+
+.active-cue-card {
+  margin-top: 16px;
+  border: 1px solid rgba(151, 128, 255, 0.22);
+  border-radius: 14px;
+  padding: 16px;
+  background: rgba(124, 92, 255, 0.07);
+}
+
+.active-cue-time {
+  color: #938ba8;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.active-cue-text {
+  margin-top: 10px;
+  color: #f7f8fb;
+  font-size: 1.05rem;
+  font-weight: 650;
+  line-height: 1.55;
+}
+
+.token-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.token-chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.token-chip strong {
+  color: #f5f7fb;
+  font-size: 0.78rem;
+}
+
+.token-chip small {
+  color: #9a91bf;
+  font-size: 0.68rem;
+}
+
+.empty-subtitle-state {
+  margin-top: 16px;
+  color: #777f91;
+  font-size: 0.82rem;
 }
 
 .track-table-wrap {
@@ -196,6 +275,7 @@
 
 @media (max-width: 800px) {
   .playback-proof-header,
+  .subtitle-diagnostic-header,
   .video-dropzone {
     align-items: flex-start;
     flex-direction: column;

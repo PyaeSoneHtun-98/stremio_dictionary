@@ -1,8 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { basename } from 'node:path'
 import { createConnection, type Socket } from 'node:net'
-import type { PlaybackSnapshot } from '../../shared/media'
-import { normalizeMpvTracks } from '../../shared/media'
+import type { MediaTrack, PlaybackSnapshot, SubtitleCue } from '../../shared/media'
+import { createEmptySubtitleModel, normalizeMpvTracks } from '../../shared/media'
+import { SubtitleExtractor } from '../subtitles/SubtitleExtractor'
+import { findActiveCue } from '../subtitles/normalize'
 
 const PIPE_PATH = `\\\\.\\pipe\\subtitle-bridge-mpv-${process.pid}`
 const CONNECT_RETRIES = 50
@@ -22,6 +24,10 @@ export class MpvController {
   private incomingBuffer = ''
   private paused = false
   private readonly expectedExits = new WeakSet<ChildProcess>()
+  private readonly subtitleExtractor = new SubtitleExtractor()
+  private subtitleCues: SubtitleCue[] = []
+  private subtitleExtractionKey: string | null = null
+  private subtitleExtractionVersion = 0
   private state: PlaybackSnapshot = {
     status: 'idle',
     filePath: null,
@@ -31,6 +37,7 @@ export class MpvController {
     volume: 100,
     speed: 1,
     tracks: [],
+    subtitle: createEmptySubtitleModel(),
     error: null
   }
 
@@ -55,6 +62,7 @@ export class MpvController {
 
     try {
       await this.ensureStarted(windowId)
+      this.resetSubtitleExtraction()
       this.paused = false
       this.patchState({
         status: 'loading',
@@ -64,12 +72,11 @@ export class MpvController {
         duration: null,
         speed: 1,
         tracks: [],
+        subtitle: createEmptySubtitleModel(),
         error: null
       })
       this.sendCommand(['set_property', 'speed', 1])
       this.sendCommand(['loadfile', filePath, 'replace'])
-      // mpv can transiently leave the replacement file paused while swapping media.
-      // Make every newly opened file start playing so the UI and mpv stay in sync.
       this.sendCommand(['set_property', 'pause', false])
     } catch (error) {
       const message = toUserMessage(error)
@@ -108,6 +115,9 @@ export class MpvController {
   }
 
   dispose(): void {
+    this.subtitleExtractor.dispose()
+    this.subtitleExtractionVersion += 1
+
     const socket = this.socket
     this.socket = null
 
@@ -192,11 +202,7 @@ export class MpvController {
       }
 
       const detail = code !== null ? ` with exit code ${code}` : signal ? ` after signal ${signal}` : ''
-      this.patchState({
-        status: 'error',
-        currentTime: null,
-        error: `mpv exited unexpectedly${detail}. Reopen the video to retry.`
-      })
+      this.failPlayback(`mpv exited unexpectedly${detail}. Reopen the video to retry.`)
     })
 
     let socket: Socket
@@ -250,7 +256,7 @@ export class MpvController {
       }
     }
 
-    this.patchState({ status: 'error', currentTime: null, error: `${message} Reopen the video to retry.` })
+    this.failPlayback(`${message} Reopen the video to retry.`)
   }
 
   private handleChunk(chunk: string): void {
@@ -289,11 +295,7 @@ export class MpvController {
 
       if (message.reason === 'error') {
         const detail = message.error ? ` (${message.error})` : ''
-        this.patchState({
-          status: 'error',
-          currentTime: null,
-          error: `This video could not be played${detail}. Try another MKV file.`
-        })
+        this.failPlayback(`This video could not be played${detail}. Try another MKV file.`)
         return
       }
 
@@ -306,9 +308,16 @@ export class MpvController {
     }
 
     switch (message.name) {
-      case 'time-pos':
-        this.patchState({ currentTime: finiteNumberOrNull(message.data) })
+      case 'time-pos': {
+        const currentTime = finiteNumberOrNull(message.data)
+        const activeCue =
+          this.state.subtitle.status === 'ready' ? findActiveCue(this.subtitleCues, currentTime) : null
+        this.patchState({
+          currentTime,
+          subtitle: { ...this.state.subtitle, activeCue }
+        })
         break
+      }
       case 'duration':
         this.patchState({ duration: finiteNumberOrNull(message.data) })
         break
@@ -332,12 +341,133 @@ export class MpvController {
         }
         break
       }
-      case 'track-list':
-        this.patchState({ tracks: normalizeMpvTracks(message.data) })
+      case 'track-list': {
+        const tracks = normalizeMpvTracks(message.data)
+        this.patchState({ tracks })
+        void this.refreshSubtitleModel(tracks)
         break
+      }
       default:
         break
     }
+  }
+
+  private async refreshSubtitleModel(tracks: MediaTrack[]): Promise<void> {
+    const filePath = this.state.filePath
+    if (!filePath) {
+      return
+    }
+
+    const textTracks = tracks.filter(
+      (track) => track.type === 'subtitle' && track.subtitleKind === 'text' && track.ffIndex !== null
+    )
+    const selectedTrack = chooseSubtitleTrack(textTracks)
+
+    if (!selectedTrack || selectedTrack.ffIndex === null) {
+      this.subtitleExtractor.cancel()
+      this.subtitleCues = []
+      this.subtitleExtractionKey = null
+      this.subtitleExtractionVersion += 1
+      const subtitleTracks = tracks.filter((track) => track.type === 'subtitle')
+      this.patchState({
+        subtitle: {
+          ...createEmptySubtitleModel(),
+          status: subtitleTracks.length > 0 ? 'unsupported' : 'idle',
+          error:
+            subtitleTracks.length > 0
+              ? 'No supported embedded text subtitle track was found. Image subtitles are not parsed.'
+              : null
+        }
+      })
+      return
+    }
+
+    const extractionKey = `${filePath}\u0000${selectedTrack.id}\u0000${selectedTrack.ffIndex}`
+    if (this.subtitleExtractionKey === extractionKey) {
+      return
+    }
+
+    this.subtitleExtractionKey = extractionKey
+    this.subtitleCues = []
+    const version = ++this.subtitleExtractionVersion
+    this.patchState({
+      subtitle: {
+        status: 'extracting',
+        trackId: selectedTrack.id,
+        trackLanguage: selectedTrack.language,
+        trackTitle: selectedTrack.title,
+        trackCodec: selectedTrack.codec,
+        cueCount: 0,
+        activeCue: null,
+        error: null
+      }
+    })
+
+    try {
+      const cues = await this.subtitleExtractor.extract(filePath, selectedTrack.ffIndex)
+      if (version !== this.subtitleExtractionVersion || this.subtitleExtractionKey !== extractionKey) {
+        return
+      }
+
+      this.subtitleCues = cues
+      this.patchState({
+        subtitle: {
+          status: 'ready',
+          trackId: selectedTrack.id,
+          trackLanguage: selectedTrack.language,
+          trackTitle: selectedTrack.title,
+          trackCodec: selectedTrack.codec,
+          cueCount: cues.length,
+          activeCue: findActiveCue(cues, this.state.currentTime),
+          error: null
+        }
+      })
+    } catch (error) {
+      if (version !== this.subtitleExtractionVersion || this.subtitleExtractionKey !== extractionKey) {
+        return
+      }
+
+      this.subtitleCues = []
+      this.patchState({
+        subtitle: {
+          status: 'error',
+          trackId: selectedTrack.id,
+          trackLanguage: selectedTrack.language,
+          trackTitle: selectedTrack.title,
+          trackCodec: selectedTrack.codec,
+          cueCount: 0,
+          activeCue: null,
+          error: error instanceof Error ? error.message : 'Could not extract this subtitle track.'
+        }
+      })
+    }
+  }
+
+  private failPlayback(message: string): void {
+    const subtitle = { ...this.state.subtitle, activeCue: null }
+    const subtitleWasActive = subtitle.status === 'extracting' || subtitle.status === 'ready'
+
+    this.resetSubtitleExtraction()
+
+    if (subtitleWasActive) {
+      subtitle.status = 'error'
+      subtitle.cueCount = 0
+      subtitle.error = 'Subtitle processing stopped because playback failed.'
+    }
+
+    this.patchState({
+      status: 'error',
+      currentTime: null,
+      subtitle,
+      error: message
+    })
+  }
+
+  private resetSubtitleExtraction(): void {
+    this.subtitleExtractor.cancel()
+    this.subtitleExtractionVersion += 1
+    this.subtitleExtractionKey = null
+    this.subtitleCues = []
   }
 
   private assertConnected(): void {
@@ -362,6 +492,21 @@ export class MpvController {
     this.state = { ...this.state, ...patch }
     this.onState(this.getState())
   }
+}
+
+function chooseSubtitleTrack(tracks: MediaTrack[]): MediaTrack | null {
+  if (tracks.length === 0) {
+    return null
+  }
+
+  return (
+    tracks.find((track) => {
+      const language = track.language?.toLowerCase()
+      return language === 'eng' || language === 'en' || language?.startsWith('en-')
+    }) ??
+    tracks.find((track) => track.selected) ??
+    tracks[0]
+  )
 }
 
 async function connectToPipe(): Promise<Socket> {
