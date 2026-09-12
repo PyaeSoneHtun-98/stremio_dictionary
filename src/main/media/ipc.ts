@@ -1,12 +1,14 @@
 import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron'
 import type { PlaybackSnapshot } from '../../shared/media'
 import { MpvController } from './MpvController'
+import { PlaybackSurface } from './PlaybackSurface'
 
 const MEDIA_STATE_CHANNEL = 'media:state'
 const OPEN_VIDEO_CHANNEL = 'media:open-video'
 const GET_STATE_CHANNEL = 'media:get-state'
 
 const controller = new MpvController(broadcastState)
+const playbackSurface = new PlaybackSurface()
 let registered = false
 
 export function registerMediaIpc(): void {
@@ -32,7 +34,8 @@ export function registerMediaIpc(): void {
     }
 
     try {
-      await controller.load(result.filePaths[0])
+      const windowId = await playbackSurface.ensure()
+      await controller.load(result.filePaths[0], windowId)
       return { cancelled: false }
     } catch (error) {
       return {
@@ -47,6 +50,7 @@ export function registerMediaIpc(): void {
 
 export function disposeMediaIpc(): void {
   controller.dispose()
+  playbackSurface.dispose()
 
   if (!registered) {
     return
