@@ -62,8 +62,10 @@ export function PlaybackProof(): React.JSX.Element {
           {opening ? 'Opening…' : 'Open MKV'}
         </button>
         <p>
-          This spike launches mpv as the playback engine and reads its JSON IPC events. mpv must be
-          available on PATH, or <code>MPV_PATH</code> must point to <code>mpv.exe</code>.
+          This spike embeds mpv into a dedicated Electron video surface and places a transparent,
+          clickable HTML overlay above it. Move or resize the video window and click an overlay word
+          to validate the future subtitle architecture. mpv must be available on PATH, or{' '}
+          <code>MPV_PATH</code> must point to <code>mpv.exe</code>.
         </p>
       </div>
 
