@@ -20,6 +20,7 @@ export class MpvController {
   private child: ChildProcess | null = null
   private socket: Socket | null = null
   private incomingBuffer = ''
+  private paused = false
   private readonly expectedExits = new WeakSet<ChildProcess>()
   private state: PlaybackSnapshot = {
     status: 'idle',
@@ -54,6 +55,7 @@ export class MpvController {
 
     try {
       await this.ensureStarted(windowId)
+      this.paused = false
       this.patchState({
         status: 'loading',
         filePath,
@@ -66,6 +68,9 @@ export class MpvController {
       })
       this.sendCommand(['set_property', 'speed', 1])
       this.sendCommand(['loadfile', filePath, 'replace'])
+      // mpv can transiently leave the replacement file paused while swapping media.
+      // Make every newly opened file start playing so the UI and mpv stay in sync.
+      this.sendCommand(['set_property', 'pause', false])
     } catch (error) {
       const message = toUserMessage(error)
       this.patchState({ status: 'unavailable', currentTime: null, error: message })
@@ -273,7 +278,7 @@ export class MpvController {
     }
 
     if (message.event === 'file-loaded') {
-      this.patchState({ status: 'playing', error: null })
+      this.patchState({ status: this.paused ? 'paused' : 'playing', error: null })
       return
     }
 
@@ -309,6 +314,7 @@ export class MpvController {
         break
       case 'pause':
         if (typeof message.data === 'boolean' && this.state.filePath) {
+          this.paused = message.data
           this.patchState({ status: message.data ? 'paused' : 'playing' })
         }
         break
