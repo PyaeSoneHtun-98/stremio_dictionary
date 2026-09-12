@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { PlaybackSnapshot } from '../../../shared/media'
+import type { PlaybackSnapshot } from '../../../../shared/media'
 import './OverlayProbe.css'
 
 const EMPTY_STATE: PlaybackSnapshot = {
