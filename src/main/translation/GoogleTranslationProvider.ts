@@ -12,6 +12,10 @@ interface GoogleTranslateResponse {
   }
 }
 
+/**
+ * Optional network-backed adapter kept behind the provider boundary.
+ * Subtitle Bridge uses LocalDictionaryProvider by default and does not require Google Cloud.
+ */
 export class GoogleTranslationProvider implements TranslationProvider {
   readonly id = 'google'
 
