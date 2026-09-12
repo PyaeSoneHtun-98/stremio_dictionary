@@ -125,9 +125,19 @@ export class MpvController {
     })
 
     this.child = child
-    this.socket = await connectToPipe()
+
+    try {
+      this.socket = await connectToPipe()
+    } catch (error) {
+      if (!child.killed) {
+        child.kill()
+      }
+      this.child = null
+      throw error
+    }
+
     this.socket.setEncoding('utf8')
-    this.socket.on('data', (chunk) => this.handleChunk(chunk))
+    this.socket.on('data', (chunk) => this.handleChunk(chunk.toString()))
     this.socket.on('close', () => {
       this.socket = null
     })
