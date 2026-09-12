@@ -12,6 +12,11 @@ export class LocalDictionaryProvider implements TranslationProvider {
       throw new Error('Choose a subtitle word to translate.')
     }
 
+    const targetLanguage = request.targetLanguage ?? 'my'
+    if (targetLanguage !== 'my') {
+      throw new Error('The offline dictionary currently supports Burmese (my) only.')
+    }
+
     const lookupWord = normalizeLookupWord(originalWord)
     const entry = this.index.get(lookupWord)
     if (!entry) {
@@ -22,7 +27,8 @@ export class LocalDictionaryProvider implements TranslationProvider {
       originalWord,
       translation: entry.translation,
       ...(entry.pronunciation ? { pronunciation: entry.pronunciation } : {}),
-      provider: this.id
+      provider: this.id,
+      targetLanguage
     }
   }
 }
