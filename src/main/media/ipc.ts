@@ -17,12 +17,15 @@ export function registerMediaIpc(): void {
   registered = true
 
   ipcMain.handle(OPEN_VIDEO_CHANNEL, async (event) => {
-    const parentWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
-    const result = await dialog.showOpenDialog(parentWindow, {
+    const parentWindow = BrowserWindow.fromWebContents(event.sender)
+    const options = {
       title: 'Open MKV video',
-      properties: ['openFile'],
+      properties: ['openFile'] as const,
       filters: [{ name: 'Matroska video', extensions: ['mkv'] }]
-    })
+    }
+    const result = parentWindow
+      ? await dialog.showOpenDialog(parentWindow, options)
+      : await dialog.showOpenDialog(options)
 
     if (result.canceled || result.filePaths.length === 0) {
       return { cancelled: true }
