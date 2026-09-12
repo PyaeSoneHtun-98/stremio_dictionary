@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
+import { disposeMediaIpc, registerMediaIpc } from './media/ipc'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -28,6 +29,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  registerMediaIpc()
   createWindow()
 
   app.on('activate', () => {
@@ -35,6 +37,10 @@ app.whenReady().then(() => {
       createWindow()
     }
   })
+})
+
+app.on('before-quit', () => {
+  disposeMediaIpc()
 })
 
 app.on('window-all-closed', () => {
