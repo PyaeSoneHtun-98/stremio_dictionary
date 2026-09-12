@@ -21,11 +21,11 @@ This repository is currently implementing the MVP issue-by-issue. Issue #1 estab
 ## Getting started
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-The dev command starts the Vite renderer and launches the Electron window.
+Use `npm ci` for reproducible installs from the committed lockfile. The dev command starts the Vite renderer and launches the Electron window.
 
 ## Validation commands
 
