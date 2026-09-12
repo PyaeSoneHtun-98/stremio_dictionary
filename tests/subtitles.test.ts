@@ -31,6 +31,38 @@ describe('parseSrtCues', () => {
     expect(parseSrtCues('bad subtitle data')).toEqual([])
     expect(parseSrtCues('1\n00:00:03,000 --> 00:00:02,000\nBackwards')).toEqual([])
   })
+
+  it('rejects subtitle models that exceed the configured cue limit', () => {
+    expect(() =>
+      parseSrtCues(SAMPLE_SRT, {
+        maxCues: 1,
+        maxTokens: 100,
+        maxSourceLines: 100
+      })
+    ).toThrow('safe cue limit')
+  })
+
+  it('rejects subtitle models that exceed the configured token limit', () => {
+    const source = '1\n00:00:01,000 --> 00:00:03,000\none two three'
+
+    expect(() =>
+      parseSrtCues(source, {
+        maxCues: 10,
+        maxTokens: 2,
+        maxSourceLines: 100
+      })
+    ).toThrow('safe token limit')
+  })
+
+  it('rejects subtitle sources that exceed the configured line limit before model allocation', () => {
+    expect(() =>
+      parseSrtCues(SAMPLE_SRT, {
+        maxCues: 100,
+        maxTokens: 100,
+        maxSourceLines: 3
+      })
+    ).toThrow('safe line limit')
+  })
 })
 
 describe('lookup normalization', () => {
