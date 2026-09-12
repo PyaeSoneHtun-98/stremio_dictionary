@@ -4,10 +4,19 @@
   border-radius: 22px;
   padding: 28px;
   background: rgba(255, 255, 255, 0.025);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
 }
 
-.playback-proof-header,
-.playback-proof-actions {
+.playback-proof.is-dragging {
+  border-color: rgba(151, 128, 255, 0.72);
+  background: rgba(108, 82, 232, 0.08);
+  transform: translateY(-2px);
+}
+
+.playback-proof-header {
   display: flex;
   gap: 20px;
   align-items: center;
@@ -36,26 +45,54 @@
   color: #9de6b0;
 }
 
+.status-paused {
+  color: #f2d59b;
+}
+
 .status-error,
 .status-unavailable {
   color: #ffaaa8;
 }
 
-.playback-proof-actions {
-  justify-content: flex-start;
+.video-dropzone {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  justify-content: space-between;
   margin-top: 26px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.14);
 }
 
-.playback-proof-actions p {
-  max-width: 720px;
-  margin: 0;
+.is-dragging .video-dropzone {
+  border-color: rgba(162, 143, 255, 0.84);
+  background: rgba(124, 92, 255, 0.1);
+}
+
+.video-dropzone strong,
+.video-dropzone span {
+  display: block;
+}
+
+.video-dropzone strong {
+  color: #f5f7fb;
+  font-size: 0.96rem;
+}
+
+.video-dropzone span {
+  margin-top: 5px;
+  color: #7f8798;
+  font-size: 0.8rem;
+}
+
+.playback-help {
+  max-width: 790px;
+  margin: 14px 0 0;
   color: #8f96a7;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   line-height: 1.6;
-}
-
-.playback-proof-actions code {
-  color: #c9c0ff;
 }
 
 .media-error {
@@ -70,7 +107,7 @@
 
 .playback-metrics {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-top: 24px;
 }
@@ -147,15 +184,33 @@
   text-align: center;
 }
 
+@media (max-width: 980px) {
+  .playback-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .metric-card:first-child {
+    grid-column: span 2;
+  }
+}
+
 @media (max-width: 800px) {
   .playback-proof-header,
-  .playback-proof-actions {
+  .video-dropzone {
     align-items: flex-start;
     flex-direction: column;
   }
 
+  .video-dropzone .primary-action {
+    width: 100%;
+  }
+
   .playback-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric-card:first-child {
+    grid-column: span 2;
   }
 }
 
@@ -166,5 +221,9 @@
 
   .playback-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .metric-card:first-child {
+    grid-column: auto;
   }
 }

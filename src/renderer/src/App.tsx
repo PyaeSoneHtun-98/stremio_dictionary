@@ -21,7 +21,7 @@ export function App(): React.JSX.Element {
         </p>
         <div className="hero-actions">
           <span className="build-note">
-            Issue #2 is validating the media pipeline before the polished player UI is built.
+            Issue #3 is turning the validated media engine into a usable local video player.
           </span>
         </div>
       </section>
@@ -31,7 +31,7 @@ export function App(): React.JSX.Element {
       <section className="foundation" aria-labelledby="foundation-title">
         <div>
           <span className="eyebrow">MVP architecture</span>
-          <h2 id="foundation-title">Media first, then interactive subtitles and translation</h2>
+          <h2 id="foundation-title">Media controls now, synchronized subtitles next</h2>
         </div>
         <div className="runtime-pill" title="Provided through the secure preload bridge">
           Runtime: {window.desktop.platform}

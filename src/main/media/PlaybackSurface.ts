@@ -28,7 +28,7 @@ export class PlaybackSurface {
       show: false,
       autoHideMenuBar: true,
       backgroundColor: '#000000',
-      title: 'Subtitle Bridge Video Surface POC'
+      title: 'Subtitle Bridge Player'
     })
 
     const overlayWindow = new BrowserWindow({
@@ -61,6 +61,8 @@ export class PlaybackSurface {
     hostWindow.on('maximize', syncOverlay)
     hostWindow.on('unmaximize', syncOverlay)
     hostWindow.on('restore', syncOverlay)
+    hostWindow.on('enter-full-screen', syncOverlay)
+    hostWindow.on('leave-full-screen', syncOverlay)
     hostWindow.on('focus', () => {
       if (!overlayWindow.isDestroyed()) {
         overlayWindow.moveTop()
@@ -93,6 +95,15 @@ export class PlaybackSurface {
     overlayWindow.moveTop()
 
     return getWin32WindowId(hostWindow)
+  }
+
+  toggleFullscreen(): void {
+    const hostWindow = this.hostWindow
+    if (!hostWindow || hostWindow.isDestroyed()) {
+      throw new Error('Open a video before entering fullscreen.')
+    }
+
+    hostWindow.setFullScreen(!hostWindow.isFullScreen())
   }
 
   dispose(): void {
@@ -142,7 +153,7 @@ async function loadOverlayRenderer(window: BrowserWindow): Promise<void> {
 
 function getWin32WindowId(window: BaseWindow): string {
   if (process.platform !== 'win32') {
-    throw new Error('The playback surface proof of concept currently supports Windows only.')
+    throw new Error('The playback surface currently supports Windows only.')
   }
 
   const handle = window.getNativeWindowHandle()

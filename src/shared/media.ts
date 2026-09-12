@@ -26,6 +26,8 @@ export interface PlaybackSnapshot {
   fileName: string | null
   currentTime: number | null
   duration: number | null
+  volume: number
+  speed: number
   tracks: MediaTrack[]
   error: string | null
 }
@@ -39,7 +41,14 @@ export interface DesktopBridge {
   platform: string
   media: {
     openVideo: () => Promise<OpenVideoResult>
+    openVideoPath: (filePath: string) => Promise<OpenVideoResult>
+    getPathForFile: (file: unknown) => string
     getState: () => Promise<PlaybackSnapshot>
+    setPaused: (paused: boolean) => Promise<void>
+    seek: (seconds: number) => Promise<void>
+    setVolume: (volume: number) => Promise<void>
+    setSpeed: (speed: number) => Promise<void>
+    toggleFullscreen: () => Promise<void>
     onState: (listener: (state: PlaybackSnapshot) => void) => () => void
   }
 }

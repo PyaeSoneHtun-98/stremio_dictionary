@@ -12,12 +12,15 @@ interface MpvEvent {
   event?: string
   name?: string
   data?: unknown
+  reason?: string
+  error?: string
 }
 
 export class MpvController {
   private child: ChildProcess | null = null
   private socket: Socket | null = null
   private incomingBuffer = ''
+  private paused = false
   private readonly expectedExits = new WeakSet<ChildProcess>()
   private state: PlaybackSnapshot = {
     status: 'idle',
@@ -25,6 +28,8 @@ export class MpvController {
     fileName: null,
     currentTime: null,
     duration: null,
+    volume: 100,
+    speed: 1,
     tracks: [],
     error: null
   }
@@ -50,21 +55,56 @@ export class MpvController {
 
     try {
       await this.ensureStarted(windowId)
+      this.paused = false
       this.patchState({
         status: 'loading',
         filePath,
         fileName: basename(filePath),
         currentTime: 0,
         duration: null,
+        speed: 1,
         tracks: [],
         error: null
       })
+      this.sendCommand(['set_property', 'speed', 1])
       this.sendCommand(['loadfile', filePath, 'replace'])
+      // mpv can transiently leave the replacement file paused while swapping media.
+      // Make every newly opened file start playing so the UI and mpv stay in sync.
+      this.sendCommand(['set_property', 'pause', false])
     } catch (error) {
       const message = toUserMessage(error)
       this.patchState({ status: 'unavailable', currentTime: null, error: message })
       throw error
     }
+  }
+
+  setPaused(paused: boolean): void {
+    this.assertControllable()
+
+    if (!paused && this.state.status === 'ended') {
+      this.sendCommand(['seek', 0, 'absolute+exact'])
+    }
+
+    this.sendCommand(['set_property', 'pause', paused])
+  }
+
+  seek(seconds: number): void {
+    this.assertControllable()
+    const upperBound = this.state.duration ?? Number.MAX_SAFE_INTEGER
+    const target = Math.min(Math.max(seconds, 0), upperBound)
+    this.sendCommand(['seek', target, 'absolute+exact'])
+  }
+
+  setVolume(volume: number): void {
+    this.assertConnected()
+    const nextVolume = Math.min(Math.max(volume, 0), 100)
+    this.sendCommand(['set_property', 'volume', nextVolume])
+  }
+
+  setSpeed(speed: number): void {
+    this.assertControllable()
+    const nextSpeed = Math.min(Math.max(speed, 0.25), 3)
+    this.sendCommand(['set_property', 'speed', nextSpeed])
   }
 
   dispose(): void {
@@ -188,6 +228,8 @@ export class MpvController {
     this.sendCommand(['observe_property', 3, 'duration'])
     this.sendCommand(['observe_property', 4, 'track-list'])
     this.sendCommand(['observe_property', 5, 'path'])
+    this.sendCommand(['observe_property', 6, 'volume'])
+    this.sendCommand(['observe_property', 7, 'speed'])
   }
 
   private handleSocketFailure(socket: Socket, child: ChildProcess, message: string): void {
@@ -236,11 +278,25 @@ export class MpvController {
     }
 
     if (message.event === 'file-loaded') {
-      this.patchState({ status: 'playing', error: null })
+      this.patchState({ status: this.paused ? 'paused' : 'playing', error: null })
       return
     }
 
     if (message.event === 'end-file') {
+      if (message.reason === 'stop') {
+        return
+      }
+
+      if (message.reason === 'error') {
+        const detail = message.error ? ` (${message.error})` : ''
+        this.patchState({
+          status: 'error',
+          currentTime: null,
+          error: `This video could not be played${detail}. Try another MKV file.`
+        })
+        return
+      }
+
       this.patchState({ status: 'ended' })
       return
     }
@@ -258,9 +314,24 @@ export class MpvController {
         break
       case 'pause':
         if (typeof message.data === 'boolean' && this.state.filePath) {
+          this.paused = message.data
           this.patchState({ status: message.data ? 'paused' : 'playing' })
         }
         break
+      case 'volume': {
+        const volume = finiteNumberOrNull(message.data)
+        if (volume !== null) {
+          this.patchState({ volume: Math.min(Math.max(volume, 0), 100) })
+        }
+        break
+      }
+      case 'speed': {
+        const speed = finiteNumberOrNull(message.data)
+        if (speed !== null) {
+          this.patchState({ speed })
+        }
+        break
+      }
       case 'track-list':
         this.patchState({ tracks: normalizeMpvTracks(message.data) })
         break
@@ -269,12 +340,22 @@ export class MpvController {
     }
   }
 
-  private sendCommand(command: unknown[]): void {
+  private assertConnected(): void {
     if (!this.socket || this.socket.destroyed) {
-      throw new Error('mpv IPC is not connected')
+      throw new Error('The player is not connected. Reopen the video to retry.')
     }
+  }
 
-    this.socket.write(`${JSON.stringify({ command })}\n`)
+  private assertControllable(): void {
+    this.assertConnected()
+    if (!this.state.filePath) {
+      throw new Error('Open a video before using playback controls.')
+    }
+  }
+
+  private sendCommand(command: unknown[]): void {
+    this.assertConnected()
+    this.socket?.write(`${JSON.stringify({ command })}\n`)
   }
 
   private patchState(patch: Partial<PlaybackSnapshot>): void {
