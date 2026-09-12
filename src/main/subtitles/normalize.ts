@@ -4,16 +4,34 @@ const TIMING_LINE =
   /^(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})\s+-->\s+(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})(?:\s+.*)?$/
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu
 
-export function parseSrtCues(source: string): SubtitleCue[] {
+export interface SubtitleParseLimits {
+  maxCues: number
+  maxTokens: number
+  maxSourceLines: number
+}
+
+export const DEFAULT_SUBTITLE_PARSE_LIMITS: SubtitleParseLimits = {
+  maxCues: 50_000,
+  maxTokens: 500_000,
+  maxSourceLines: 250_000
+}
+
+export function parseSrtCues(
+  source: string,
+  limits: SubtitleParseLimits = DEFAULT_SUBTITLE_PARSE_LIMITS
+): SubtitleCue[] {
+  validateParseLimits(limits)
+  assertSourceLineLimit(source, limits.maxSourceLines)
+
   const normalized = source.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').trim()
   if (!normalized) {
     return []
   }
 
   const cues: SubtitleCue[] = []
-  const blocks = normalized.split(/\n{2,}/)
+  let tokenCount = 0
 
-  for (const block of blocks) {
+  for (const block of iterateSrtBlocks(normalized)) {
     const lines = block.split('\n')
     const timingIndex = lines.findIndex((line) => TIMING_LINE.test(line.trim()))
     if (timingIndex < 0) {
@@ -41,20 +59,34 @@ export function parseSrtCues(source: string): SubtitleCue[] {
       continue
     }
 
+    if (cues.length >= limits.maxCues) {
+      throw new Error(`Subtitle track exceeds the safe cue limit of ${limits.maxCues}.`)
+    }
+
+    const tokens = tokenizeSubtitleText(text, limits.maxTokens - tokenCount)
+    tokenCount += tokens.length
+
     cues.push({
       id: `${startTime.toFixed(3)}-${endTime.toFixed(3)}-${cues.length}`,
       startTime,
       endTime,
       text,
       lines: text.split('\n'),
-      tokens: tokenizeSubtitleText(text)
+      tokens
     })
   }
 
   return cues.sort((left, right) => left.startTime - right.startTime || left.endTime - right.endTime)
 }
 
-export function tokenizeSubtitleText(text: string): SubtitleToken[] {
+export function tokenizeSubtitleText(
+  text: string,
+  maxTokens = Number.POSITIVE_INFINITY
+): SubtitleToken[] {
+  if (Number.isNaN(maxTokens) || maxTokens < 0) {
+    throw new Error('Subtitle token limit must be zero or greater.')
+  }
+
   const tokens: SubtitleToken[] = []
 
   for (const match of text.matchAll(WORD_PATTERN)) {
@@ -67,6 +99,10 @@ export function tokenizeSubtitleText(text: string): SubtitleToken[] {
     const lookupTerm = normalizeLookupTerm(value)
     if (!lookupTerm) {
       continue
+    }
+
+    if (tokens.length >= maxTokens) {
+      throw new Error('Subtitle track exceeds the safe token limit.')
     }
 
     tokens.push({
@@ -120,6 +156,45 @@ export function findActiveCue(cues: SubtitleCue[], time: number | null): Subtitl
   }
 
   return null
+}
+
+function* iterateSrtBlocks(source: string): Generator<string> {
+  const separator = /\n{2,}/g
+  let start = 0
+  let match = separator.exec(source)
+
+  while (match) {
+    yield source.slice(start, match.index)
+    start = match.index + match[0].length
+    match = separator.exec(source)
+  }
+
+  yield source.slice(start)
+}
+
+function assertSourceLineLimit(source: string, maxSourceLines: number): void {
+  if (!source) {
+    return
+  }
+
+  let lineCount = 1
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source.charCodeAt(index)
+    if (character === 10 || (character === 13 && source.charCodeAt(index + 1) !== 10)) {
+      lineCount += 1
+      if (lineCount > maxSourceLines) {
+        throw new Error(`Subtitle track exceeds the safe line limit of ${maxSourceLines}.`)
+      }
+    }
+  }
+}
+
+function validateParseLimits(limits: SubtitleParseLimits): void {
+  for (const [name, value] of Object.entries(limits)) {
+    if (!Number.isSafeInteger(value) || value < 1) {
+      throw new Error(`Subtitle parse limit ${name} must be a positive safe integer.`)
+    }
+  }
 }
 
 function timestampToSeconds(parts: string[]): number {
