@@ -1,7 +1,11 @@
 /// <reference types="vite/client" />
 
-interface Window {
-  desktop: {
-    platform: string
+import type { DesktopBridge } from '../../shared/media'
+
+declare global {
+  interface Window {
+    desktop: DesktopBridge
   }
 }
+
+export {}
