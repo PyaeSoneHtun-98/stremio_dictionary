@@ -66,6 +66,21 @@ export function OverlayProbe(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
+    const clearRememberedFocus = (): void => {
+      const activeElement = document.activeElement
+      if (activeElement instanceof HTMLElement) {
+        activeElement.blur()
+      }
+    }
+
+    // The transparent overlay loses window focus when the user clicks through to mpv.
+    // Chromium otherwise remembers the last focused control (often the seek slider), so
+    // the next native Tab re-entry resumes there instead of starting at the subtitle words.
+    window.addEventListener('blur', clearRememberedFocus)
+    return () => window.removeEventListener('blur', clearRememberedFocus)
+  }, [])
+
+  useEffect(() => {
     const handleKeyboardEntry = (event: KeyboardEvent): void => {
       if (
         event.key !== 'Tab' ||
