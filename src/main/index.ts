@@ -2,6 +2,11 @@ import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { disposeMediaIpc, registerMediaIpc } from './media/ipc'
 
+// On some Windows x64 systems, Chromium's accelerated transparent windows render their
+// transparent region as black. The subtitle overlay is a transparent BrowserWindow above mpv's
+// independently accelerated D3D11 child window, so software-composite the Electron UI only.
+app.disableHardwareAcceleration()
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1200,
