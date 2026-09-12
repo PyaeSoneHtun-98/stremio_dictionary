@@ -1,5 +1,6 @@
 import { AppShell } from './components/AppShell'
 import { featureAreas } from './features'
+import { PlaybackProof } from './features/playback/PlaybackProof'
 
 export function App(): React.JSX.Element {
   return (
@@ -12,17 +13,18 @@ export function App(): React.JSX.Element {
           the video keeps its place.
         </p>
         <div className="hero-actions">
-          <button type="button" className="primary-action" disabled>
-            Open video
-          </button>
-          <span className="build-note">Playback arrives in Issue #2.</span>
+          <span className="build-note">
+            Issue #2 is validating the media pipeline before the polished player UI is built.
+          </span>
         </div>
       </section>
 
+      <PlaybackProof />
+
       <section className="foundation" aria-labelledby="foundation-title">
         <div>
-          <span className="eyebrow">Issue #1</span>
-          <h2 id="foundation-title">Foundation ready for the media pipeline</h2>
+          <span className="eyebrow">MVP architecture</span>
+          <h2 id="foundation-title">Media first, then interactive subtitles and translation</h2>
         </div>
         <div className="runtime-pill" title="Provided through the secure preload bridge">
           Runtime: {window.desktop.platform}
