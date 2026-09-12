@@ -1,6 +1,7 @@
 export interface TranslationRequest {
   word: string
   context?: string
+  targetLanguage?: string
 }
 
 export interface TranslationResult {
@@ -8,4 +9,5 @@ export interface TranslationResult {
   translation: string
   pronunciation?: string
   provider: string
+  targetLanguage: string
 }
