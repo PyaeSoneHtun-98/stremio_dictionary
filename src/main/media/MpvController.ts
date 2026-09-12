@@ -35,7 +35,7 @@ export class MpvController {
     return structuredClone(this.state)
   }
 
-  async load(filePath: string, windowId: number): Promise<void> {
+  async load(filePath: string, windowId: string): Promise<void> {
     if (process.platform !== 'win32') {
       this.patchState({
         status: 'unavailable',
@@ -44,7 +44,7 @@ export class MpvController {
       throw new Error('Windows-only playback proof of concept')
     }
 
-    if (!Number.isInteger(windowId) || windowId <= 0) {
+    if (!/^\d+$/.test(windowId) || windowId === '0') {
       throw new Error('A valid Windows playback surface is required.')
     }
 
@@ -91,7 +91,7 @@ export class MpvController {
     }
   }
 
-  private async ensureStarted(windowId: number): Promise<void> {
+  private async ensureStarted(windowId: string): Promise<void> {
     if (this.child && this.socket && !this.socket.destroyed) {
       return
     }
@@ -105,7 +105,7 @@ export class MpvController {
         '--sid=no',
         '--no-terminal',
         '--no-osc',
-        `--wid=${windowId >>> 0}`,
+        `--wid=${windowId}`,
         `--input-ipc-server=${PIPE_PATH}`
       ],
       {
