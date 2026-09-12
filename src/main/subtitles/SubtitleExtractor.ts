@@ -91,7 +91,18 @@ export class SubtitleExtractor {
             return
           }
 
-          const cues = parseSrtCues(Buffer.concat(stdout).toString('utf8'))
+          let cues: SubtitleCue[]
+          try {
+            cues = parseSrtCues(Buffer.concat(stdout).toString('utf8'))
+          } catch (error) {
+            reject(
+              error instanceof Error
+                ? error
+                : new Error('The subtitle track could not be parsed safely.')
+            )
+            return
+          }
+
           if (cues.length === 0) {
             reject(new Error('No readable text subtitle cues were found in this track.'))
             return
