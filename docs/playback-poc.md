@@ -30,6 +30,19 @@ npm run dev
 
 No mpv binary is committed to the repository in this issue.
 
+## Embedding diagnostics
+
+The current Windows black-surface investigation keeps the documented `--wid` contract unchanged: mpv receives the Electron host HWND as an unsigned 32-bit value and creates its own child video window. Do not truncate or reinterpret it as a 64-bit pointer.
+
+To capture the mpv windowing and D3D11 video-output decision without changing renderer flags, set `MPV_LOG_FILE` to an absolute writable path before starting the app:
+
+```powershell
+$env:MPV_LOG_FILE = "$env:TEMP\\subtitle-bridge-mpv.log"
+npm run dev
+```
+
+After reproducing the black surface, attach that log. It includes the Win32 window backend and GPU/D3D11 initialization messages needed to distinguish an invalid parent window from a video-output or composition failure.
+
 ## Manual validation
 
 1. Run `npm ci`.
