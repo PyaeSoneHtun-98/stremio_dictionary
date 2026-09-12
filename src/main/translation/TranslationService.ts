@@ -2,7 +2,11 @@ import type { TranslationProviderId } from '../../shared/settings'
 import type { TranslationRequest, TranslationResult } from '../../shared/translation'
 import { GoogleTranslationProvider } from './GoogleTranslationProvider'
 import { LocalDictionaryProvider } from './LocalDictionaryProvider'
-import { TranslationCache, normalizeCacheWord } from './TranslationCache'
+import {
+  TranslationCache,
+  normalizeCacheWord,
+  serializeTranslationCacheKey
+} from './TranslationCache'
 import type { TranslationProvider } from './TranslationProvider'
 
 export interface TranslationRuntimeSettings {
@@ -19,7 +23,14 @@ export type TranslationProviderFactory = (
   settings: TranslationRuntimeSettings
 ) => TranslationProvider
 
+interface PendingLookup {
+  generation: number
+  promise: Promise<TranslationResult>
+}
+
 export class TranslationService {
+  private readonly pendingLookups = new Map<string, PendingLookup>()
+
   constructor(
     private readonly settingsSource: TranslationRuntimeSettingsSource,
     private readonly cache = new TranslationCache(),
@@ -43,17 +54,48 @@ export class TranslationService {
       }
     }
 
+    const generation = this.cache.generation
+    const pendingKey = serializeTranslationCacheKey(cacheKey)
+    const existingPending = this.pendingLookups.get(pendingKey)
+
+    if (existingPending?.generation === generation) {
+      const result = await existingPending.promise
+      return {
+        ...result,
+        originalWord: request.word.trim()
+      }
+    }
+
     const provider = this.providerFactory(settings)
-    const result = await provider.translate({
-      ...request,
-      targetLanguage: settings.targetLanguage
-    })
-    this.cache.set(cacheKey, result)
-    return result
+    let lookupPromise: Promise<TranslationResult>
+    lookupPromise = provider
+      .translate({
+        ...request,
+        targetLanguage: settings.targetLanguage
+      })
+      .then((result) => {
+        this.cache.setIfCurrent(cacheKey, result, generation)
+        return result
+      })
+      .finally(() => {
+        const currentPending = this.pendingLookups.get(pendingKey)
+        if (currentPending?.promise === lookupPromise) {
+          this.pendingLookups.delete(pendingKey)
+        }
+      })
+
+    this.pendingLookups.set(pendingKey, { generation, promise: lookupPromise })
+
+    const result = await lookupPromise
+    return {
+      ...result,
+      originalWord: request.word.trim()
+    }
   }
 
   clearCache(): void {
     this.cache.clear()
+    this.pendingLookups.clear()
   }
 
   get cacheSize(): number {
