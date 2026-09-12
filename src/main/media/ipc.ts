@@ -109,7 +109,7 @@ async function validateMkvFile(filePath: string): Promise<void> {
     throw new Error('Subtitle Bridge currently supports MKV files only.')
   }
 
-  let fileStats
+  let fileStats: Awaited<ReturnType<typeof stat>>
   try {
     fileStats = await stat(filePath)
   } catch {
