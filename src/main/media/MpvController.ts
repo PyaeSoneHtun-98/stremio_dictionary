@@ -100,11 +100,16 @@ export class MpvController {
     const child = spawn(
       executable,
       [
+        '--no-config',
         '--idle=yes',
         '--keep-open=yes',
         '--sid=no',
         '--no-terminal',
         '--no-osc',
+        '--vo=gpu',
+        '--gpu-api=d3d11',
+        '--gpu-context=d3d11',
+        '--hwdec=no',
         `--wid=${windowId}`,
         `--input-ipc-server=${PIPE_PATH}`
       ],
