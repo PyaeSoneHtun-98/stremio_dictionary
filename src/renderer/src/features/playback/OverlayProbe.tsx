@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PlaybackSnapshot } from '../../../../shared/media'
+import { createEmptySubtitleModel } from '../../../../shared/media'
 import './OverlayProbe.css'
 
 const EMPTY_STATE: PlaybackSnapshot = {
@@ -11,6 +12,7 @@ const EMPTY_STATE: PlaybackSnapshot = {
   volume: 100,
   speed: 1,
   tracks: [],
+  subtitle: createEmptySubtitleModel(),
   error: null
 }
 
