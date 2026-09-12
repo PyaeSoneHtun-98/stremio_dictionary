@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PlaybackSnapshot, SubtitleToken } from '../../../../shared/media'
+import type { MediaTrack, PlaybackSnapshot, SubtitleToken } from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
 import './OverlayProbe.css'
 import { segmentSubtitleCue } from './subtitleSegments'
@@ -73,9 +73,6 @@ export function OverlayProbe(): React.JSX.Element {
       }
     }
 
-    // The transparent overlay loses window focus when the user clicks through to mpv.
-    // Chromium otherwise remembers the last focused control (often the seek slider), so
-    // the next native Tab re-entry resumes there instead of starting at the subtitle words.
     window.addEventListener('blur', clearRememberedFocus)
     return () => window.removeEventListener('blur', clearRememberedFocus)
   }, [])
@@ -122,6 +119,9 @@ export function OverlayProbe(): React.JSX.Element {
   const currentTime = Math.min(state.currentTime ?? 0, duration || Number.MAX_SAFE_INTEGER)
   const activeCue = state.subtitle.activeCue
   const subtitleSegments = activeCue ? segmentSubtitleCue(activeCue) : []
+  const subtitleTracks = state.tracks.filter((track) => track.type === 'subtitle')
+  const supportedSubtitleTracks = subtitleTracks.filter(isSelectableSubtitleTrack)
+  const canChangeSubtitleTrack = state.status === 'paused' && supportedSubtitleTracks.length > 0
 
   const runControl = async (action: () => Promise<void>): Promise<void> => {
     setControlError(null)
@@ -192,6 +192,8 @@ export function OverlayProbe(): React.JSX.Element {
           </div>
         ) : state.subtitle.status === 'extracting' ? (
           <div className="subtitle-transient-status">Loading subtitles…</div>
+        ) : state.subtitle.error ? (
+          <div className="subtitle-transient-status subtitle-transient-warning">{state.subtitle.error}</div>
         ) : null}
       </section>
 
@@ -248,6 +250,30 @@ export function OverlayProbe(): React.JSX.Element {
             <strong>{Math.round(state.volume)}%</strong>
           </label>
 
+          <label className="subtitle-track-control" title={subtitleControlTitle(state, subtitleTracks)}>
+            <span>Subtitles</span>
+            <select
+              aria-label="Embedded subtitle track"
+              value={state.subtitle.trackId === null ? '' : String(state.subtitle.trackId)}
+              disabled={!canChangeSubtitleTrack}
+              onChange={(event) => {
+                const trackId = Number(event.currentTarget.value)
+                void runControl(() => window.desktop.media.selectSubtitleTrack(trackId))
+              }}
+            >
+              {supportedSubtitleTracks.length === 0 ? <option value="">No text tracks</option> : null}
+              {subtitleTracks.map((track) => (
+                <option
+                  value={track.id}
+                  key={track.id}
+                  disabled={!isSelectableSubtitleTrack(track)}
+                >
+                  {formatSubtitleTrack(track)}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <label className="speed-control">
             <span>Speed</span>
             <select
@@ -279,6 +305,28 @@ export function OverlayProbe(): React.JSX.Element {
       </div>
     </main>
   )
+}
+
+function isSelectableSubtitleTrack(track: MediaTrack): boolean {
+  return track.subtitleKind === 'text' && track.ffIndex !== null
+}
+
+function formatSubtitleTrack(track: MediaTrack): string {
+  const language = track.language ?? 'und'
+  const title = track.title ? ` · ${track.title}` : ''
+  const codec = track.codec ?? 'unknown'
+  const unsupported = isSelectableSubtitleTrack(track) ? '' : ' · unsupported'
+  return `${language}${title} · ${codec}${unsupported}`
+}
+
+function subtitleControlTitle(state: PlaybackSnapshot, tracks: MediaTrack[]): string {
+  if (tracks.length === 0) {
+    return 'This file has no embedded subtitle tracks.'
+  }
+  if (state.status !== 'paused') {
+    return 'Pause playback to change subtitle tracks.'
+  }
+  return 'Choose an embedded text subtitle track.'
 }
 
 function formatTime(seconds: number | null): string {
