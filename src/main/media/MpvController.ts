@@ -28,6 +28,7 @@ export class MpvController {
   private subtitleCues: SubtitleCue[] = []
   private subtitleExtractionKey: string | null = null
   private subtitleExtractionVersion = 0
+  private selectedSubtitleTrackId: number | null = null
   private state: PlaybackSnapshot = {
     status: 'idle',
     filePath: null,
@@ -63,6 +64,7 @@ export class MpvController {
     try {
       await this.ensureStarted(windowId)
       this.resetSubtitleExtraction()
+      this.selectedSubtitleTrackId = null
       this.paused = false
       this.patchState({
         status: 'loading',
@@ -112,6 +114,38 @@ export class MpvController {
     this.assertControllable()
     const nextSpeed = Math.min(Math.max(speed, 0.25), 3)
     this.sendCommand(['set_property', 'speed', nextSpeed])
+  }
+
+  async selectSubtitleTrack(trackId: number): Promise<void> {
+    this.assertControllable()
+
+    if (this.state.status !== 'paused') {
+      throw new Error('Pause playback before changing subtitle tracks.')
+    }
+
+    const track = this.state.tracks.find(
+      (candidate) => candidate.type === 'subtitle' && candidate.id === trackId
+    )
+
+    if (!track) {
+      throw new Error('That subtitle track is no longer available.')
+    }
+
+    if (track.subtitleKind !== 'text' || track.ffIndex === null) {
+      throw new Error('Only embedded text subtitle tracks can be selected in the MVP.')
+    }
+
+    if (
+      this.selectedSubtitleTrackId === track.id &&
+      this.state.subtitle.trackId === track.id &&
+      ['extracting', 'ready'].includes(this.state.subtitle.status)
+    ) {
+      return
+    }
+
+    this.selectedSubtitleTrackId = track.id
+    this.resetSubtitleExtraction()
+    await this.refreshSubtitleModel(this.state.tracks)
   }
 
   dispose(): void {
@@ -358,30 +392,46 @@ export class MpvController {
       return
     }
 
-    const textTracks = tracks.filter(
-      (track) => track.type === 'subtitle' && track.subtitleKind === 'text' && track.ffIndex !== null
+    const subtitleTracks = tracks.filter((track) => track.type === 'subtitle')
+    const textTracks = subtitleTracks.filter(
+      (track) => track.subtitleKind === 'text' && track.ffIndex !== null
     )
-    const selectedTrack = chooseSubtitleTrack(textTracks)
+
+    const selectedTrack =
+      this.selectedSubtitleTrackId === null
+        ? chooseSubtitleTrack(textTracks)
+        : textTracks.find((track) => track.id === this.selectedSubtitleTrackId) ?? null
 
     if (!selectedTrack || selectedTrack.ffIndex === null) {
-      this.subtitleExtractor.cancel()
-      this.subtitleCues = []
-      this.subtitleExtractionKey = null
-      this.subtitleExtractionVersion += 1
-      const subtitleTracks = tracks.filter((track) => track.type === 'subtitle')
+      this.resetSubtitleExtraction()
+      this.selectedSubtitleTrackId = null
+
+      if (subtitleTracks.length === 0) {
+        this.patchState({
+          subtitle: {
+            ...createEmptySubtitleModel(),
+            status: 'missing',
+            error:
+              'This MKV has no embedded subtitle tracks. Try another MKV with embedded SRT, ASS, or SSA subtitles.'
+          }
+        })
+        return
+      }
+
+      const imageOnly = subtitleTracks.every((track) => track.subtitleKind === 'image')
       this.patchState({
         subtitle: {
           ...createEmptySubtitleModel(),
-          status: subtitleTracks.length > 0 ? 'unsupported' : 'idle',
-          error:
-            subtitleTracks.length > 0
-              ? 'No supported embedded text subtitle track was found. Image subtitles are not parsed.'
-              : null
+          status: 'unsupported',
+          error: imageOnly
+            ? 'This MKV only contains image-based subtitles such as PGS/VobSub. Image subtitles are not supported in the MVP.'
+            : 'No supported embedded text subtitle track was found. Use an MKV with SRT, ASS, or SSA subtitles.'
         }
       })
       return
     }
 
+    this.selectedSubtitleTrackId = selectedTrack.id
     const extractionKey = `${filePath}\u0000${selectedTrack.id}\u0000${selectedTrack.ffIndex}`
     if (this.subtitleExtractionKey === extractionKey) {
       return
