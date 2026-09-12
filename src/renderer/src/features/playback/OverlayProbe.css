@@ -377,3 +377,168 @@ html.overlay-mode #root {
     max-width: 52vw;
   }
 }
+
+/* Issue #8 translation settings and popup placement */
+.subtitle-cue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.subtitle-text {
+  order: 0;
+}
+
+.translation-popup.popup-above {
+  order: -1;
+  margin: 0 auto 9px;
+}
+
+.translation-popup.popup-below {
+  order: 1;
+  margin: 9px auto 0;
+}
+
+.translation-settings-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: min(620px, calc(100vw - 36px));
+  max-height: min(520px, 70vh);
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(8, 9, 15, 0.96);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.48);
+  color: #f6f7fb;
+  text-align: left;
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.translation-settings-heading,
+.translation-cache-row,
+.translation-api-key-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.translation-settings-heading {
+  margin-bottom: 12px;
+}
+
+.translation-settings-heading strong {
+  font-size: 0.92rem;
+}
+
+.translation-settings-heading span,
+.translation-cache-row span {
+  color: #aeb5c4;
+  font-size: 0.72rem;
+}
+
+.translation-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.translation-settings-grid label,
+.translation-api-key-row label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  color: #adb4c2;
+  font-size: 0.72rem;
+}
+
+.translation-settings-grid select,
+.translation-api-key-row input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
+  padding: 8px 9px;
+  background: #171922;
+  color: #ffffff;
+  font: inherit;
+}
+
+.translation-settings-check {
+  display: flex !important;
+  grid-column: 1 / -1;
+  grid-template-columns: none !important;
+  flex-direction: row;
+  gap: 8px !important;
+  align-items: center;
+}
+
+.translation-settings-check input {
+  width: auto;
+  accent-color: #8a72ff;
+}
+
+.translation-settings-note,
+.translation-settings-error {
+  margin-top: 10px;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.translation-settings-note {
+  border: 1px solid rgba(255, 190, 110, 0.24);
+  background: rgba(65, 40, 8, 0.45);
+  color: #ffe0ad;
+}
+
+.translation-settings-error {
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 120, 120, 0.28);
+  background: rgba(120, 25, 25, 0.34);
+  color: #ffc5c3;
+}
+
+.translation-api-key-row,
+.translation-cache-row {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 12px;
+}
+
+.translation-api-key-row label {
+  min-width: 220px;
+  flex: 1;
+}
+
+.translation-api-key-row .control-button,
+.translation-cache-row .control-button {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 700px) {
+  .translation-settings-panel {
+    right: -4px;
+    width: calc(100vw - 20px);
+    max-height: 58vh;
+  }
+
+  .translation-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .translation-settings-check {
+    grid-column: auto;
+  }
+
+  .translation-api-key-row {
+    flex-wrap: wrap;
+  }
+
+  .translation-api-key-row label {
+    flex-basis: 100%;
+  }
+}
