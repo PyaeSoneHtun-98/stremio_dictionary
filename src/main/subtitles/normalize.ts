@@ -3,6 +3,7 @@ import type { SubtitleCue, SubtitleToken } from '../../shared/media'
 const TIMING_LINE =
   /^(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})\s+-->\s+(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})(?:\s+.*)?$/
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu
+const HAS_LETTER = /\p{L}/u
 
 export interface SubtitleParseLimits {
   maxCues: number
@@ -12,7 +13,7 @@ export interface SubtitleParseLimits {
 
 export const DEFAULT_SUBTITLE_PARSE_LIMITS: SubtitleParseLimits = {
   maxCues: 50_000,
-  maxTokens: 500_000,
+  maxTokens: 1_000_000,
   maxSourceLines: 250_000
 }
 
@@ -93,6 +94,13 @@ export function tokenizeSubtitleText(
     const value = match[0]
     const start = match.index
     if (start === undefined) {
+      continue
+    }
+
+    // Pure numbers are not useful dictionary targets and are common in ASS vector/effect data.
+    // Skipping them keeps dense styled tracks from exhausting the global token budget while
+    // still allowing mixed terms such as H264 or 1080p to remain selectable.
+    if (!HAS_LETTER.test(value)) {
       continue
     }
 
