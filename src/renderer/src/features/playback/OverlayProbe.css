@@ -130,26 +130,75 @@ html.overlay-mode #root {
   outline-offset: 3px;
 }
 
-.selected-word-status {
+.translation-popup {
+  width: min(360px, 86vw);
+  margin: 9px auto 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  padding: 10px 13px 11px;
+  background: rgba(8, 9, 15, 0.9);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.38);
+  color: #f7f7fb;
+  text-align: left;
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  user-select: text;
+}
+
+.translation-popup-header {
   display: flex;
-  width: max-content;
-  max-width: 90vw;
-  gap: 7px;
-  align-items: center;
-  margin: 8px auto 0;
-  border-radius: 999px;
-  padding: 5px 10px;
-  background: rgba(6, 7, 11, 0.76);
-  color: #d7dbe5;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  color: #c8ceda;
   font-size: 0.72rem;
 }
 
-.selected-word-status strong {
+.translation-popup-header strong {
+  overflow: hidden;
   color: #ffffff;
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.selected-word-status span {
-  color: #aaa2d9;
+.translation-popup-header span {
+  color: #9c93cf;
+  white-space: nowrap;
+}
+
+.translation-loading,
+.translation-error {
+  margin-top: 7px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.translation-loading {
+  color: #c8ceda;
+}
+
+.translation-burmese {
+  margin-top: 7px;
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.translation-pronunciation {
+  margin-top: 3px;
+  color: #aeb5c4;
+  font-size: 0.74rem;
+}
+
+.translation-error {
+  color: #ffc0bd;
+}
+
+.translation-error.translation-popup,
+.translation-popup.translation-error {
+  border-color: rgba(255, 120, 120, 0.3);
 }
 
 .subtitle-transient-status {
@@ -308,6 +357,10 @@ html.overlay-mode #root {
     max-width: 100%;
     padding: 8px 12px;
     font-size: clamp(1rem, 5vw, 1.45rem);
+  }
+
+  .translation-popup {
+    width: min(330px, 92vw);
   }
 
   .player-controls {
