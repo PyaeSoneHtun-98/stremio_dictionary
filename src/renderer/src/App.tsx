@@ -1,8 +1,15 @@
 import { AppShell } from './components/AppShell'
 import { featureAreas } from './features'
+import { OverlayProbe } from './features/playback/OverlayProbe'
 import { PlaybackProof } from './features/playback/PlaybackProof'
 
 export function App(): React.JSX.Element {
+  const mode = new URLSearchParams(window.location.search).get('mode')
+
+  if (mode === 'overlay') {
+    return <OverlayProbe />
+  }
+
   return (
     <AppShell>
       <section className="hero" aria-labelledby="hero-title">
