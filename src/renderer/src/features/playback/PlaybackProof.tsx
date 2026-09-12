@@ -163,9 +163,7 @@ export function PlaybackProof(): React.JSX.Element {
         <div className="subtitle-diagnostic-header">
           <div>
             <span className="eyebrow">Normalized cue model</span>
-            <strong>
-              {subtitleTrackLabel(state)}
-            </strong>
+            <strong>{subtitleTrackLabel(state)}</strong>
           </div>
           <span className={`status-pill subtitle-status-${state.subtitle.status}`}>
             {state.subtitle.status}
@@ -179,14 +177,7 @@ export function PlaybackProof(): React.JSX.Element {
             <div className="active-cue-time">
               {formatTime(state.subtitle.activeCue.startTime)} → {formatTime(state.subtitle.activeCue.endTime)}
             </div>
-            <div className="active-cue-text">
-              {state.subtitle.activeCue.lines.map((line, index) => (
-                <span key={`${state.subtitle.activeCue?.id}-${index}`}>
-                  {line}
-                  {index < state.subtitle.activeCue!.lines.length - 1 ? <br /> : null}
-                </span>
-              ))}
-            </div>
+            <div className="active-cue-text">{state.subtitle.activeCue.text}</div>
             <div className="token-preview">
               {state.subtitle.activeCue.tokens.map((token) => (
                 <span className="token-chip" key={`${token.start}-${token.end}`}>
