@@ -18,6 +18,7 @@ export class MpvController {
   private child: ChildProcess | null = null
   private socket: Socket | null = null
   private incomingBuffer = ''
+  private readonly expectedExits = new WeakSet<ChildProcess>()
   private state: PlaybackSnapshot = {
     status: 'idle',
     filePath: null,
@@ -34,7 +35,7 @@ export class MpvController {
     return structuredClone(this.state)
   }
 
-  async load(filePath: string): Promise<void> {
+  async load(filePath: string, windowId: number): Promise<void> {
     if (process.platform !== 'win32') {
       this.patchState({
         status: 'unavailable',
@@ -43,8 +44,12 @@ export class MpvController {
       throw new Error('Windows-only playback proof of concept')
     }
 
+    if (!Number.isInteger(windowId) || windowId <= 0) {
+      throw new Error('A valid Windows playback surface is required.')
+    }
+
     try {
-      await this.ensureStarted()
+      await this.ensureStarted(windowId)
       this.patchState({
         status: 'loading',
         filePath,
@@ -57,31 +62,36 @@ export class MpvController {
       this.sendCommand(['loadfile', filePath, 'replace'])
     } catch (error) {
       const message = toUserMessage(error)
-      this.patchState({ status: 'unavailable', error: message })
+      this.patchState({ status: 'unavailable', currentTime: null, error: message })
       throw error
     }
   }
 
   dispose(): void {
-    if (this.socket && !this.socket.destroyed) {
+    const socket = this.socket
+    this.socket = null
+
+    if (socket && !socket.destroyed) {
       try {
-        this.sendCommand(['quit'])
+        socket.write(`${JSON.stringify({ command: ['quit'] })}\n`)
       } catch {
         // The IPC pipe can already be closing during application shutdown.
       }
-      this.socket.destroy()
+      socket.destroy()
     }
 
-    this.socket = null
-
-    if (this.child && !this.child.killed) {
-      this.child.kill()
-    }
-
+    const child = this.child
     this.child = null
+
+    if (child) {
+      this.expectedExits.add(child)
+      if (!child.killed) {
+        child.kill()
+      }
+    }
   }
 
-  private async ensureStarted(): Promise<void> {
+  private async ensureStarted(windowId: number): Promise<void> {
     if (this.child && this.socket && !this.socket.destroyed) {
       return
     }
@@ -91,11 +101,11 @@ export class MpvController {
       executable,
       [
         '--idle=yes',
-        '--force-window=yes',
         '--keep-open=yes',
         '--sid=no',
         '--no-terminal',
-        '--title=Subtitle Bridge Playback POC',
+        '--no-osc',
+        `--wid=${windowId >>> 0}`,
         `--input-ipc-server=${PIPE_PATH}`
       ],
       {
@@ -118,28 +128,53 @@ export class MpvController {
       child.once('error', handleError)
     })
 
-    child.on('exit', () => {
-      this.child = null
-      this.socket?.destroy()
-      this.socket = null
-    })
-
     this.child = child
 
+    child.on('exit', (code, signal) => {
+      const wasExpected = this.expectedExits.has(child)
+      if (this.child !== child) {
+        return
+      }
+
+      this.child = null
+      const socket = this.socket
+      this.socket = null
+      socket?.destroy()
+
+      if (wasExpected) {
+        return
+      }
+
+      const detail = code !== null ? ` with exit code ${code}` : signal ? ` after signal ${signal}` : ''
+      this.patchState({
+        status: 'error',
+        currentTime: null,
+        error: `mpv exited unexpectedly${detail}. Reopen the video to retry.`
+      })
+    })
+
+    let socket: Socket
     try {
-      this.socket = await connectToPipe()
+      socket = await connectToPipe()
     } catch (error) {
+      if (this.child === child) {
+        this.child = null
+      }
+      this.expectedExits.add(child)
       if (!child.killed) {
         child.kill()
       }
-      this.child = null
       throw error
     }
 
-    this.socket.setEncoding('utf8')
-    this.socket.on('data', (chunk) => this.handleChunk(chunk.toString()))
-    this.socket.on('close', () => {
-      this.socket = null
+    this.socket = socket
+    socket.setEncoding('utf8')
+    socket.on('data', (chunk) => this.handleChunk(chunk.toString()))
+    socket.on('error', (error) => {
+      this.handleSocketFailure(socket, child, `Lost the mpv IPC connection: ${error.message}`)
+    })
+    socket.on('close', () => {
+      this.handleSocketFailure(socket, child, 'The mpv IPC connection closed unexpectedly.')
     })
 
     this.sendCommand(['observe_property', 1, 'time-pos'])
@@ -147,6 +182,27 @@ export class MpvController {
     this.sendCommand(['observe_property', 3, 'duration'])
     this.sendCommand(['observe_property', 4, 'track-list'])
     this.sendCommand(['observe_property', 5, 'path'])
+  }
+
+  private handleSocketFailure(socket: Socket, child: ChildProcess, message: string): void {
+    if (this.socket !== socket) {
+      return
+    }
+
+    this.socket = null
+    if (!socket.destroyed) {
+      socket.destroy()
+    }
+
+    if (this.child === child) {
+      this.child = null
+      this.expectedExits.add(child)
+      if (!child.killed) {
+        child.kill()
+      }
+    }
+
+    this.patchState({ status: 'error', currentTime: null, error: `${message} Reopen the video to retry.` })
   }
 
   private handleChunk(chunk: string): void {
@@ -240,15 +296,18 @@ function connectOnce(): Promise<Socket> {
   return new Promise((resolve, reject) => {
     const socket = createConnection(PIPE_PATH)
 
-    socket.once('connect', () => {
-      socket.removeAllListeners('error')
+    const handleConnect = (): void => {
+      socket.off('error', handleConnectError)
       resolve(socket)
-    })
-
-    socket.once('error', (error) => {
+    }
+    const handleConnectError = (error: Error): void => {
+      socket.off('connect', handleConnect)
       socket.destroy()
       reject(error)
-    })
+    }
+
+    socket.once('connect', handleConnect)
+    socket.once('error', handleConnectError)
   })
 }
 
