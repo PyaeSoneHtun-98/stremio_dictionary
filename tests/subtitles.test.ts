@@ -37,6 +37,7 @@ describe('parseSrtCues', () => {
       parseSrtCues(SAMPLE_SRT, {
         maxCues: 1,
         maxTokens: 100,
+        maxTokenMatches: 100,
         maxSourceLines: 100
       })
     ).toThrow('safe cue limit')
@@ -49,9 +50,23 @@ describe('parseSrtCues', () => {
       parseSrtCues(source, {
         maxCues: 10,
         maxTokens: 2,
+        maxTokenMatches: 100,
         maxSourceLines: 100
       })
     ).toThrow('safe token limit')
+  })
+
+  it('counts skipped numeric matches against the tokenizer work limit', () => {
+    const source = '1\n00:00:01,000 --> 00:00:03,000\n1 2 3 4 hello'
+
+    expect(() =>
+      parseSrtCues(source, {
+        maxCues: 10,
+        maxTokens: 100,
+        maxTokenMatches: 3,
+        maxSourceLines: 100
+      })
+    ).toThrow('safe tokenizer work limit')
   })
 
   it('rejects subtitle sources that exceed the configured line limit before model allocation', () => {
@@ -59,6 +74,7 @@ describe('parseSrtCues', () => {
       parseSrtCues(SAMPLE_SRT, {
         maxCues: 100,
         maxTokens: 100,
+        maxTokenMatches: 100,
         maxSourceLines: 3
       })
     ).toThrow('safe line limit')
@@ -73,6 +89,14 @@ describe('lookup normalization', () => {
     const tokens = tokenizeSubtitleText('hello?')
     expect(tokens).toEqual([{ text: 'hello', lookupTerm: 'hello', start: 0, end: 5 }])
     expect('hello?'.slice(tokens[0].end)).toBe('?')
+  })
+
+  it('skips pure numbers while keeping mixed letter-number terms selectable', () => {
+    expect(tokenizeSubtitleText('123 H264 1080p hello').map((token) => token.text)).toEqual([
+      'H264',
+      '1080p',
+      'hello'
+    ])
   })
 })
 

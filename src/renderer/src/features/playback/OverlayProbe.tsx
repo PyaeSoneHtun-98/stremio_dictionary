@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PlaybackSnapshot } from '../../../../shared/media'
+import type { PlaybackSnapshot, SubtitleToken } from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
 import './OverlayProbe.css'
+import { segmentSubtitleCue } from './subtitleSegments'
 
 const EMPTY_STATE: PlaybackSnapshot = {
   status: 'idle',
@@ -18,11 +19,19 @@ const EMPTY_STATE: PlaybackSnapshot = {
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
 
+interface SelectedWord {
+  cueId: string
+  tokenStart: number
+  text: string
+  lookupTerm: string
+}
+
 export function OverlayProbe(): React.JSX.Element {
   const [state, setState] = useState<PlaybackSnapshot>(EMPTY_STATE)
-  const [selectedWord, setSelectedWord] = useState<string | null>(null)
+  const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null)
   const [controlError, setControlError] = useState<string | null>(null)
   const currentFilePath = useRef<string | null>(null)
+  const currentCueId = useRef<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -38,6 +47,12 @@ export function OverlayProbe(): React.JSX.Element {
         setControlError(null)
       }
 
+      const nextCueId = snapshot.subtitle.activeCue?.id ?? null
+      if (currentCueId.current !== nextCueId) {
+        currentCueId.current = nextCueId
+        setSelectedWord(null)
+      }
+
       setState(snapshot)
     }
 
@@ -50,10 +65,63 @@ export function OverlayProbe(): React.JSX.Element {
     }
   }, [])
 
+  useEffect(() => {
+    const clearRememberedFocus = (): void => {
+      const activeElement = document.activeElement
+      if (activeElement instanceof HTMLElement) {
+        activeElement.blur()
+      }
+    }
+
+    // The transparent overlay loses window focus when the user clicks through to mpv.
+    // Chromium otherwise remembers the last focused control (often the seek slider), so
+    // the next native Tab re-entry resumes there instead of starting at the subtitle words.
+    window.addEventListener('blur', clearRememberedFocus)
+    return () => window.removeEventListener('blur', clearRememberedFocus)
+  }, [])
+
+  useEffect(() => {
+    const handleKeyboardEntry = (event: KeyboardEvent): void => {
+      if (
+        event.key !== 'Tab' ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        !state.subtitle.activeCue
+      ) {
+        return
+      }
+
+      const activeElement = document.activeElement
+      const startsFromDocument =
+        activeElement === null || activeElement === document.body || activeElement === document.documentElement
+
+      if (!startsFromDocument) {
+        return
+      }
+
+      const words = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.subtitle-word:not(:disabled)')
+      )
+      const target = event.shiftKey ? words.at(-1) : words[0]
+      if (!target) {
+        return
+      }
+
+      event.preventDefault()
+      target.focus()
+    }
+
+    window.addEventListener('keydown', handleKeyboardEntry, true)
+    return () => window.removeEventListener('keydown', handleKeyboardEntry, true)
+  }, [state.subtitle.activeCue])
+
   const canControl = Boolean(state.filePath) && !['loading', 'error', 'unavailable'].includes(state.status)
   const playing = state.status === 'playing'
   const duration = state.duration ?? 0
   const currentTime = Math.min(state.currentTime ?? 0, duration || Number.MAX_SAFE_INTEGER)
+  const activeCue = state.subtitle.activeCue
+  const subtitleSegments = activeCue ? segmentSubtitleCue(activeCue) : []
 
   const runControl = async (action: () => Promise<void>): Promise<void> => {
     setControlError(null)
@@ -64,6 +132,15 @@ export function OverlayProbe(): React.JSX.Element {
     }
   }
 
+  const selectWord = (cueId: string, token: SubtitleToken): void => {
+    setSelectedWord({
+      cueId,
+      tokenStart: token.start,
+      text: token.text,
+      lookupTerm: token.lookupTerm
+    })
+  }
+
   return (
     <main className="overlay-probe" aria-label="Subtitle Bridge video controls">
       <div className="overlay-topline">
@@ -71,29 +148,52 @@ export function OverlayProbe(): React.JSX.Element {
         <strong title={state.fileName ?? undefined}>{state.fileName ?? 'No video loaded'}</strong>
       </div>
 
-      <div className="overlay-probe-panel">
-        <div className="overlay-probe-meta">
-          <span>Interactive subtitle layer</span>
-          <strong>{formatTime(state.currentTime)}</strong>
-        </div>
-        <div className="overlay-probe-line">
-          <span>Click a word:</span>
-          {['interactive', 'subtitle', 'works'].map((word) => (
-            <button
-              key={word}
-              type="button"
-              className="overlay-word"
-              aria-pressed={selectedWord === word}
-              onClick={() => setSelectedWord(word)}
-            >
-              {word}
-            </button>
-          ))}
-        </div>
-        <div className="overlay-probe-result" aria-live="polite">
-          {selectedWord ? `Clicked: ${selectedWord}` : 'Clickable subtitle words will appear here.'}
-        </div>
-      </div>
+      <section className="subtitle-overlay" aria-label="Interactive English subtitle" aria-live="polite">
+        {activeCue ? (
+          <div className="subtitle-cue" key={activeCue.id}>
+            <div className="subtitle-text">
+              {subtitleSegments.map((segment) => {
+                if (segment.kind === 'break') {
+                  return <br key={segment.key} />
+                }
+
+                if (segment.kind === 'text') {
+                  return <span key={segment.key}>{segment.text}</span>
+                }
+
+                const selected =
+                  selectedWord?.cueId === activeCue.id && selectedWord.tokenStart === segment.token.start
+
+                return (
+                  <button
+                    key={segment.key}
+                    type="button"
+                    className="subtitle-word"
+                    aria-pressed={selected}
+                    aria-label={`Select word ${segment.token.text}`}
+                    title={`Lookup: ${segment.token.lookupTerm}`}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      selectWord(activeCue.id, segment.token)
+                    }}
+                  >
+                    {segment.token.text}
+                  </button>
+                )
+              })}
+            </div>
+            {selectedWord ? (
+              <div className="selected-word-status" aria-live="polite">
+                Selected: <strong>{selectedWord.text}</strong>
+                <span>lookup “{selectedWord.lookupTerm}”</span>
+              </div>
+            ) : null}
+          </div>
+        ) : state.subtitle.status === 'extracting' ? (
+          <div className="subtitle-transient-status">Loading subtitles…</div>
+        ) : null}
+      </section>
 
       <div className="player-controls">
         {state.error || controlError ? (

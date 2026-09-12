@@ -3,16 +3,19 @@ import type { SubtitleCue, SubtitleToken } from '../../shared/media'
 const TIMING_LINE =
   /^(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})\s+-->\s+(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})(?:\s+.*)?$/
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu
+const HAS_LETTER = /\p{L}/u
 
 export interface SubtitleParseLimits {
   maxCues: number
   maxTokens: number
+  maxTokenMatches: number
   maxSourceLines: number
 }
 
 export const DEFAULT_SUBTITLE_PARSE_LIMITS: SubtitleParseLimits = {
   maxCues: 50_000,
-  maxTokens: 500_000,
+  maxTokens: 1_000_000,
+  maxTokenMatches: 1_000_000,
   maxSourceLines: 250_000
 }
 
@@ -30,6 +33,7 @@ export function parseSrtCues(
 
   const cues: SubtitleCue[] = []
   let tokenCount = 0
+  let tokenMatchCount = 0
 
   for (const block of iterateSrtBlocks(normalized)) {
     const lines = block.split('\n')
@@ -63,8 +67,13 @@ export function parseSrtCues(
       throw new Error(`Subtitle track exceeds the safe cue limit of ${limits.maxCues}.`)
     }
 
-    const tokens = tokenizeSubtitleText(text, limits.maxTokens - tokenCount)
-    tokenCount += tokens.length
+    const tokenization = tokenizeSubtitleTextWithStats(
+      text,
+      limits.maxTokens - tokenCount,
+      limits.maxTokenMatches - tokenMatchCount
+    )
+    tokenCount += tokenization.tokens.length
+    tokenMatchCount += tokenization.matchCount
 
     cues.push({
       id: `${startTime.toFixed(3)}-${endTime.toFixed(3)}-${cues.length}`,
@@ -72,7 +81,7 @@ export function parseSrtCues(
       endTime,
       text,
       lines: text.split('\n'),
-      tokens
+      tokens: tokenization.tokens
     })
   }
 
@@ -81,18 +90,43 @@ export function parseSrtCues(
 
 export function tokenizeSubtitleText(
   text: string,
-  maxTokens = Number.POSITIVE_INFINITY
+  maxTokens = Number.POSITIVE_INFINITY,
+  maxTokenMatches = Number.POSITIVE_INFINITY
 ): SubtitleToken[] {
+  return tokenizeSubtitleTextWithStats(text, maxTokens, maxTokenMatches).tokens
+}
+
+function tokenizeSubtitleTextWithStats(
+  text: string,
+  maxTokens: number,
+  maxTokenMatches: number
+): { tokens: SubtitleToken[]; matchCount: number } {
   if (Number.isNaN(maxTokens) || maxTokens < 0) {
     throw new Error('Subtitle token limit must be zero or greater.')
   }
 
+  if (Number.isNaN(maxTokenMatches) || maxTokenMatches < 0) {
+    throw new Error('Subtitle tokenizer work limit must be zero or greater.')
+  }
+
   const tokens: SubtitleToken[] = []
+  let matchCount = 0
 
   for (const match of text.matchAll(WORD_PATTERN)) {
+    if (matchCount >= maxTokenMatches) {
+      throw new Error('Subtitle track exceeds the safe tokenizer work limit.')
+    }
+    matchCount += 1
+
     const value = match[0]
     const start = match.index
     if (start === undefined) {
+      continue
+    }
+
+    // Pure numbers are not useful dictionary targets and are common in ASS vector/effect data.
+    // They still count against maxTokenMatches so skipped matches cannot bypass the CPU work cap.
+    if (!HAS_LETTER.test(value)) {
       continue
     }
 
@@ -113,7 +147,7 @@ export function tokenizeSubtitleText(
     })
   }
 
-  return tokens
+  return { tokens, matchCount }
 }
 
 export function normalizeLookupTerm(value: string): string {
