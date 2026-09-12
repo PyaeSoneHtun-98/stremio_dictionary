@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import type { SubtitleCue } from '../../shared/media'
 import { parseSrtCues } from './normalize'
 
@@ -6,7 +6,7 @@ const MAX_SUBTITLE_BYTES = 16 * 1024 * 1024
 const MAX_ERROR_BYTES = 64 * 1024
 
 export class SubtitleExtractor {
-  private child: ChildProcessWithoutNullStreams | null = null
+  private child: ChildProcess | null = null
 
   async extract(filePath: string, ffIndex: number): Promise<SubtitleCue[]> {
     this.cancel()
