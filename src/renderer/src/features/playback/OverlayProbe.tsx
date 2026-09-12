@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MediaTrack, PlaybackSnapshot, SubtitleToken } from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
+import type { TranslationResult } from '../../../../shared/translation'
 import './OverlayProbe.css'
 import { segmentSubtitleCue } from './subtitleSegments'
 
@@ -26,12 +27,21 @@ interface SelectedWord {
   lookupTerm: string
 }
 
+type TranslationLookupState =
+  | { status: 'idle' }
+  | { status: 'loading'; word: string }
+  | { status: 'ready'; word: string; result: TranslationResult }
+  | { status: 'error'; word: string; error: string }
+
 export function OverlayProbe(): React.JSX.Element {
   const [state, setState] = useState<PlaybackSnapshot>(EMPTY_STATE)
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null)
+  const [translation, setTranslation] = useState<TranslationLookupState>({ status: 'idle' })
   const [controlError, setControlError] = useState<string | null>(null)
   const currentFilePath = useRef<string | null>(null)
   const currentCueId = useRef<string | null>(null)
+  const currentSubtitleTrackId = useRef<number | null>(null)
+  const translationRequestVersion = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -41,18 +51,25 @@ export function OverlayProbe(): React.JSX.Element {
         return
       }
 
+      const nextCueId = snapshot.subtitle.activeCue?.id ?? null
+      const selectionContextChanged =
+        currentFilePath.current !== snapshot.filePath ||
+        currentCueId.current !== nextCueId ||
+        currentSubtitleTrackId.current !== snapshot.subtitle.trackId
+
       if (currentFilePath.current !== snapshot.filePath) {
-        currentFilePath.current = snapshot.filePath
-        setSelectedWord(null)
         setControlError(null)
       }
 
-      const nextCueId = snapshot.subtitle.activeCue?.id ?? null
-      if (currentCueId.current !== nextCueId) {
-        currentCueId.current = nextCueId
+      if (selectionContextChanged) {
+        translationRequestVersion.current += 1
         setSelectedWord(null)
+        setTranslation({ status: 'idle' })
       }
 
+      currentFilePath.current = snapshot.filePath
+      currentCueId.current = nextCueId
+      currentSubtitleTrackId.current = snapshot.subtitle.trackId
       setState(snapshot)
     }
 
@@ -61,6 +78,7 @@ export function OverlayProbe(): React.JSX.Element {
 
     return () => {
       active = false
+      translationRequestVersion.current += 1
       unsubscribe()
     }
   }, [])
@@ -132,13 +150,37 @@ export function OverlayProbe(): React.JSX.Element {
     }
   }
 
-  const selectWord = (cueId: string, token: SubtitleToken): void => {
+  const selectWord = (cueId: string, token: SubtitleToken, context: string): void => {
+    const requestVersion = ++translationRequestVersion.current
     setSelectedWord({
       cueId,
       tokenStart: token.start,
       text: token.text,
       lookupTerm: token.lookupTerm
     })
+    setTranslation({ status: 'loading', word: token.text })
+
+    void window.desktop.translation
+      .translateWord({
+        word: token.lookupTerm,
+        context
+      })
+      .then((result) => {
+        if (translationRequestVersion.current !== requestVersion) {
+          return
+        }
+        setTranslation({ status: 'ready', word: token.text, result })
+      })
+      .catch((error: unknown) => {
+        if (translationRequestVersion.current !== requestVersion) {
+          return
+        }
+        setTranslation({
+          status: 'error',
+          word: token.text,
+          error: translationErrorMessage(error)
+        })
+      })
   }
 
   return (
@@ -170,12 +212,12 @@ export function OverlayProbe(): React.JSX.Element {
                     type="button"
                     className="subtitle-word"
                     aria-pressed={selected}
-                    aria-label={`Select word ${segment.token.text}`}
-                    title={`Lookup: ${segment.token.lookupTerm}`}
+                    aria-label={`Translate word ${segment.token.text}`}
+                    title={`Translate: ${segment.token.lookupTerm}`}
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation()
-                      selectWord(activeCue.id, segment.token)
+                      selectWord(activeCue.id, segment.token, activeCue.text)
                     }}
                   >
                     {segment.token.text}
@@ -184,10 +226,7 @@ export function OverlayProbe(): React.JSX.Element {
               })}
             </div>
             {selectedWord ? (
-              <div className="selected-word-status" aria-live="polite">
-                Selected: <strong>{selectedWord.text}</strong>
-                <span>lookup “{selectedWord.lookupTerm}”</span>
-              </div>
+              <TranslationPopup selectedWord={selectedWord} translation={translation} />
             ) : null}
           </div>
         ) : state.subtitle.status === 'extracting' ? (
@@ -263,11 +302,7 @@ export function OverlayProbe(): React.JSX.Element {
             >
               {supportedSubtitleTracks.length === 0 ? <option value="">No text tracks</option> : null}
               {subtitleTracks.map((track) => (
-                <option
-                  value={track.id}
-                  key={track.id}
-                  disabled={!isSelectableSubtitleTrack(track)}
-                >
+                <option value={track.id} key={track.id} disabled={!isSelectableSubtitleTrack(track)}>
                   {formatSubtitleTrack(track)}
                 </option>
               ))}
@@ -305,6 +340,52 @@ export function OverlayProbe(): React.JSX.Element {
       </div>
     </main>
   )
+}
+
+function TranslationPopup({
+  selectedWord,
+  translation
+}: {
+  selectedWord: SelectedWord
+  translation: TranslationLookupState
+}): React.JSX.Element {
+  return (
+    <div className={`translation-popup translation-${translation.status}`} role="status" aria-live="polite">
+      <div className="translation-popup-header">
+        <strong>{selectedWord.text}</strong>
+        <span>English → Burmese</span>
+      </div>
+
+      {translation.status === 'loading' ? (
+        <div className="translation-loading">Translating…</div>
+      ) : null}
+
+      {translation.status === 'ready' ? (
+        <>
+          <div className="translation-burmese" lang="my">
+            {translation.result.translation}
+          </div>
+          {translation.result.pronunciation ? (
+            <div className="translation-pronunciation">{translation.result.pronunciation}</div>
+          ) : null}
+        </>
+      ) : null}
+
+      {translation.status === 'error' ? (
+        <div className="translation-error">{translation.error}</div>
+      ) : null}
+    </div>
+  )
+}
+
+function translationErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return 'Translation failed. Try the word again.'
+  }
+
+  return error.message
+    .replace(/^Error invoking remote method 'translation:translate-word':\s*/i, '')
+    .replace(/^Error:\s*/i, '')
 }
 
 function isSelectableSubtitleTrack(track: MediaTrack): boolean {
