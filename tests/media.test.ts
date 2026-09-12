@@ -23,10 +23,10 @@ describe('normalizeMpvTracks', () => {
   it('maps mpv track-list entries into renderer-safe track metadata', () => {
     expect(
       normalizeMpvTracks([
-        { id: 1, type: 'video', codec: 'h264', selected: true },
-        { id: 2, type: 'audio', codec: 'aac', lang: 'eng', title: 'Stereo' },
-        { id: 3, type: 'sub', codec: 'ass', lang: 'eng', title: 'English' },
-        { id: 4, type: 'sub', codec: 'hdmv_pgs_subtitle', lang: 'jpn' }
+        { id: 1, type: 'video', codec: 'h264', selected: true, 'ff-index': 0 },
+        { id: 2, type: 'audio', codec: 'aac', lang: 'eng', title: 'Stereo', 'ff-index': 1 },
+        { id: 3, type: 'sub', codec: 'ass', lang: 'eng', title: 'English', 'ff-index': 2 },
+        { id: 4, type: 'sub', codec: 'hdmv_pgs_subtitle', lang: 'jpn', 'ff-index': 3 }
       ])
     ).toEqual([
       {
@@ -36,7 +36,8 @@ describe('normalizeMpvTracks', () => {
         language: null,
         title: null,
         selected: true,
-        subtitleKind: null
+        subtitleKind: null,
+        ffIndex: 0
       },
       {
         id: 2,
@@ -45,7 +46,8 @@ describe('normalizeMpvTracks', () => {
         language: 'eng',
         title: 'Stereo',
         selected: false,
-        subtitleKind: null
+        subtitleKind: null,
+        ffIndex: 1
       },
       {
         id: 3,
@@ -54,7 +56,8 @@ describe('normalizeMpvTracks', () => {
         language: 'eng',
         title: 'English',
         selected: false,
-        subtitleKind: 'text'
+        subtitleKind: 'text',
+        ffIndex: 2
       },
       {
         id: 4,
@@ -63,9 +66,14 @@ describe('normalizeMpvTracks', () => {
         language: 'jpn',
         title: null,
         selected: false,
-        subtitleKind: 'image'
+        subtitleKind: 'image',
+        ffIndex: 3
       }
     ])
+  })
+
+  it('keeps a missing FFmpeg index explicit', () => {
+    expect(normalizeMpvTracks([{ id: 1, type: 'sub', codec: 'ass' }])[0]?.ffIndex).toBeNull()
   })
 
   it('ignores malformed track entries', () => {
