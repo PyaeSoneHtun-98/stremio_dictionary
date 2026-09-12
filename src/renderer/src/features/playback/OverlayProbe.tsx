@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PlaybackSnapshot } from '../../../../shared/media'
 import './OverlayProbe.css'
 
@@ -20,32 +20,33 @@ export function OverlayProbe(): React.JSX.Element {
   const [state, setState] = useState<PlaybackSnapshot>(EMPTY_STATE)
   const [selectedWord, setSelectedWord] = useState<string | null>(null)
   const [controlError, setControlError] = useState<string | null>(null)
+  const currentFilePath = useRef<string | null>(null)
 
   useEffect(() => {
     let active = true
 
-    void window.desktop.media.getState().then((snapshot) => {
-      if (active) {
-        setState(snapshot)
+    const applySnapshot = (snapshot: PlaybackSnapshot): void => {
+      if (!active) {
+        return
       }
-    })
 
-    const unsubscribe = window.desktop.media.onState((snapshot) => {
-      if (active) {
-        setState(snapshot)
+      if (currentFilePath.current !== snapshot.filePath) {
+        currentFilePath.current = snapshot.filePath
+        setSelectedWord(null)
+        setControlError(null)
       }
-    })
+
+      setState(snapshot)
+    }
+
+    void window.desktop.media.getState().then(applySnapshot)
+    const unsubscribe = window.desktop.media.onState(applySnapshot)
 
     return () => {
       active = false
       unsubscribe()
     }
   }, [])
-
-  useEffect(() => {
-    setSelectedWord(null)
-    setControlError(null)
-  }, [state.filePath])
 
   const canControl = Boolean(state.filePath) && !['loading', 'error', 'unavailable'].includes(state.status)
   const playing = state.status === 'playing'
@@ -92,7 +93,7 @@ export function OverlayProbe(): React.JSX.Element {
         </div>
       </div>
 
-      <div className="player-controls" aria-label="Playback controls">
+      <div className="player-controls">
         {state.error || controlError ? (
           <div className="player-control-error" role="status">
             {controlError ?? state.error}
