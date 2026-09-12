@@ -5,7 +5,7 @@ export class PlaybackSurface {
   private hostWindow: BrowserWindow | null = null
   private overlayWindow: BrowserWindow | null = null
 
-  async ensure(): Promise<number> {
+  async ensure(): Promise<string> {
     if (
       this.hostWindow &&
       !this.hostWindow.isDestroyed() &&
@@ -145,15 +145,20 @@ async function loadOverlayRenderer(window: BrowserWindow): Promise<void> {
   })
 }
 
-function getWin32WindowId(window: BrowserWindow): number {
+function getWin32WindowId(window: BrowserWindow): string {
   if (process.platform !== 'win32') {
     throw new Error('The playback surface proof of concept currently supports Windows only.')
   }
 
   const handle = window.getNativeWindowHandle()
-  if (handle.byteLength < 4) {
-    throw new Error('Electron returned an invalid native window handle.')
+
+  if (handle.byteLength >= 8) {
+    return handle.readBigUInt64LE(0).toString()
   }
 
-  return handle.readUInt32LE(0)
+  if (handle.byteLength >= 4) {
+    return handle.readUInt32LE(0).toString()
+  }
+
+  throw new Error('Electron returned an invalid native window handle.')
 }
