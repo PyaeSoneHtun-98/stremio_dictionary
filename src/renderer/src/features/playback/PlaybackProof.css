@@ -141,10 +141,10 @@
   border-bottom: 0;
 }
 
-.empty-table-cell {
-  padding: 24px !important;
-  color: #777f91 !important;
-  text-align: center !important;
+.track-table td.empty-table-cell {
+  padding: 24px;
+  color: #777f91;
+  text-align: center;
 }
 
 @media (max-width: 800px) {
