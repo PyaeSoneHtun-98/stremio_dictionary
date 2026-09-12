@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron'
 import type { PlaybackSnapshot } from '../../shared/media'
 import { MpvController } from './MpvController'
 
@@ -18,9 +18,9 @@ export function registerMediaIpc(): void {
 
   ipcMain.handle(OPEN_VIDEO_CHANNEL, async (event) => {
     const parentWindow = BrowserWindow.fromWebContents(event.sender)
-    const options = {
+    const options: OpenDialogOptions = {
       title: 'Open MKV video',
-      properties: ['openFile'] as const,
+      properties: ['openFile'],
       filters: [{ name: 'Matroska video', extensions: ['mkv'] }]
     }
     const result = parentWindow
