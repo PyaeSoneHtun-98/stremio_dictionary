@@ -295,19 +295,24 @@ async function connectToPipe(): Promise<Socket> {
 function connectOnce(): Promise<Socket> {
   return new Promise((resolve, reject) => {
     const socket = createConnection(PIPE_PATH)
+    let connected = false
 
     const handleConnect = (): void => {
-      socket.off('error', handleConnectError)
+      connected = true
       resolve(socket)
     }
-    const handleConnectError = (error: Error): void => {
+    const handleError = (error: Error): void => {
+      if (connected) {
+        return
+      }
+
       socket.off('connect', handleConnect)
       socket.destroy()
       reject(error)
     }
 
     socket.once('connect', handleConnect)
-    socket.once('error', handleConnectError)
+    socket.on('error', handleError)
   })
 }
 
