@@ -1,3 +1,5 @@
+import type { TranslationRequest, TranslationResult } from './translation'
+
 export type PlaybackStatus =
   | 'idle'
   | 'loading'
@@ -81,6 +83,9 @@ export interface DesktopBridge {
     selectSubtitleTrack: (trackId: number) => Promise<void>
     toggleFullscreen: () => Promise<void>
     onState: (listener: (state: PlaybackSnapshot) => void) => () => void
+  }
+  translation: {
+    translateWord: (request: TranslationRequest) => Promise<TranslationResult>
   }
 }
 
