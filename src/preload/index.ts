@@ -21,6 +21,9 @@ const desktopBridge: DesktopBridge = {
 
       return () => ipcRenderer.removeListener('media:state', subscription)
     }
+  },
+  translation: {
+    translateWord: (request) => ipcRenderer.invoke('translation:translate-word', request)
   }
 }
 
