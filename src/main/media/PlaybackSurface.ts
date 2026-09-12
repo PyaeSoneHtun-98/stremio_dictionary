@@ -1,8 +1,8 @@
-import { BrowserWindow } from 'electron'
+import { BaseWindow, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 
 export class PlaybackSurface {
-  private hostWindow: BrowserWindow | null = null
+  private hostWindow: BaseWindow | null = null
   private overlayWindow: BrowserWindow | null = null
 
   async ensure(): Promise<string> {
@@ -20,7 +20,7 @@ export class PlaybackSurface {
 
     this.dispose()
 
-    const hostWindow = new BrowserWindow({
+    const hostWindow = new BaseWindow({
       width: 960,
       height: 600,
       minWidth: 640,
@@ -28,12 +28,7 @@ export class PlaybackSurface {
       show: false,
       autoHideMenuBar: true,
       backgroundColor: '#000000',
-      title: 'Subtitle Bridge Video Surface POC',
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true
-      }
+      title: 'Subtitle Bridge Video Surface POC'
     })
 
     const overlayWindow = new BrowserWindow({
@@ -90,7 +85,7 @@ export class PlaybackSurface {
       }
     })
 
-    await Promise.all([hostWindow.loadURL('about:blank'), loadOverlayRenderer(overlayWindow)])
+    await loadOverlayRenderer(overlayWindow)
 
     hostWindow.show()
     this.syncOverlayBounds()
@@ -145,20 +140,16 @@ async function loadOverlayRenderer(window: BrowserWindow): Promise<void> {
   })
 }
 
-function getWin32WindowId(window: BrowserWindow): string {
+function getWin32WindowId(window: BaseWindow): string {
   if (process.platform !== 'win32') {
     throw new Error('The playback surface proof of concept currently supports Windows only.')
   }
 
   const handle = window.getNativeWindowHandle()
-
-  if (handle.byteLength >= 8) {
-    return handle.readBigUInt64LE(0).toString()
+  if (handle.byteLength < 4) {
+    throw new Error('Electron returned an invalid native window handle.')
   }
 
-  if (handle.byteLength >= 4) {
-    return handle.readUInt32LE(0).toString()
-  }
-
-  throw new Error('Electron returned an invalid native window handle.')
+  // mpv's win32 --wid contract expects HWND cast to uint32_t.
+  return handle.readUInt32LE(0).toString()
 }
