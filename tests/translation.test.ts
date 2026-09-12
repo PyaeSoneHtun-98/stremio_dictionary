@@ -10,7 +10,8 @@ describe('LocalDictionaryProvider', () => {
     await expect(provider.translate({ word: 'emperor' })).resolves.toEqual({
       originalWord: 'emperor',
       translation: 'ဧကရာဇ်',
-      provider: 'local-dictionary'
+      provider: 'local-dictionary',
+      targetLanguage: 'my'
     })
   })
 
@@ -20,7 +21,8 @@ describe('LocalDictionaryProvider', () => {
     await expect(provider.translate({ word: 'RUNNING' })).resolves.toMatchObject({
       originalWord: 'RUNNING',
       translation: 'ပြေးသည်',
-      provider: 'local-dictionary'
+      provider: 'local-dictionary',
+      targetLanguage: 'my'
     })
     await expect(provider.translate({ word: 'treaties' })).resolves.toMatchObject({
       translation: 'သဘောတူစာချုပ်'
@@ -28,6 +30,14 @@ describe('LocalDictionaryProvider', () => {
     await expect(provider.translate({ word: 'signed' })).resolves.toMatchObject({
       translation: 'လက်မှတ်ရေးထိုးသည်'
     })
+  })
+
+  it('rejects target languages not present in the offline dataset', async () => {
+    const provider = new LocalDictionaryProvider()
+
+    await expect(provider.translate({ word: 'emperor', targetLanguage: 'ja' })).rejects.toThrow(
+      'currently supports Burmese'
+    )
   })
 
   it('returns a short readable failure for words not in the offline dictionary', async () => {
@@ -54,20 +64,20 @@ describe('GoogleTranslationProvider', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('sends only the selected word to Google and targets Burmese', async () => {
+  it('sends only the selected word to Google and uses the requested target language', async () => {
     const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
       expect(init?.method).toBe('POST')
       expect(JSON.parse(String(init?.body))).toEqual({
         q: 'emperor',
         source: 'en',
-        target: 'my',
+        target: 'ja',
         format: 'text'
       })
 
       return new Response(
         JSON.stringify({
           data: {
-            translations: [{ translatedText: 'ဧကရာဇ်' }]
+            translations: [{ translatedText: '皇帝' }]
           }
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -76,11 +86,16 @@ describe('GoogleTranslationProvider', () => {
     const provider = new GoogleTranslationProvider('test-key', fetchMock as typeof fetch)
 
     await expect(
-      provider.translate({ word: 'emperor', context: 'You will be emperor.' })
+      provider.translate({
+        word: 'emperor',
+        context: 'You will be emperor.',
+        targetLanguage: 'ja'
+      })
     ).resolves.toEqual({
       originalWord: 'emperor',
-      translation: 'ဧကရာဇ်',
-      provider: 'google'
+      translation: '皇帝',
+      provider: 'google',
+      targetLanguage: 'ja'
     })
 
     expect(fetchMock).toHaveBeenCalledOnce()
