@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MediaTrack, PlaybackSnapshot, SubtitleToken } from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
+import {
+  DEFAULT_TRANSLATION_SETTINGS,
+  type TranslationSettingsSnapshot,
+  type TranslationSettingsUpdate
+} from '../../../../shared/settings'
 import type { TranslationResult } from '../../../../shared/translation'
 import './OverlayProbe.css'
 import { segmentSubtitleCue } from './subtitleSegments'
@@ -19,6 +24,14 @@ const EMPTY_STATE: PlaybackSnapshot = {
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
+const TARGET_LANGUAGE_OPTIONS = [
+  { code: 'my', label: 'Burmese' },
+  { code: 'ja', label: 'Japanese' },
+  { code: 'ko', label: 'Korean' },
+  { code: 'zh-cn', label: 'Chinese (Simplified)' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'fr', label: 'French' }
+] as const
 
 interface SelectedWord {
   cueId: string
@@ -37,6 +50,12 @@ export function OverlayProbe(): React.JSX.Element {
   const [state, setState] = useState<PlaybackSnapshot>(EMPTY_STATE)
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null)
   const [translation, setTranslation] = useState<TranslationLookupState>({ status: 'idle' })
+  const [translationSettings, setTranslationSettings] = useState<TranslationSettingsSnapshot>(
+    DEFAULT_TRANSLATION_SETTINGS
+  )
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
+  const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [controlError, setControlError] = useState<string | null>(null)
   const currentFilePath = useRef<string | null>(null)
   const currentCueId = useRef<string | null>(null)
@@ -80,6 +99,27 @@ export function OverlayProbe(): React.JSX.Element {
       active = false
       translationRequestVersion.current += 1
       unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+
+    void window.desktop.translation
+      .getSettings()
+      .then((settings) => {
+        if (active) {
+          setTranslationSettings(settings)
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setSettingsError(translationErrorMessage(error))
+        }
+      })
+
+    return () => {
+      active = false
     }
   }, [])
 
@@ -150,6 +190,46 @@ export function OverlayProbe(): React.JSX.Element {
     }
   }
 
+  const updateTranslationSettings = async (
+    update: TranslationSettingsUpdate
+  ): Promise<boolean> => {
+    setSettingsError(null)
+    try {
+      const nextSettings = await window.desktop.translation.updateSettings(update)
+      setTranslationSettings(nextSettings)
+
+      if (update.provider !== undefined || update.targetLanguage !== undefined) {
+        translationRequestVersion.current += 1
+        setSelectedWord(null)
+        setTranslation({ status: 'idle' })
+      }
+
+      return true
+    } catch (error) {
+      setSettingsError(translationErrorMessage(error))
+      return false
+    }
+  }
+
+  const clearTranslationCache = async (): Promise<void> => {
+    setSettingsError(null)
+    try {
+      const nextSettings = await window.desktop.translation.clearCache()
+      setTranslationSettings(nextSettings)
+    } catch (error) {
+      setSettingsError(translationErrorMessage(error))
+    }
+  }
+
+  const saveApiKey = async (): Promise<void> => {
+    if (!apiKeyDraft.trim()) {
+      return
+    }
+    if (await updateTranslationSettings({ apiKey: apiKeyDraft })) {
+      setApiKeyDraft('')
+    }
+  }
+
   const selectWord = (cueId: string, token: SubtitleToken, context: string): void => {
     const requestVersion = ++translationRequestVersion.current
     setSelectedWord({
@@ -159,6 +239,10 @@ export function OverlayProbe(): React.JSX.Element {
       lookupTerm: token.lookupTerm
     })
     setTranslation({ status: 'loading', word: token.text })
+
+    if (translationSettings.autoPauseOnWordClick && state.status === 'playing') {
+      void runControl(() => window.desktop.media.setPaused(true))
+    }
 
     void window.desktop.translation
       .translateWord({
@@ -170,6 +254,7 @@ export function OverlayProbe(): React.JSX.Element {
           return
         }
         setTranslation({ status: 'ready', word: token.text, result })
+        void refreshTranslationSettings(setTranslationSettings)
       })
       .catch((error: unknown) => {
         if (translationRequestVersion.current !== requestVersion) {
@@ -226,7 +311,12 @@ export function OverlayProbe(): React.JSX.Element {
               })}
             </div>
             {selectedWord ? (
-              <TranslationPopup selectedWord={selectedWord} translation={translation} />
+              <TranslationPopup
+                selectedWord={selectedWord}
+                translation={translation}
+                popupPosition={translationSettings.popupPosition}
+                targetLanguage={translationSettings.targetLanguage}
+              />
             ) : null}
           </div>
         ) : state.subtitle.status === 'extracting' ? (
@@ -237,6 +327,28 @@ export function OverlayProbe(): React.JSX.Element {
       </section>
 
       <div className="player-controls">
+        {settingsOpen ? (
+          <TranslationSettingsPanel
+            settings={translationSettings}
+            apiKeyDraft={apiKeyDraft}
+            error={settingsError}
+            onApiKeyDraftChange={setApiKeyDraft}
+            onUpdate={(update) => {
+              void updateTranslationSettings(update)
+            }}
+            onSaveApiKey={() => {
+              void saveApiKey()
+            }}
+            onClearApiKey={() => {
+              setApiKeyDraft('')
+              void updateTranslationSettings({ apiKey: null })
+            }}
+            onClearCache={() => {
+              void clearTranslationCache()
+            }}
+          />
+        ) : null}
+
         {state.error || controlError ? (
           <div className="player-control-error" role="status">
             {controlError ?? state.error}
@@ -329,6 +441,17 @@ export function OverlayProbe(): React.JSX.Element {
           <button
             type="button"
             className="control-button"
+            aria-expanded={settingsOpen}
+            onClick={() => {
+              setSettingsOpen((open) => !open)
+            }}
+          >
+            Settings
+          </button>
+
+          <button
+            type="button"
+            className="control-button"
             disabled={!state.filePath}
             onClick={() => {
               void runControl(() => window.desktop.media.toggleFullscreen())
@@ -344,16 +467,26 @@ export function OverlayProbe(): React.JSX.Element {
 
 function TranslationPopup({
   selectedWord,
-  translation
+  translation,
+  popupPosition,
+  targetLanguage
 }: {
   selectedWord: SelectedWord
   translation: TranslationLookupState
+  popupPosition: 'above' | 'below'
+  targetLanguage: string
 }): React.JSX.Element {
+  const resultLanguage = translation.status === 'ready' ? translation.result.targetLanguage : targetLanguage
+
   return (
-    <div className={`translation-popup translation-${translation.status}`} role="status" aria-live="polite">
+    <div
+      className={`translation-popup popup-${popupPosition} translation-${translation.status}`}
+      role="status"
+      aria-live="polite"
+    >
       <div className="translation-popup-header">
         <strong>{selectedWord.text}</strong>
-        <span>English → Burmese</span>
+        <span>English → {languageLabel(resultLanguage)}</span>
       </div>
 
       {translation.status === 'loading' ? (
@@ -362,7 +495,7 @@ function TranslationPopup({
 
       {translation.status === 'ready' ? (
         <>
-          <div className="translation-burmese" lang="my">
+          <div className="translation-burmese" lang={translation.result.targetLanguage}>
             {translation.result.translation}
           </div>
           {translation.result.pronunciation ? (
@@ -378,14 +511,152 @@ function TranslationPopup({
   )
 }
 
+function TranslationSettingsPanel({
+  settings,
+  apiKeyDraft,
+  error,
+  onApiKeyDraftChange,
+  onUpdate,
+  onSaveApiKey,
+  onClearApiKey,
+  onClearCache
+}: {
+  settings: TranslationSettingsSnapshot
+  apiKeyDraft: string
+  error: string | null
+  onApiKeyDraftChange: (value: string) => void
+  onUpdate: (update: TranslationSettingsUpdate) => void
+  onSaveApiKey: () => void
+  onClearApiKey: () => void
+  onClearCache: () => void
+}): React.JSX.Element {
+  return (
+    <section className="translation-settings-panel" aria-label="Translation settings">
+      <div className="translation-settings-heading">
+        <strong>Translation settings</strong>
+        <span>{settings.cacheEntries} cached</span>
+      </div>
+
+      {error ? <div className="translation-settings-error">{error}</div> : null}
+
+      <div className="translation-settings-grid">
+        <label>
+          <span>Provider</span>
+          <select
+            value={settings.provider}
+            onChange={(event) => {
+              onUpdate({ provider: event.currentTarget.value as TranslationSettingsSnapshot['provider'] })
+            }}
+          >
+            <option value="local-dictionary">Local dictionary (offline)</option>
+            <option value="google">Google Translation (optional)</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Target language</span>
+          <select
+            value={settings.targetLanguage}
+            onChange={(event) => {
+              onUpdate({ targetLanguage: event.currentTarget.value })
+            }}
+          >
+            {TARGET_LANGUAGE_OPTIONS.map((language) => (
+              <option value={language.code} key={language.code}>
+                {language.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <span>Popup position</span>
+          <select
+            value={settings.popupPosition}
+            onChange={(event) => {
+              onUpdate({ popupPosition: event.currentTarget.value as 'above' | 'below' })
+            }}
+          >
+            <option value="below">Below subtitle</option>
+            <option value="above">Above subtitle</option>
+          </select>
+        </label>
+
+        <label className="translation-settings-check">
+          <input
+            type="checkbox"
+            checked={settings.autoPauseOnWordClick}
+            onChange={(event) => {
+              onUpdate({ autoPauseOnWordClick: event.currentTarget.checked })
+            }}
+          />
+          <span>Pause automatically when I click a word</span>
+        </label>
+      </div>
+
+      {settings.provider === 'local-dictionary' && settings.targetLanguage !== 'my' ? (
+        <div className="translation-settings-note">
+          The offline dictionary currently contains Burmese only. Choose Burmese for offline lookup or use a provider that supports the selected language.
+        </div>
+      ) : null}
+
+      {settings.provider === 'google' ? (
+        <div className="translation-api-key-row">
+          <label>
+            <span>Google API key</span>
+            <input
+              type="password"
+              value={apiKeyDraft}
+              autoComplete="off"
+              placeholder={settings.apiKeyConfigured ? '•••••••• saved securely' : 'Enter API key'}
+              onChange={(event) => {
+                onApiKeyDraftChange(event.currentTarget.value)
+              }}
+            />
+          </label>
+          <button type="button" className="control-button" disabled={!apiKeyDraft.trim()} onClick={onSaveApiKey}>
+            Save key
+          </button>
+          {settings.apiKeyConfigured ? (
+            <button type="button" className="control-button" onClick={onClearApiKey}>
+              Clear key
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="translation-cache-row">
+        <span>Session translation cache: {settings.cacheEntries} entries</span>
+        <button type="button" className="control-button" disabled={settings.cacheEntries === 0} onClick={onClearCache}>
+          Clear cache
+        </button>
+      </div>
+    </section>
+  )
+}
+
+async function refreshTranslationSettings(
+  setSettings: (settings: TranslationSettingsSnapshot) => void
+): Promise<void> {
+  try {
+    setSettings(await window.desktop.translation.getSettings())
+  } catch {
+    // Translation already succeeded; a settings-count refresh should not replace that result.
+  }
+}
+
 function translationErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
     return 'Translation failed. Try the word again.'
   }
 
   return error.message
-    .replace(/^Error invoking remote method 'translation:translate-word':\s*/i, '')
+    .replace(/^Error invoking remote method '[^']+':\s*/i, '')
     .replace(/^Error:\s*/i, '')
+}
+
+function languageLabel(code: string): string {
+  return TARGET_LANGUAGE_OPTIONS.find((language) => language.code === code)?.label ?? code
 }
 
 function isSelectableSubtitleTrack(track: MediaTrack): boolean {
