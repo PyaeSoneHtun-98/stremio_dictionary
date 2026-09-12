@@ -4,6 +4,11 @@ import { App } from './App'
 import './styles.css'
 
 const root = document.getElementById('root')
+const mode = new URLSearchParams(window.location.search).get('mode')
+
+if (mode === 'overlay') {
+  document.documentElement.classList.add('overlay-mode')
+}
 
 if (!root) {
   throw new Error('Root element was not found')
