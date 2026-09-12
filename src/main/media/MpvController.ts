@@ -110,6 +110,7 @@ export class MpvController {
         '--gpu-api=d3d11',
         '--gpu-context=d3d11',
         '--hwdec=no',
+        ...mpvDiagnosticArguments(),
         `--wid=${windowId}`,
         `--input-ipc-server=${PIPE_PATH}`
       ],
@@ -319,6 +320,18 @@ function connectOnce(): Promise<Socket> {
     socket.once('connect', handleConnect)
     socket.on('error', handleError)
   })
+}
+
+function mpvDiagnosticArguments(): string[] {
+  const logFile = process.env.MPV_LOG_FILE?.trim()
+  if (!logFile) {
+    return []
+  }
+
+  return [
+    `--log-file=${logFile}`,
+    '--msg-level=all=warn,vo/gpu=debug,vo/d3d11=debug,w32=debug,cplayer=info'
+  ]
 }
 
 function delay(milliseconds: number): Promise<void> {
