@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PlaybackSnapshot } from '../../../../shared/media'
+import './PlaybackProof.css'
 
 const EMPTY_STATE: PlaybackSnapshot = {
   status: 'idle',
