@@ -30,10 +30,10 @@ export class GoogleTranslationProvider implements TranslationProvider {
       throw new Error('Choose a subtitle word to translate.')
     }
 
+    const targetLanguage = request.targetLanguage ?? 'my'
+
     if (!this.apiKey) {
-      throw new Error(
-        'Google Translation is not configured. Set GOOGLE_TRANSLATE_API_KEY and restart Subtitle Bridge.'
-      )
+      throw new Error('Google Translation is not configured. Add an API key in Translation settings.')
     }
 
     const controller = new AbortController()
@@ -50,7 +50,7 @@ export class GoogleTranslationProvider implements TranslationProvider {
           body: JSON.stringify({
             q: word,
             source: 'en',
-            target: 'my',
+            target: targetLanguage,
             format: 'text'
           }),
           signal: controller.signal
@@ -70,7 +70,8 @@ export class GoogleTranslationProvider implements TranslationProvider {
       return {
         originalWord: word,
         translation: translatedText.trim(),
-        provider: this.id
+        provider: this.id,
+        targetLanguage
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {

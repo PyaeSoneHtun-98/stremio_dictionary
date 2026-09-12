@@ -1,13 +1,18 @@
 import { ipcMain } from 'electron'
 import type { TranslationRequest } from '../../shared/translation'
-import { LocalDictionaryProvider } from './LocalDictionaryProvider'
-import type { TranslationProvider } from './TranslationProvider'
+import { TranslationService } from './TranslationService'
+import { TranslationSettingsStore } from './TranslationSettingsStore'
+import { normalizeTranslationSettingsUpdate } from './settingsValidation'
 
 const TRANSLATE_WORD_CHANNEL = 'translation:translate-word'
+const GET_SETTINGS_CHANNEL = 'translation:get-settings'
+const UPDATE_SETTINGS_CHANNEL = 'translation:update-settings'
+const CLEAR_CACHE_CHANNEL = 'translation:clear-cache'
 const MAX_WORD_LENGTH = 120
 const MAX_CONTEXT_LENGTH = 600
 
-let provider: TranslationProvider | null = null
+let settingsStore: TranslationSettingsStore | null = null
+let service: TranslationService | null = null
 let registered = false
 
 export function registerTranslationIpc(): void {
@@ -16,16 +21,40 @@ export function registerTranslationIpc(): void {
   }
 
   registered = true
-  provider = new LocalDictionaryProvider()
+  settingsStore = new TranslationSettingsStore()
+  service = new TranslationService(settingsStore)
 
   ipcMain.handle(TRANSLATE_WORD_CHANNEL, async (_event, value: unknown) => {
     const request = normalizeTranslationRequest(value)
-    const activeProvider = provider
-    if (!activeProvider) {
-      throw new Error('Translation service is unavailable. Restart Subtitle Bridge and try again.')
+    return requireService().translate(request)
+  })
+
+  ipcMain.handle(GET_SETTINGS_CHANNEL, async () => {
+    const activeService = requireService()
+    return requireSettingsStore().getSnapshot(activeService.cacheSize)
+  })
+
+  ipcMain.handle(UPDATE_SETTINGS_CHANNEL, async (_event, value: unknown) => {
+    const update = normalizeTranslationSettingsUpdate(value)
+    const activeService = requireService()
+    const store = requireSettingsStore()
+    await store.update(update)
+
+    if (
+      update.provider !== undefined ||
+      update.targetLanguage !== undefined ||
+      update.apiKey !== undefined
+    ) {
+      activeService.clearCache()
     }
 
-    return activeProvider.translate(request)
+    return store.getSnapshot(activeService.cacheSize)
+  })
+
+  ipcMain.handle(CLEAR_CACHE_CHANNEL, async () => {
+    const activeService = requireService()
+    activeService.clearCache()
+    return requireSettingsStore().getSnapshot(activeService.cacheSize)
   })
 }
 
@@ -35,7 +64,11 @@ export function disposeTranslationIpc(): void {
   }
 
   ipcMain.removeHandler(TRANSLATE_WORD_CHANNEL)
-  provider = null
+  ipcMain.removeHandler(GET_SETTINGS_CHANNEL)
+  ipcMain.removeHandler(UPDATE_SETTINGS_CHANNEL)
+  ipcMain.removeHandler(CLEAR_CACHE_CHANNEL)
+  service = null
+  settingsStore = null
   registered = false
 }
 
@@ -67,4 +100,18 @@ export function normalizeTranslationRequest(value: unknown): TranslationRequest 
   }
 
   return context ? { word, context } : { word }
+}
+
+function requireService(): TranslationService {
+  if (!service) {
+    throw new Error('Translation service is unavailable. Restart Subtitle Bridge and try again.')
+  }
+  return service
+}
+
+function requireSettingsStore(): TranslationSettingsStore {
+  if (!settingsStore) {
+    throw new Error('Translation settings are unavailable. Restart Subtitle Bridge and try again.')
+  }
+  return settingsStore
 }

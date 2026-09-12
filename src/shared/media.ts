@@ -1,3 +1,4 @@
+import type { TranslationSettingsSnapshot, TranslationSettingsUpdate } from './settings'
 import type { TranslationRequest, TranslationResult } from './translation'
 
 export type PlaybackStatus =
@@ -86,6 +87,9 @@ export interface DesktopBridge {
   }
   translation: {
     translateWord: (request: TranslationRequest) => Promise<TranslationResult>
+    getSettings: () => Promise<TranslationSettingsSnapshot>
+    updateSettings: (update: TranslationSettingsUpdate) => Promise<TranslationSettingsSnapshot>
+    clearCache: () => Promise<TranslationSettingsSnapshot>
   }
 }
 
