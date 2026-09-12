@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import type { TranslationRequest } from '../../shared/translation'
-import { GoogleTranslationProvider } from './GoogleTranslationProvider'
+import { LocalDictionaryProvider } from './LocalDictionaryProvider'
 import type { TranslationProvider } from './TranslationProvider'
 
 const TRANSLATE_WORD_CHANNEL = 'translation:translate-word'
@@ -16,7 +16,7 @@ export function registerTranslationIpc(): void {
   }
 
   registered = true
-  provider = new GoogleTranslationProvider()
+  provider = new LocalDictionaryProvider()
 
   ipcMain.handle(TRANSLATE_WORD_CHANNEL, async (_event, value: unknown) => {
     const request = normalizeTranslationRequest(value)
