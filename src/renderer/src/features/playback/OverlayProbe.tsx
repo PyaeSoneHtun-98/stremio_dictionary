@@ -65,6 +65,42 @@ export function OverlayProbe(): React.JSX.Element {
     }
   }, [])
 
+  useEffect(() => {
+    const handleKeyboardEntry = (event: KeyboardEvent): void => {
+      if (
+        event.key !== 'Tab' ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        !state.subtitle.activeCue
+      ) {
+        return
+      }
+
+      const activeElement = document.activeElement
+      const startsFromDocument =
+        activeElement === null || activeElement === document.body || activeElement === document.documentElement
+
+      if (!startsFromDocument) {
+        return
+      }
+
+      const words = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('.subtitle-word:not(:disabled)')
+      )
+      const target = event.shiftKey ? words.at(-1) : words[0]
+      if (!target) {
+        return
+      }
+
+      event.preventDefault()
+      target.focus()
+    }
+
+    window.addEventListener('keydown', handleKeyboardEntry, true)
+    return () => window.removeEventListener('keydown', handleKeyboardEntry, true)
+  }, [state.subtitle.activeCue])
+
   const canControl = Boolean(state.filePath) && !['loading', 'error', 'unavailable'].includes(state.status)
   const playing = state.status === 'playing'
   const duration = state.duration ?? 0
