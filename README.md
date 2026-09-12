@@ -4,12 +4,12 @@ Subtitle Bridge is a Windows-first desktop video player for English learners. It
 
 ## Stack
 
-- Electron for the desktop shell, native playback window integration, and network/provider access
+- Electron for the desktop shell and native playback window integration
 - React + TypeScript for the renderer UI
 - Vite through `electron-vite` for development and production builds
 - mpv for video playback
 - FFmpeg for embedded text subtitle extraction
-- Google Cloud Translation Basic (v2) as the first Burmese translation provider
+- a replaceable translation-provider interface with an offline English → Burmese dictionary as the default provider
 - Biome for linting/formatting
 - Vitest for tests
 
@@ -30,27 +30,15 @@ npm run dev
 
 Use `npm ci` for reproducible installs from the committed lockfile. The dev command starts the Vite renderer and launches the Electron application.
 
-## Google Translation development setup
+## Offline Burmese dictionary
 
-Issue #7 uses Google Cloud Translation Basic (v2) through a replaceable translation-provider interface. Enable the Cloud Translation API in a Google Cloud project, create an API key that can call the Basic API, and expose it to the Electron main process before starting the app.
+Issue #7 uses `LocalDictionaryProvider` by default. It performs English → Burmese word lookup entirely inside the Electron main process, so normal translation lookup requires no account, API key, payment method, or internet connection.
 
-Windows Command Prompt:
+The starter dataset lives in `src/main/translation/localDictionary.ts`. It contains a small curated set of common words plus selected inflected aliases such as `running → run`, `treaties → treaty`, and `signed → sign`. The dataset is intentionally easy to replace or expand while a larger English → Burmese dictionary is developed.
 
-```cmd
-set "GOOGLE_TRANSLATE_API_KEY=your-api-key"
-npm run dev
-```
+A word that is not yet in the local dataset returns a short readable “not available yet” message while video and subtitle playback continue normally.
 
-PowerShell:
-
-```powershell
-$env:GOOGLE_TRANSLATE_API_KEY = "your-api-key"
-npm run dev
-```
-
-The API key stays in the Electron main process and is not exposed through the preload bridge to the React renderer. The current Google provider sends only the normalized selected word to Google (`source=en`, `target=my`, plain text). The current subtitle-line context is available to the provider interface for future context-aware/local providers but is not sent by `GoogleTranslationProvider`.
-
-Do not commit API keys to the repository. Persistent provider settings and translation caching are handled in the next settings/caching milestone.
+`GoogleTranslationProvider` remains in the codebase as an optional provider adapter example, but it is not the active provider and no Google Cloud configuration is required to run Subtitle Bridge.
 
 ## Validation commands
 
@@ -76,7 +64,8 @@ Electron main process
 ├── mpv playback controller
 ├── FFmpeg subtitle extraction
 ├── translation provider adapters
-│   └── GoogleTranslationProvider
+│   ├── LocalDictionaryProvider  ← default/offline
+│   └── GoogleTranslationProvider  ← optional adapter
 └── secure preload bridge
     └── React renderer
         ├── player controls
@@ -86,7 +75,7 @@ Electron main process
 
 The renderer runs with Node integration disabled and context isolation enabled. System capabilities and provider calls are exposed through narrow preload/IPC APIs instead of importing Node APIs into React components.
 
-The translation provider is intentionally replaceable so a future local English→Burmese dictionary can become the primary provider with Google Translation as a fallback.
+The provider boundary is intentionally replaceable so the starter dictionary can grow into a larger JSON/SQLite dataset later, and additional translation providers can be added without changing the subtitle UI.
 
 ## Development workflow
 
