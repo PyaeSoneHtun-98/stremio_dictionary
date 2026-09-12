@@ -13,6 +13,7 @@ const SET_PAUSED_CHANNEL = 'media:set-paused'
 const SEEK_CHANNEL = 'media:seek'
 const SET_VOLUME_CHANNEL = 'media:set-volume'
 const SET_SPEED_CHANNEL = 'media:set-speed'
+const SELECT_SUBTITLE_TRACK_CHANNEL = 'media:select-subtitle-track'
 const TOGGLE_FULLSCREEN_CHANNEL = 'media:toggle-fullscreen'
 
 const controller = new MpvController(broadcastState)
@@ -68,6 +69,13 @@ export function registerMediaIpc(): void {
   ipcMain.handle(SET_SPEED_CHANNEL, (_event, speed: unknown) => {
     controller.setSpeed(requireFiniteNumber(speed, 'playback speed'))
   })
+  ipcMain.handle(SELECT_SUBTITLE_TRACK_CHANNEL, async (_event, trackId: unknown) => {
+    const value = requireFiniteNumber(trackId, 'subtitle track')
+    if (!Number.isSafeInteger(value)) {
+      throw new Error('Invalid subtitle track.')
+    }
+    await controller.selectSubtitleTrack(value)
+  })
   ipcMain.handle(TOGGLE_FULLSCREEN_CHANNEL, () => playbackSurface.toggleFullscreen())
 }
 
@@ -86,6 +94,7 @@ export function disposeMediaIpc(): void {
   ipcMain.removeHandler(SEEK_CHANNEL)
   ipcMain.removeHandler(SET_VOLUME_CHANNEL)
   ipcMain.removeHandler(SET_SPEED_CHANNEL)
+  ipcMain.removeHandler(SELECT_SUBTITLE_TRACK_CHANNEL)
   ipcMain.removeHandler(TOGGLE_FULLSCREEN_CHANNEL)
   registered = false
 }

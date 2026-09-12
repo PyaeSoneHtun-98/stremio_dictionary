@@ -13,6 +13,7 @@ const desktopBridge: DesktopBridge = {
     seek: (seconds) => ipcRenderer.invoke('media:seek', seconds),
     setVolume: (volume) => ipcRenderer.invoke('media:set-volume', volume),
     setSpeed: (speed) => ipcRenderer.invoke('media:set-speed', speed),
+    selectSubtitleTrack: (trackId) => ipcRenderer.invoke('media:select-subtitle-track', trackId),
     toggleFullscreen: () => ipcRenderer.invoke('media:toggle-fullscreen'),
     onState: (listener) => {
       const subscription = (_event: IpcRendererEvent, state: PlaybackSnapshot): void => listener(state)

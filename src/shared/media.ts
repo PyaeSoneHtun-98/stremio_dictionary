@@ -9,7 +9,7 @@ export type PlaybackStatus =
 
 export type MediaTrackType = 'video' | 'audio' | 'subtitle'
 export type SubtitleTrackKind = 'text' | 'image' | 'unknown'
-export type SubtitleModelStatus = 'idle' | 'extracting' | 'ready' | 'unsupported' | 'error'
+export type SubtitleModelStatus = 'idle' | 'missing' | 'extracting' | 'ready' | 'unsupported' | 'error'
 
 export interface MediaTrack {
   id: number
@@ -78,6 +78,7 @@ export interface DesktopBridge {
     seek: (seconds: number) => Promise<void>
     setVolume: (volume: number) => Promise<void>
     setSpeed: (speed: number) => Promise<void>
+    selectSubtitleTrack: (trackId: number) => Promise<void>
     toggleFullscreen: () => Promise<void>
     onState: (listener: (state: PlaybackSnapshot) => void) => () => void
   }

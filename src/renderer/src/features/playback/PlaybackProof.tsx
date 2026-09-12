@@ -125,8 +125,8 @@ export function PlaybackProof(): React.JSX.Element {
     >
       <div className="playback-proof-header">
         <div>
-          <span className="eyebrow">Issue #4 subtitle cue pipeline</span>
-          <h2 id="playback-proof-title">Extract and normalize embedded text subtitles</h2>
+          <span className="eyebrow">Issue #6 subtitle track selection</span>
+          <h2 id="playback-proof-title">Choose embedded text subtitles safely</h2>
         </div>
         <span className={`status-pill status-${state.status}`}>{state.status}</span>
       </div>
@@ -142,10 +142,9 @@ export function PlaybackProof(): React.JSX.Element {
       </div>
 
       <p className="playback-help">
-        Playback controls remain on the video surface. Issue #4 automatically picks a supported
-        embedded English text subtitle track when available, extracts it with FFmpeg, and keeps a
-        normalized cue model synchronized to playback time. Set <code>FFMPEG_PATH</code> if ffmpeg is
-        not on PATH.
+        Embedded subtitle tracks are listed below with language, title, and codec. Pause playback in
+        the video window to change text subtitle tracks. PGS/VobSub and other image subtitles are
+        listed but remain unsupported in the MVP.
       </p>
 
       {state.error || localError ? <div className="media-error">{localError ?? state.error}</div> : null}
@@ -162,7 +161,7 @@ export function PlaybackProof(): React.JSX.Element {
       <div className="subtitle-diagnostic" aria-live="polite">
         <div className="subtitle-diagnostic-header">
           <div>
-            <span className="eyebrow">Normalized cue model</span>
+            <span className="eyebrow">Selected subtitle model</span>
             <strong>{subtitleTrackLabel(state)}</strong>
           </div>
           <span className={`status-pill subtitle-status-${state.subtitle.status}`}>
@@ -191,7 +190,7 @@ export function PlaybackProof(): React.JSX.Element {
           <div className="empty-subtitle-state">
             {state.subtitle.status === 'ready'
               ? 'No subtitle cue is active at the current playback position.'
-              : 'Open an MKV with an embedded SRT, ASS, or SSA text subtitle track.'}
+              : state.subtitle.error ?? 'Open an MKV with an embedded text subtitle track.'}
           </div>
         )}
       </div>
@@ -206,6 +205,7 @@ export function PlaybackProof(): React.JSX.Element {
               <th>Title</th>
               <th>Codec</th>
               <th>Subtitle mode</th>
+              <th>App selected</th>
               <th>FFmpeg index</th>
             </tr>
           </thead>
@@ -219,12 +219,13 @@ export function PlaybackProof(): React.JSX.Element {
                   <td>{track.title ?? '—'}</td>
                   <td>{track.codec ?? 'unknown'}</td>
                   <td>{track.subtitleKind ?? '—'}</td>
+                  <td>{track.type === 'subtitle' && state.subtitle.trackId === track.id ? 'yes' : '—'}</td>
                   <td>{track.ffIndex ?? '—'}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={7} className="empty-table-cell">
+                <td colSpan={8} className="empty-table-cell">
                   Open an MKV file to inspect its embedded tracks.
                 </td>
               </tr>
