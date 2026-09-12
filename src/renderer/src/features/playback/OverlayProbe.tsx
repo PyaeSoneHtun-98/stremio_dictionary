@@ -44,7 +44,7 @@ export function OverlayProbe(): React.JSX.Element {
           <span>HTML overlay probe</span>
           <strong>{formatTime(state.currentTime)}</strong>
         </div>
-        <div className="overlay-probe-line" role="group" aria-label="Clickable test subtitle">
+        <div className="overlay-probe-line">
           <span>Click a word:</span>
           {['interactive', 'subtitle', 'works'].map((word) => (
             <button
