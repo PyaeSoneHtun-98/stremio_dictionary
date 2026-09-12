@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { disposeMediaIpc, registerMediaIpc } from './media/ipc'
+import { disposeTranslationIpc, registerTranslationIpc } from './translation/ipc'
 
 // On some Windows x64 systems, Chromium's accelerated transparent windows render their
 // transparent region as black. The subtitle overlay is a transparent BrowserWindow above mpv's
@@ -35,6 +36,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   registerMediaIpc()
+  registerTranslationIpc()
   createWindow()
 
   app.on('activate', () => {
@@ -45,6 +47,7 @@ app.whenReady().then(() => {
 })
 
 app.on('before-quit', () => {
+  disposeTranslationIpc()
   disposeMediaIpc()
 })
 
