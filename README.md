@@ -97,7 +97,11 @@ Subtitle Bridge accepts HTTP/HTTPS media URLs on the command line, including Str
 
 For HTTP/HTTPS playback, Subtitle Bridge uses mpv's selected embedded text subtitle track as a **live subtitle source**. mpv keeps its own subtitle rendering hidden while exposing the current plain subtitle text, which is tokenized and shown through the existing clickable React overlay. This avoids waiting for FFmpeg to scan an entire torrent-backed stream before subtitles become usable. Local MKV files continue to use FFmpeg full-track extraction.
 
-The Issue #24 draft also experimented with taking over the current user's `vlc://` protocol handler. Real Stremio Windows testing showed that the in-player **Play in VLC** menu item is actually driven by Stremio's playback-device/casting server and launches the detected player directly, so the protocol override is **not** considered the final one-click integration. Direct stream-URL playback is being validated first; the one-click handoff will be redesigned against Stremio's actual playback-device mechanism.
+The tested Stremio 6 beta build exposes only **Disabled** and **M3U Playlist** under **Settings → Player → Play in external player**, so the earlier `vlc://` settings-based approach is not available there. The working Stremio desktop path is the in-player external-device menu, where the streaming server already discovers entries such as **Play in VLC**.
+
+The packaged `Enable-StremioHandoff.ps1` helper therefore makes an opt-in, reversible patch to Stremio's local `server.js` external-player table and adds **Play in Subtitle Bridge** to that menu. It validates the expected server layout and creates a backup before writing. `Disable-StremioHandoff.ps1` removes only the marked Subtitle Bridge block. Stremio must be fully restarted after either operation, and Stremio updates may require rerunning the enable helper.
+
+Full instructions and compatibility details are in [`docs/STREMIO_HANDOFF.md`](docs/STREMIO_HANDOFF.md).
 
 Separate subtitle-addon URLs and watched/progress synchronization are later work.
 
@@ -126,6 +130,10 @@ Electron main process
         ├── player controls
         ├── interactive subtitle overlay
         └── Burmese translation popup
+
+Optional Stremio compatibility helper
+└── patches Stremio server.js external-player table
+    └── adds "Play in Subtitle Bridge"
 ```
 
 The renderer runs with Node integration disabled and context isolation enabled. System capabilities and provider calls are exposed through narrow preload/IPC APIs instead of importing Node APIs into React components.
