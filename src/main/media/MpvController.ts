@@ -627,7 +627,7 @@ export class MpvController {
       this.liveSubtitleCueCount += 1
     }
 
-    let tokens
+    let tokens: SubtitleCue['tokens']
     try {
       tokens = tokenizeSubtitleText(text, MAX_LIVE_SUBTITLE_TOKENS, MAX_LIVE_SUBTITLE_MATCHES)
     } catch {
