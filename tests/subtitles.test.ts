@@ -32,6 +32,31 @@ describe('parseSrtCues', () => {
     expect(parseSrtCues('1\n00:00:03,000 --> 00:00:02,000\nBackwards')).toEqual([])
   })
 
+  it('strips ASS override tags while preserving normal dialogue', () => {
+    const source = `1\n00:00:01,000 --> 00:00:03,000\n{\\an8}{\\i1}Hello{\\i0} world!`
+
+    const cues = parseSrtCues(source)
+
+    expect(cues).toHaveLength(1)
+    expect(cues[0].text).toBe('Hello world!')
+    expect(cues[0].tokens.map((token) => token.lookupTerm)).toEqual(['hello', 'world'])
+  })
+
+  it('drops FFmpeg-flattened ASS vector drawing payloads', () => {
+    const source = `1\n00:00:01,000 --> 00:00:03,000\n{\\an2}m -2 0 b -2 0 -2 0 -2 0 l -2 1 l 6 1 l 6 0`
+
+    expect(parseSrtCues(source)).toEqual([])
+  })
+
+  it('drops explicit ASS drawing-mode geometry but keeps text after drawing mode ends', () => {
+    const source = `1\n00:00:01,000 --> 00:00:03,000\n{\\p1}m 0 0 l 10 0 l 10 10 l 0 10{\\p0}Visible dialogue`
+
+    const cues = parseSrtCues(source)
+
+    expect(cues).toHaveLength(1)
+    expect(cues[0].text).toBe('Visible dialogue')
+  })
+
   it('rejects subtitle models that exceed the configured cue limit', () => {
     expect(() =>
       parseSrtCues(SAMPLE_SRT, {
