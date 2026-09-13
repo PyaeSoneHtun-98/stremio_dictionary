@@ -10,10 +10,10 @@ export function AppShell({ children }: PropsWithChildren): React.JSX.Element {
           </span>
           <span>
             <strong>Subtitle Bridge</strong>
-            <small>Interactive subtitle translator</small>
+            <small>Watch. Understand. Remember.</small>
           </span>
         </a>
-        <span className="version-badge">MVP · v0.1</span>
+        <span className="version-badge">Your personal cinema</span>
       </header>
       <main id="top">{children}</main>
     </div>

@@ -251,3 +251,90 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+:root {
+  color-scheme: dark;
+}
+body {
+  background: radial-gradient(ellipse at 80% 0%, #19332f60, transparent 55%), #0c1319;
+}
+.app-shell {
+  max-width: 1000px;
+}
+.brand-mark {
+  background: #b5e6d1;
+  color: #173025;
+  box-shadow: none;
+}
+.version-badge {
+  border: 0;
+  background: none;
+  color: #8fa79c;
+}
+.hero {
+  padding: 70px 0 46px;
+  max-width: 760px;
+}
+.hero h1 {
+  font-size: clamp(36px, 5vw, 58px);
+  line-height: 1.12;
+  font-weight: 550;
+  letter-spacing: -0.04em;
+}
+.hero h1 span {
+  color: #b5e6d1;
+}
+.hero-copy {
+  max-width: 490px;
+  font-size: 15px;
+}
+.eyebrow {
+  color: #9bb9aa;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+.app-shell .playback-proof {
+  background: #142028;
+  border-color: #ffffff14;
+}
+.app-shell .video-dropzone {
+  border-color: #b5e6d14d;
+  background: #b5e6d108;
+  padding: 30px;
+}
+.primary-action {
+  background: #b5e6d1;
+  color: #173025;
+  cursor: pointer;
+}
+.primary-action:hover {
+  background: #d6f6e7;
+}
+.playback-proof-header h2 {
+  font-size: 22px;
+  font-weight: 500;
+}
+.app-shell .playback-help {
+  color: #9fb0a8;
+}
+.media-details {
+  margin-top: 24px;
+}
+.media-details summary {
+  cursor: pointer;
+  padding: 10px 0;
+  color: #a3b6aa;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.media-details summary:focus-visible {
+  outline: 2px solid #b5e6d1;
+  outline-offset: 3px;
+}
+.launcher-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 28px;
+  color: #849a8f;
+  font-size: 11px;
+}
