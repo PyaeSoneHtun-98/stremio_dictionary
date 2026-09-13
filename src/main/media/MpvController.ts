@@ -344,12 +344,14 @@ export class MpvController {
     switch (message.name) {
       case 'time-pos': {
         const currentTime = finiteNumberOrNull(message.data)
+        const applyAssEffectHeuristics = isAssSubtitleCodec(this.state.subtitle.trackCodec)
         const activeCue =
           this.state.subtitle.status === 'ready'
             ? findActiveCue(
                 this.subtitleCues,
                 currentTime,
-                this.state.subtitle.trackLanguage ?? this.state.subtitle.trackTitle
+                this.state.subtitle.trackLanguage ?? this.state.subtitle.trackTitle,
+                applyAssEffectHeuristics
               )
             : null
         this.patchState({
@@ -477,7 +479,8 @@ export class MpvController {
           activeCue: findActiveCue(
             cues,
             this.state.currentTime,
-            selectedTrack.language ?? selectedTrack.title
+            selectedTrack.language ?? selectedTrack.title,
+            isAssSubtitleCodec(selectedTrack.codec)
           ),
           error: null
         }
@@ -567,6 +570,11 @@ function chooseSubtitleTrack(tracks: MediaTrack[]): MediaTrack | null {
     tracks.find((track) => track.selected) ??
     tracks[0]
   )
+}
+
+function isAssSubtitleCodec(codec: string | null | undefined): boolean {
+  const normalized = codec?.trim().toLocaleLowerCase('en-US')
+  return normalized === 'ass' || normalized === 'ssa'
 }
 
 async function connectToPipe(): Promise<Socket> {
