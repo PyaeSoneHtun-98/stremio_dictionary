@@ -4,7 +4,6 @@ const TIMING_LINE =
   /^(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})\s+-->\s+(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})(?:\s+.*)?$/
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu
 const HAS_LETTER = /\p{L}/u
-const ASS_OVERRIDE_BLOCK = /\{\\[^}]*\}/g
 const ASS_DRAWING_COMMAND = /^[mnlbspc]$/i
 const ASS_DRAWING_NUMBER = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/
 
@@ -255,26 +254,33 @@ function stripAssOverrideBlocks(value: string): string {
   let cursor = 0
   let output = ''
 
-  ASS_OVERRIDE_BLOCK.lastIndex = 0
-  for (const match of value.matchAll(ASS_OVERRIDE_BLOCK)) {
-    const start = match.index
-    if (start === undefined) {
-      continue
+  while (cursor < value.length) {
+    const blockStart = value.indexOf('{\\', cursor)
+    if (blockStart < 0) {
+      if (!drawingMode) {
+        output += value.slice(cursor)
+      }
+      break
     }
 
     if (!drawingMode) {
-      output += value.slice(cursor, start)
+      output += value.slice(cursor, blockStart)
     }
 
-    for (const drawingTag of match[0].matchAll(/\\p(\d+)/gi)) {
+    const blockEnd = value.indexOf('}', blockStart + 2)
+    if (blockEnd < 0) {
+      // A malformed ASS override block has no trustworthy boundary. Preserve only
+      // text that was already proven to be outside the block and discard the rest
+      // so raw tags/drawing commands cannot become clickable subtitle words.
+      return output
+    }
+
+    const block = value.slice(blockStart, blockEnd + 1)
+    for (const drawingTag of block.matchAll(/\\p(\d+)/gi)) {
       drawingMode = Number(drawingTag[1]) > 0
     }
 
-    cursor = start + match[0].length
-  }
-
-  if (!drawingMode) {
-    output += value.slice(cursor)
+    cursor = blockEnd + 1
   }
 
   return output
