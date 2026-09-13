@@ -107,7 +107,9 @@ jobs:
           Copy-Item -LiteralPath $packageDir -Destination $brokenPackageDir -Recurse
           Remove-Item -LiteralPath (Join-Path $brokenPackageDir 'resources\app\out\renderer\index.html') -Force
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $brokenPackageDir 'Install-SubtitleBridge.ps1') -InstallDir $installDir -NoShortcut -NoLaunch
-          if ($LASTEXITCODE -eq 0) {
+          $brokenExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($brokenExitCode -eq 0) {
             throw 'Installer accepted an incomplete staged package.'
           }
           if (-not (Test-Path -LiteralPath $rollbackMarker)) {
@@ -116,7 +118,9 @@ jobs:
 
           $nestedInstallDir = Join-Path $packageDir 'nested-install-should-fail'
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $nestedInstallDir -NoShortcut -NoLaunch
-          if ($LASTEXITCODE -eq 0) {
+          $nestedExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($nestedExitCode -eq 0) {
             throw 'Installer accepted a destination nested inside the source package.'
           }
 
