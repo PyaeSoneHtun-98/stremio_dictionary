@@ -69,7 +69,9 @@ function Assert-CompatibleStremioLayout([string]$Text) {
 
 function Write-AtomicUtf8([string]$Path, [string]$Text) {
   $directory = Split-Path -Parent $Path
-  $tempPath = Join-Path $directory ('.subtitle-bridge-' + [Guid]::NewGuid().ToString('N') + '.tmp')
+  $token = [Guid]::NewGuid().ToString('N')
+  $tempPath = Join-Path $directory ('.subtitle-bridge-' + $token + '.tmp')
+  $replaceBackupPath = Join-Path $directory ('.subtitle-bridge-replace-' + $token + '.bak')
 
   try {
     [System.IO.File]::WriteAllText($tempPath, $Text, [System.Text.UTF8Encoding]::new($false))
@@ -83,10 +85,13 @@ function Write-AtomicUtf8([string]$Path, [string]$Text) {
       throw 'Simulated Stremio atomic replacement failure.'
     }
 
-    [System.IO.File]::Replace($tempPath, $Path, $null)
+    [System.IO.File]::Replace($tempPath, $Path, $replaceBackupPath)
   } finally {
     if (Test-Path -LiteralPath $tempPath) {
       Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path -LiteralPath $replaceBackupPath) {
+      Remove-Item -LiteralPath $replaceBackupPath -Force -ErrorAction SilentlyContinue
     }
   }
 }
