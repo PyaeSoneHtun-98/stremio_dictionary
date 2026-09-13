@@ -132,8 +132,17 @@ jobs:
           New-Item -ItemType Directory -Path $stremioFixtureDir -Force | Out-Null
           $serverJs = Join-Path $stremioFixtureDir 'server.js'
           $originalServerJs = @'
-          var players = { vlc: { title: "VLC" } };
-          devices.groups.external = [];
+          var players = {
+              vlc: { title: "VLC", win32: { path: [ '"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe"' ] } }
+          };
+          devices.groups.external = [], Object.keys(players).forEach(function(el) {
+              var player = players[el];
+              player[process.platform] && player[process.platform].path.forEach(function(p) {
+                  if (fs.existsSync(p.replace(/"/gi, ""))) {
+                      devices.groups.external.push({ id: el });
+                  }
+              });
+          });
           '@
           [System.IO.File]::WriteAllText($serverJs, $originalServerJs)
 
@@ -145,8 +154,12 @@ jobs:
           if ($patchedServerJs -notmatch 'Subtitle Bridge external player BEGIN' -or $patchedServerJs -notmatch 'players\.subtitleBridge' -or $patchedServerJs -notmatch 'Subtitle Bridge\.exe') {
             throw 'Stremio handoff helper did not add the Subtitle Bridge external-player entry.'
           }
-          if (-not (Test-Path -LiteralPath "$serverJs.subtitle-bridge.backup")) {
-            throw 'Stremio handoff helper did not create a server.js backup.'
+          $primaryBackup = "$serverJs.subtitle-bridge.backup"
+          if (-not (Test-Path -LiteralPath $primaryBackup)) {
+            throw 'Stremio handoff helper did not create a server.js safety backup.'
+          }
+          if ([System.IO.File]::ReadAllText($primaryBackup) -ne $originalServerJs) {
+            throw 'Stremio handoff safety backup does not contain the pristine compatible server.js.'
           }
 
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $serverJs
@@ -158,29 +171,65 @@ jobs:
           if ($markerCount -ne 1) {
             throw "Stremio handoff helper is not idempotent; marker count: $markerCount"
           }
+          if ([System.IO.File]::ReadAllText($primaryBackup) -ne $originalServerJs) {
+            throw 'Repeated enable overwrote the pristine Stremio safety backup.'
+          }
 
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -ServerJsPath $serverJs
           if ($LASTEXITCODE -ne 0) {
             throw 'Stremio external-player disable helper failed.'
           }
           $restoredServerJs = Get-Content -LiteralPath $serverJs -Raw
-          if ($restoredServerJs -match 'Subtitle Bridge external player BEGIN' -or $restoredServerJs -match 'players\.subtitleBridge') {
-            throw 'Stremio handoff disable helper did not remove the Subtitle Bridge entry.'
-          }
-          if ($restoredServerJs -notmatch 'devices\.groups\.external\s*=\s*\[\s*\]') {
-            throw 'Stremio handoff disable helper damaged the external-player discovery anchor.'
+          if ($restoredServerJs -ne $originalServerJs) {
+            throw 'Stremio handoff disable helper did not restore the exact pre-patch content.'
           }
 
           $unsupportedServerJs = Join-Path $stremioFixtureDir 'unsupported-server.js'
-          [System.IO.File]::WriteAllText($unsupportedServerJs, 'var players = {};')
+          $unsupportedContent = "var players = {};`r`ndevices.groups.external = [];`r`n"
+          [System.IO.File]::WriteAllText($unsupportedServerJs, $unsupportedContent)
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $unsupportedServerJs
           $unsupportedExitCode = $LASTEXITCODE
           $global:LASTEXITCODE = 0
           if ($unsupportedExitCode -eq 0) {
-            throw 'Stremio handoff helper accepted an unsupported server.js layout.'
+            throw 'Stremio handoff helper accepted a structurally incompatible server.js layout.'
           }
-          if ((Get-Content -LiteralPath $unsupportedServerJs -Raw) -ne 'var players = {};') {
+          if ([System.IO.File]::ReadAllText($unsupportedServerJs) -ne $unsupportedContent) {
             throw 'Unsupported Stremio server.js was modified before validation failed.'
+          }
+          if (Test-Path -LiteralPath "$unsupportedServerJs.subtitle-bridge.backup") {
+            throw 'Unsupported Stremio layout created a backup before validation succeeded.'
+          }
+
+          $malformedServerJs = Join-Path $stremioFixtureDir 'malformed-markers-server.js'
+          $malformedContent = $originalServerJs.Replace(
+            'devices.groups.external',
+            "/* Subtitle Bridge external player BEGIN */`r`ndevices.groups.external"
+          )
+          [System.IO.File]::WriteAllText($malformedServerJs, $malformedContent)
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $malformedServerJs
+          $malformedExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($malformedExitCode -eq 0) {
+            throw 'Stremio handoff helper accepted malformed patch markers.'
+          }
+          if ([System.IO.File]::ReadAllText($malformedServerJs) -ne $malformedContent) {
+            throw 'Malformed-marker Stremio server.js was modified.'
+          }
+
+          $updatedServerJs = Join-Path $stremioFixtureDir 'updated-server.js'
+          [System.IO.File]::WriteAllText($updatedServerJs, $originalServerJs)
+          $existingBackup = "$updatedServerJs.subtitle-bridge.backup"
+          [System.IO.File]::WriteAllText($existingBackup, 'older-useful-backup')
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $updatedServerJs
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Stremio handoff helper failed when a previous safety backup already existed.'
+          }
+          if ([System.IO.File]::ReadAllText($existingBackup) -ne 'older-useful-backup') {
+            throw 'Stremio handoff helper overwrote an existing useful safety backup.'
+          }
+          $backupCount = @(Get-ChildItem -LiteralPath $stremioFixtureDir -Filter 'updated-server.js.subtitle-bridge.backup*').Count
+          if ($backupCount -lt 2) {
+            throw 'Stremio handoff helper did not create a new versioned safety backup for the updated server.js.'
           }
 
       - name: Upload Windows MVP artifact
