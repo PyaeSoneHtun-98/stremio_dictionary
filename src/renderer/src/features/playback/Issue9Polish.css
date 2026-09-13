@@ -1,3 +1,25 @@
+.overlay-probe::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: transparent;
+  cursor: default;
+  pointer-events: auto;
+}
+
+.overlay-topline {
+  z-index: 10;
+}
+
+.subtitle-overlay {
+  z-index: 20;
+}
+
+.player-controls {
+  z-index: 30;
+}
+
 .translation-popup {
   width: min(380px, calc(100vw - 24px));
   max-width: calc(100vw - 24px);
