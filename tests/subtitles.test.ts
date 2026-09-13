@@ -57,6 +57,22 @@ describe('parseSrtCues', () => {
     expect(cues[0].text).toBe('Visible dialogue')
   })
 
+  it('fails safely when an ASS override block is unterminated', () => {
+    const source = `1\n00:00:01,000 --> 00:00:03,000\n{\\p1 m 0 0 l 10 0`
+
+    expect(parseSrtCues(source)).toEqual([])
+  })
+
+  it('keeps proven dialogue before an unterminated ASS block and discards the unsafe remainder', () => {
+    const source = `1\n00:00:01,000 --> 00:00:03,000\nSafe dialogue {\\p1 m 0 0 l 10 0`
+
+    const cues = parseSrtCues(source)
+
+    expect(cues).toHaveLength(1)
+    expect(cues[0].text).toBe('Safe dialogue')
+    expect(cues[0].tokens.map((token) => token.lookupTerm)).toEqual(['safe', 'dialogue'])
+  })
+
   it('rejects subtitle models that exceed the configured cue limit', () => {
     expect(() =>
       parseSrtCues(SAMPLE_SRT, {
