@@ -37,7 +37,7 @@ New-ItemProperty -LiteralPath $ProtocolKey -Name $MarkerName -Value '1' -Propert
 
 $CommandKey = Join-Path $ProtocolKey 'shell\open\command'
 New-Item -Path $CommandKey -Force | Out-Null
-Set-Item -LiteralPath $CommandKey -Value ('"{0}" "%1"' -f $ExecutablePath).Replace('\"', '"')
+Set-Item -LiteralPath $CommandKey -Value ('"{0}" "%1"' -f $ExecutablePath)
 
 Write-Host 'Subtitle Bridge now handles vlc:// links for the current Windows user.'
 Write-Host 'In Stremio: Settings -> Player -> External Player -> VLC.'
