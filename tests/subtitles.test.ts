@@ -155,30 +155,41 @@ describe('findActiveCue', () => {
     const source = `1\n00:00:01,000 --> 00:00:05,000\nThrow the lonely courage into the torrent\n\n2\n00:00:02,000 --> 00:00:02,600\n孤\n\n3\n00:00:02,600 --> 00:00:03,200\n勇`
     const cues = parseSrtCues(source)
 
-    expect(findActiveCue(cues, 2.2, 'en')?.text).toBe('Throw the lonely courage into the torrent')
-    expect(findActiveCue(cues, 2.8, 'English')?.text).toBe(
+    expect(findActiveCue(cues, 2.2, 'en', true)?.text).toBe(
+      'Throw the lonely courage into the torrent'
+    )
+    expect(findActiveCue(cues, 2.8, 'English', true)?.text).toBe(
       'Throw the lonely courage into the torrent'
     )
   })
 
-  it('suppresses non-English micro-cues when the selected track is English', () => {
+  it('suppresses non-English micro-cues when the selected ASS track is English', () => {
     const source = `1\n00:00:01,000 --> 00:00:01,600\n孤`
     const cues = parseSrtCues(source)
 
-    expect(findActiveCue(cues, 1.2, 'eng')).toBeNull()
+    expect(findActiveCue(cues, 1.2, 'eng', true)).toBeNull()
   })
 
-  it('does not suppress a legitimate one-word English cue when it is the only active cue', () => {
+  it('does not suppress a legitimate one-word English ASS cue when it is the only active cue', () => {
     const source = `1\n00:00:01,000 --> 00:00:01,600\nRun!`
     const cues = parseSrtCues(source)
 
-    expect(findActiveCue(cues, 1.2, 'en')?.text).toBe('Run!')
+    expect(findActiveCue(cues, 1.2, 'en', true)?.text).toBe('Run!')
   })
 
-  it('prefers a stable English line over an overlapping one-word transient effect', () => {
+  it('prefers a stable English line over an overlapping one-word transient ASS effect', () => {
     const source = `1\n00:00:01,000 --> 00:00:05,000\nTraveling through time and space with the wind\n\n2\n00:00:02,000 --> 00:00:02,500\nwind`
     const cues = parseSrtCues(source)
 
-    expect(findActiveCue(cues, 2.2, 'en')?.text).toBe('Traveling through time and space with the wind')
+    expect(findActiveCue(cues, 2.2, 'en', true)?.text).toBe(
+      'Traveling through time and space with the wind'
+    )
+  })
+
+  it('keeps normal newest-cue behavior for overlapping SRT subtitles', () => {
+    const source = `1\n00:00:01,000 --> 00:00:05,000\nKeep moving forward.\n\n2\n00:00:02,000 --> 00:00:02,600\nRun!`
+    const cues = parseSrtCues(source)
+
+    expect(findActiveCue(cues, 2.2, 'en')?.text).toBe('Run!')
   })
 })
