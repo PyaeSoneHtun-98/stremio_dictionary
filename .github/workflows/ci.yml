@@ -129,6 +129,7 @@ jobs:
           $vlcKey = 'HKCU:\Software\Classes\vlc'
           $vlcCommandKey = Join-Path $vlcKey 'shell\open\command'
           $handoffBackupDir = Join-Path $env:LOCALAPPDATA 'Subtitle Bridge\stremio-handoff'
+          $handoffBackupPath = Join-Path $handoffBackupDir 'vlc-protocol-before-subtitle-bridge.reg'
           Remove-Item -LiteralPath $vlcKey -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item -LiteralPath $handoffBackupDir -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -Path $vlcCommandKey -Force | Out-Null
@@ -160,6 +161,20 @@ jobs:
           if ($restoredName -ne 'URL:CI VLC handler' -or $restoredCommand -ne '"C:\CI\vlc.exe" "%1"') {
             throw 'Stremio handoff disable helper did not restore the previous current-user vlc:// registration.'
           }
+
+          New-Item -ItemType Directory -Path $handoffBackupDir -Force | Out-Null
+          Set-Content -LiteralPath $handoffBackupPath -Value 'stale backup sentinel'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe')
+          $staleBackupExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($staleBackupExitCode -eq 0) {
+            throw 'Stremio handoff enable helper accepted a stale backup while another handler owned vlc://.'
+          }
+          $stillRestoredName = (Get-Item -LiteralPath $vlcKey).GetValue('')
+          if ($stillRestoredName -ne 'URL:CI VLC handler') {
+            throw 'Stale-backup protection modified the existing vlc:// handler.'
+          }
+
           Remove-Item -LiteralPath $vlcKey -Recurse -Force
           Remove-Item -LiteralPath $handoffBackupDir -Recurse -Force -ErrorAction SilentlyContinue
 
