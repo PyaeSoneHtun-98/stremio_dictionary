@@ -1,13 +1,13 @@
 import { AppShell } from './components/AppShell'
 import { featureAreas } from './features'
-import { OverlayProbe } from './features/playback/OverlayProbe'
 import { PlaybackProof } from './features/playback/PlaybackProof'
+import { PolishedOverlay } from './features/playback/PolishedOverlay'
 
 export function App(): React.JSX.Element {
   const mode = new URLSearchParams(window.location.search).get('mode')
 
   if (mode === 'overlay') {
-    return <OverlayProbe />
+    return <PolishedOverlay />
   }
 
   return (
