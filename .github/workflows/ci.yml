@@ -175,6 +175,19 @@ jobs:
             throw 'Repeated enable overwrote the pristine Stremio safety backup.'
           }
 
+          $patchedBeforeFailedDisable = [System.IO.File]::ReadAllText($serverJs)
+          $env:SUBTITLE_BRIDGE_TEST_FORCE_STREMIO_REPLACE_FAILURE = '1'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -ServerJsPath $serverJs
+          $forcedDisableExitCode = $LASTEXITCODE
+          Remove-Item Env:SUBTITLE_BRIDGE_TEST_FORCE_STREMIO_REPLACE_FAILURE -ErrorAction SilentlyContinue
+          $global:LASTEXITCODE = 0
+          if ($forcedDisableExitCode -eq 0) {
+            throw 'Forced Stremio disable replacement failure unexpectedly succeeded.'
+          }
+          if ([System.IO.File]::ReadAllText($serverJs) -ne $patchedBeforeFailedDisable) {
+            throw 'Failed atomic Stremio disable modified server.js.'
+          }
+
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -ServerJsPath $serverJs
           if ($LASTEXITCODE -ne 0) {
             throw 'Stremio external-player disable helper failed.'
@@ -182,6 +195,20 @@ jobs:
           $restoredServerJs = Get-Content -LiteralPath $serverJs -Raw
           if ($restoredServerJs -ne $originalServerJs) {
             throw 'Stremio handoff disable helper did not restore the exact pre-patch content.'
+          }
+
+          $replaceFailureServerJs = Join-Path $stremioFixtureDir 'replace-failure-server.js'
+          [System.IO.File]::WriteAllText($replaceFailureServerJs, $originalServerJs)
+          $env:SUBTITLE_BRIDGE_TEST_FORCE_STREMIO_REPLACE_FAILURE = '1'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $replaceFailureServerJs
+          $forcedEnableExitCode = $LASTEXITCODE
+          Remove-Item Env:SUBTITLE_BRIDGE_TEST_FORCE_STREMIO_REPLACE_FAILURE -ErrorAction SilentlyContinue
+          $global:LASTEXITCODE = 0
+          if ($forcedEnableExitCode -eq 0) {
+            throw 'Forced Stremio enable replacement failure unexpectedly succeeded.'
+          }
+          if ([System.IO.File]::ReadAllText($replaceFailureServerJs) -ne $originalServerJs) {
+            throw 'Failed atomic Stremio enable modified server.js.'
           }
 
           $unsupportedServerJs = Join-Path $stremioFixtureDir 'unsupported-server.js'
