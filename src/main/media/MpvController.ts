@@ -1,5 +1,4 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { basename } from 'node:path'
 import { createConnection, type Socket } from 'node:net'
 import type { MediaTrack, PlaybackSnapshot, SubtitleCue } from '../../shared/media'
 import { createEmptySubtitleModel, normalizeMpvTracks } from '../../shared/media'
@@ -50,7 +49,7 @@ export class MpvController {
     return structuredClone(this.state)
   }
 
-  async load(filePath: string, windowId: string): Promise<void> {
+  async load(mediaTarget: string, windowId: string, displayName: string): Promise<void> {
     if (process.platform !== 'win32') {
       this.patchState({
         status: 'unavailable',
@@ -63,7 +62,7 @@ export class MpvController {
       throw new Error('A valid Windows playback surface is required.')
     }
 
-    diagnosticLog('media.loadRequested', { fileName: basename(filePath) })
+    diagnosticLog('media.loadRequested', { fileName: displayName })
 
     try {
       await this.ensureStarted(windowId)
@@ -72,8 +71,8 @@ export class MpvController {
       this.paused = false
       this.patchState({
         status: 'loading',
-        filePath,
-        fileName: basename(filePath),
+        filePath: mediaTarget,
+        fileName: displayName,
         currentTime: 0,
         duration: null,
         speed: 1,
@@ -82,11 +81,11 @@ export class MpvController {
         error: null
       })
       this.sendCommand(['set_property', 'speed', 1])
-      this.sendCommand(['loadfile', filePath, 'replace'])
+      this.sendCommand(['loadfile', mediaTarget, 'replace'])
       this.sendCommand(['set_property', 'pause', false])
     } catch (error) {
       const message = toUserMessage(error)
-      diagnosticLog('media.loadFailed', { fileName: basename(filePath), message })
+      diagnosticLog('media.loadFailed', { fileName: displayName, message })
       this.patchState({ status: 'unavailable', currentTime: null, error: message })
       throw error
     }
@@ -340,7 +339,7 @@ export class MpvController {
 
       if (message.reason === 'error') {
         const detail = message.error ? ` (${message.error})` : ''
-        this.failPlayback(`This video could not be played${detail}. Try another MKV file.`)
+        this.failPlayback(`This video could not be played${detail}. Try another video or stream.`)
         return
       }
 
@@ -406,8 +405,8 @@ export class MpvController {
   }
 
   private async refreshSubtitleModel(tracks: MediaTrack[]): Promise<void> {
-    const filePath = this.state.filePath
-    if (!filePath) {
+    const mediaTarget = this.state.filePath
+    if (!mediaTarget) {
       return
     }
 
@@ -431,7 +430,7 @@ export class MpvController {
             ...createEmptySubtitleModel(),
             status: 'missing',
             error:
-              'This MKV has no embedded subtitle tracks. Try another MKV with embedded SRT, ASS, or SSA subtitles.'
+              'This video has no embedded subtitle tracks. Try another video with embedded SRT, ASS, or SSA subtitles.'
           }
         })
         return
@@ -443,15 +442,15 @@ export class MpvController {
           ...createEmptySubtitleModel(),
           status: 'unsupported',
           error: imageOnly
-            ? 'This MKV only contains image-based subtitles such as PGS/VobSub. Image subtitles are not supported in the MVP.'
-            : 'No supported embedded text subtitle track was found. Use an MKV with SRT, ASS, or SSA subtitles.'
+            ? 'This video only contains image-based subtitles such as PGS/VobSub. Image subtitles are not supported in the MVP.'
+            : 'No supported embedded text subtitle track was found. Use a video with SRT, ASS, or SSA subtitles.'
         }
       })
       return
     }
 
     this.selectedSubtitleTrackId = selectedTrack.id
-    const extractionKey = `${filePath}\u0000${selectedTrack.id}\u0000${selectedTrack.ffIndex}`
+    const extractionKey = `${mediaTarget}\u0000${selectedTrack.id}\u0000${selectedTrack.ffIndex}`
     if (this.subtitleExtractionKey === extractionKey) {
       return
     }
@@ -473,7 +472,7 @@ export class MpvController {
     })
 
     try {
-      const cues = await this.subtitleExtractor.extract(filePath, selectedTrack.ffIndex)
+      const cues = await this.subtitleExtractor.extract(mediaTarget, selectedTrack.ffIndex)
       if (version !== this.subtitleExtractionVersion || this.subtitleExtractionKey !== extractionKey) {
         return
       }
@@ -507,7 +506,11 @@ export class MpvController {
       }
 
       const message = error instanceof Error ? error.message : 'Could not extract this subtitle track.'
-      diagnosticLog('subtitle.failed', { codec: selectedTrack.codec, language: selectedTrack.language, message })
+      diagnosticLog('subtitle.failed', {
+        codec: selectedTrack.codec,
+        language: selectedTrack.language,
+        reason: 'extractor-error'
+      })
       this.subtitleCues = []
       this.patchState({
         subtitle: {
@@ -657,7 +660,7 @@ function finiteNumberOrNull(value: unknown): number | null {
 
 function toUserMessage(error: unknown): string {
   if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-    return 'mpv was not found. Install mpv and add it to PATH, set MPV_PATH to mpv.exe, or use a package that bundles mpv.exe.'
+    return 'mpv was not found. Install mpv and add it to PATH, or set MPV_PATH to mpv.exe before launching Subtitle Bridge.'
   }
 
   if (error instanceof Error) {
