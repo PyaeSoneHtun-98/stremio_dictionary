@@ -218,8 +218,9 @@ function choosePreferredActiveCue(
 
   const englishCues = activeCues.filter((cue) => HAS_LATIN_LETTER.test(cue.text))
   if (englishCues.length === 0) {
-    // English ASS tracks frequently contain short Chinese/Japanese karaoke/effect events layered
-    // over the translated dialogue. Do not surface those fragments as the interactive subtitle.
+    // English ASS tracks can carry overlapping karaoke/effect layers in the source language.
+    // FFmpeg flattens those layers into ordinary text cues, so suppress them instead of letting
+    // a one-character effect temporarily replace the English dialogue in the interactive overlay.
     return null
   }
 
