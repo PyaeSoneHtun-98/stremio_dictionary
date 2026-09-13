@@ -126,57 +126,62 @@ jobs:
             throw 'Installer accepted a destination nested inside the source package.'
           }
 
-          $vlcKey = 'HKCU:\Software\Classes\vlc'
-          $vlcCommandKey = Join-Path $vlcKey 'shell\open\command'
-          $handoffBackupDir = Join-Path $env:LOCALAPPDATA 'Subtitle Bridge\stremio-handoff'
-          $handoffBackupPath = Join-Path $handoffBackupDir 'vlc-protocol-before-subtitle-bridge.reg'
-          Remove-Item -LiteralPath $vlcKey -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item -LiteralPath $handoffBackupDir -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item -Path $vlcCommandKey -Force | Out-Null
-          Set-Item -LiteralPath $vlcKey -Value 'URL:CI VLC handler'
-          New-ItemProperty -LiteralPath $vlcKey -Name 'URL Protocol' -Value '' -PropertyType String -Force | Out-Null
-          Set-Item -LiteralPath $vlcCommandKey -Value '"C:\CI\vlc.exe" "%1"'
-
           $enableHandoff = Join-Path $installDir 'Enable-StremioHandoff.ps1'
           $disableHandoff = Join-Path $installDir 'Disable-StremioHandoff.ps1'
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe')
+          $stremioFixtureDir = Join-Path $env:RUNNER_TEMP 'StremioFixture'
+          New-Item -ItemType Directory -Path $stremioFixtureDir -Force | Out-Null
+          $serverJs = Join-Path $stremioFixtureDir 'server.js'
+          $originalServerJs = @'
+var players = { vlc: { title: "VLC" } };
+devices.groups.external = [];
+'@
+          [System.IO.File]::WriteAllText($serverJs, $originalServerJs)
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $serverJs
           if ($LASTEXITCODE -ne 0) {
-            throw 'Stremio handoff enable helper failed.'
+            throw 'Stremio external-player enable helper failed.'
           }
-          $enabled = Get-ItemProperty -LiteralPath $vlcKey
-          if ($enabled.SubtitleBridgeCompatibility -ne '1') {
-            throw 'Stremio handoff helper did not mark the vlc:// registration as owned by Subtitle Bridge.'
+          $patchedServerJs = Get-Content -LiteralPath $serverJs -Raw
+          if ($patchedServerJs -notmatch 'Subtitle Bridge external player BEGIN' -or $patchedServerJs -notmatch 'players\.subtitleBridge' -or $patchedServerJs -notmatch 'Subtitle Bridge\.exe') {
+            throw 'Stremio handoff helper did not add the Subtitle Bridge external-player entry.'
           }
-          $enabledCommand = (Get-Item -LiteralPath $vlcCommandKey).GetValue('')
-          if ($enabledCommand -notlike '*Subtitle Bridge.exe*') {
-            throw "Unexpected Stremio handoff command: $enabledCommand"
+          if (-not (Test-Path -LiteralPath "$serverJs.subtitle-bridge.backup")) {
+            throw 'Stremio handoff helper did not create a server.js backup.'
           }
 
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $serverJs
           if ($LASTEXITCODE -ne 0) {
-            throw 'Stremio handoff disable helper failed.'
+            throw 'Repeated Stremio external-player enable helper failed.'
           }
-          $restoredName = (Get-Item -LiteralPath $vlcKey).GetValue('')
-          $restoredCommand = (Get-Item -LiteralPath $vlcCommandKey).GetValue('')
-          if ($restoredName -ne 'URL:CI VLC handler' -or $restoredCommand -ne '"C:\CI\vlc.exe" "%1"') {
-            throw 'Stremio handoff disable helper did not restore the previous current-user vlc:// registration.'
+          $patchedTwice = Get-Content -LiteralPath $serverJs -Raw
+          $markerCount = ([regex]::Matches($patchedTwice, [regex]::Escape('/* Subtitle Bridge external player BEGIN */'))).Count
+          if ($markerCount -ne 1) {
+            throw "Stremio handoff helper is not idempotent; marker count: $markerCount"
           }
 
-          New-Item -ItemType Directory -Path $handoffBackupDir -Force | Out-Null
-          Set-Content -LiteralPath $handoffBackupPath -Value 'stale backup sentinel'
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe')
-          $staleBackupExitCode = $LASTEXITCODE
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -ServerJsPath $serverJs
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Stremio external-player disable helper failed.'
+          }
+          $restoredServerJs = Get-Content -LiteralPath $serverJs -Raw
+          if ($restoredServerJs -match 'Subtitle Bridge external player BEGIN' -or $restoredServerJs -match 'players\.subtitleBridge') {
+            throw 'Stremio handoff disable helper did not remove the Subtitle Bridge entry.'
+          }
+          if ($restoredServerJs -notmatch 'devices\.groups\.external\s*=\s*\[\s*\]') {
+            throw 'Stremio handoff disable helper damaged the external-player discovery anchor.'
+          }
+
+          $unsupportedServerJs = Join-Path $stremioFixtureDir 'unsupported-server.js'
+          [System.IO.File]::WriteAllText($unsupportedServerJs, 'var players = {};')
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $unsupportedServerJs
+          $unsupportedExitCode = $LASTEXITCODE
           $global:LASTEXITCODE = 0
-          if ($staleBackupExitCode -eq 0) {
-            throw 'Stremio handoff enable helper accepted a stale backup while another handler owned vlc://.'
+          if ($unsupportedExitCode -eq 0) {
+            throw 'Stremio handoff helper accepted an unsupported server.js layout.'
           }
-          $stillRestoredName = (Get-Item -LiteralPath $vlcKey).GetValue('')
-          if ($stillRestoredName -ne 'URL:CI VLC handler') {
-            throw 'Stale-backup protection modified the existing vlc:// handler.'
+          if ((Get-Content -LiteralPath $unsupportedServerJs -Raw) -ne 'var players = {};') {
+            throw 'Unsupported Stremio server.js was modified before validation failed.'
           }
-
-          Remove-Item -LiteralPath $vlcKey -Recurse -Force
-          Remove-Item -LiteralPath $handoffBackupDir -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Upload Windows MVP artifact
         uses: actions/upload-artifact@v4
