@@ -17,6 +17,10 @@ if (process.platform !== 'win32') {
   throw new Error('Windows packaging must run on Windows.')
 }
 
+if (process.arch !== 'x64') {
+  throw new Error(`Windows MVP packaging requires an x64 Node/Electron runtime. Received: ${process.arch}`)
+}
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const electronDist = join(root, 'node_modules', 'electron', 'dist')
@@ -69,28 +73,21 @@ copyFileSync(
   join(packageDir, 'Install-SubtitleBridge.ps1')
 )
 
-const bundledTools = {
-  mpv: bundleTool('MPV_PATH', 'mpv.exe', join(packageDir, 'resources', 'tools', 'mpv', 'mpv.exe')),
-  ffmpeg: bundleTool(
-    'FFMPEG_PATH',
-    'ffmpeg.exe',
-    join(packageDir, 'resources', 'tools', 'ffmpeg', 'ffmpeg.exe')
-  )
-}
-
-const toolsReadme = [
-  'Subtitle Bridge playback runtime tools',
-  '',
-  'If mpv.exe and ffmpeg.exe are present in these folders, the packaged app uses them automatically.',
-  'If they are not bundled, install mpv and FFmpeg on Windows and add them to PATH, or set MPV_PATH and FFMPEG_PATH before launching.',
-  '',
-  `mpv bundled: ${bundledTools.mpv ? 'yes' : 'no'}`,
-  `FFmpeg bundled: ${bundledTools.ffmpeg ? 'yes' : 'no'}`,
-  ''
-].join('\r\n')
-const toolsRoot = join(packageDir, 'resources', 'tools')
-mkdirSync(toolsRoot, { recursive: true })
-writeFileSync(join(toolsRoot, 'README.txt'), toolsReadme, 'utf8')
+writeFileSync(
+  join(packageDir, 'RUNTIME_DEPENDENCIES.txt'),
+  [
+    'Subtitle Bridge runtime dependencies',
+    '',
+    'This release artifact does NOT redistribute mpv or FFmpeg binaries.',
+    'Install compatible Windows x64 builds separately and make them available through PATH,',
+    'or set MPV_PATH and FFMPEG_PATH to the corresponding executable paths before launching.',
+    '',
+    'Keeping these third-party runtimes external avoids silently redistributing binaries whose',
+    'license obligations depend on the exact build configuration and source provenance.',
+    ''
+  ].join('\r\n'),
+  'utf8'
+)
 
 writeFileSync(
   join(packageDir, 'BUILD_INFO.json'),
@@ -99,9 +96,12 @@ writeFileSync(
       product: 'Subtitle Bridge',
       version: packageJson.version,
       platform: 'win32',
-      arch: 'x64',
+      arch: process.arch,
       createdAt: new Date().toISOString(),
-      bundledTools
+      runtimeDependencies: {
+        mpv: { bundled: false, resolution: ['MPV_PATH', 'PATH'] },
+        ffmpeg: { bundled: false, resolution: ['FFMPEG_PATH', 'PATH'] }
+      }
     },
     null,
     2
@@ -126,37 +126,8 @@ writeFileSync(checksumPath, `${digest}  ${zipPath.split(/[\\/]/).pop()}\r\n`, 'u
 console.log(`Packaged: ${packageDir}`)
 console.log(`Archive:  ${zipPath}`)
 console.log(`SHA-256:  ${digest}`)
-console.log(`Bundled mpv: ${bundledTools.mpv ? 'yes' : 'no'}`)
-console.log(`Bundled FFmpeg: ${bundledTools.ffmpeg ? 'yes' : 'no'}`)
-
-function bundleTool(environmentVariable, executableName, destination) {
-  const source = resolveTool(environmentVariable, executableName)
-  if (!source) {
-    return false
-  }
-
-  mkdirSync(dirname(destination), { recursive: true })
-  copyFileSync(source, destination)
-  return true
-}
-
-function resolveTool(environmentVariable, executableName) {
-  const explicit = process.env[environmentVariable]?.trim()
-  if (explicit && existsSync(explicit)) {
-    return explicit
-  }
-
-  try {
-    const output = execFileSync('where.exe', [executableName], { encoding: 'utf8' })
-    const firstMatch = output
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .find((line) => line && existsSync(line))
-    return firstMatch ?? null
-  } catch {
-    return null
-  }
-}
+console.log('Bundled mpv: no (external runtime required)')
+console.log('Bundled FFmpeg: no (external runtime required)')
 
 function escapePowerShell(value) {
   return value.replaceAll("'", "''")
