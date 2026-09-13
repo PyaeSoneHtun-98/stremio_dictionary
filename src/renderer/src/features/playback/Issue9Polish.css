@@ -3,7 +3,9 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: transparent;
+  /* Keep a non-zero alpha so Windows hit-tests the full transparent Electron
+     overlay instead of allowing native mpv areas to become click-through. */
+  background: rgba(0, 0, 0, 0.002);
   cursor: default;
   pointer-events: auto;
 }
