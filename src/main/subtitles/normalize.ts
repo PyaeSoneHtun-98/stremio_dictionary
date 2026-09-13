@@ -4,6 +4,10 @@ const TIMING_LINE =
   /^(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})\s+-->\s+(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})(?:\s+.*)?$/
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu
 const HAS_LETTER = /\p{L}/u
+const HAS_LATIN_LETTER = /\p{Script=Latin}/u
+const ASS_OVERRIDE_BLOCK = /\{\\[^}]*\}/g
+const ASS_DRAWING_COMMAND = /^[mnlbspc]$/i
+const ASS_DRAWING_NUMBER = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/
 
 export interface SubtitleParseLimits {
   maxCues: number
@@ -157,7 +161,12 @@ export function normalizeLookupTerm(value: string): string {
     .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
 }
 
-export function findActiveCue(cues: SubtitleCue[], time: number | null): SubtitleCue | null {
+export function findActiveCue(
+  cues: SubtitleCue[],
+  time: number | null,
+  preferredLanguage?: string | null,
+  applyAssEffectHeuristics = false
+): SubtitleCue | null {
   if (time === null || !Number.isFinite(time) || cues.length === 0) {
     return null
   }
@@ -176,20 +185,66 @@ export function findActiveCue(cues: SubtitleCue[], time: number | null): Subtitl
     }
   }
 
+  const activeCues: SubtitleCue[] = []
   for (let index = candidate; index >= 0; index -= 1) {
     const cue = cues[index]
     if (cue.startTime > time) {
       continue
     }
     if (cue.endTime > time) {
-      return cue
+      activeCues.push(cue)
     }
     if (time - cue.startTime > 30) {
       break
     }
   }
 
-  return null
+  if (activeCues.length === 0) {
+    return null
+  }
+
+  return applyAssEffectHeuristics
+    ? choosePreferredActiveCue(activeCues, preferredLanguage)
+    : newestCue(activeCues)
+}
+
+function choosePreferredActiveCue(
+  activeCues: SubtitleCue[],
+  preferredLanguage?: string | null
+): SubtitleCue | null {
+  const language = preferredLanguage?.trim().toLocaleLowerCase('en-US') ?? ''
+  const isEnglishTrack = language === 'en' || language === 'eng' || language.startsWith('english')
+
+  if (!isEnglishTrack) {
+    return newestCue(activeCues)
+  }
+
+  const englishCues = activeCues.filter((cue) => HAS_LATIN_LETTER.test(cue.text))
+  if (englishCues.length === 0) {
+    // English ASS tracks can carry overlapping karaoke/effect layers in the source language.
+    // FFmpeg flattens those layers into ordinary text cues, so suppress them instead of letting
+    // a one-character effect temporarily replace the English dialogue in the interactive overlay.
+    return null
+  }
+
+  const stableDialogue = englishCues.filter((cue) => !looksLikeTransientEffectCue(cue))
+  return newestCue(stableDialogue.length > 0 ? stableDialogue : englishCues)
+}
+
+function looksLikeTransientEffectCue(cue: SubtitleCue): boolean {
+  return cue.tokens.length <= 1 && cue.endTime - cue.startTime < 1.2
+}
+
+function newestCue(cues: SubtitleCue[]): SubtitleCue {
+  return cues.reduce((newest, cue) => {
+    if (cue.startTime > newest.startTime) {
+      return cue
+    }
+    if (cue.startTime === newest.startTime && cue.endTime > newest.endTime) {
+      return cue
+    }
+    return newest
+  })
 }
 
 function* iterateSrtBlocks(source: string): Generator<string> {
@@ -237,7 +292,73 @@ function timestampToSeconds(parts: string[]): number {
 }
 
 function stripSubtitleMarkup(value: string): string {
-  return decodeBasicEntities(value.replace(/<\/?(?:b|i|u|s)>/gi, '').replace(/<font\b[^>]*>|<\/font>/gi, ''))
+  const withoutAssDrawing = stripAssOverrideBlocks(value)
+  const decoded = decodeBasicEntities(
+    withoutAssDrawing.replace(/<\/?(?:b|i|u|s)>/gi, '').replace(/<font\b[^>]*>|<\/font>/gi, '')
+  )
+    .replace(/\\[Nn]/g, '\n')
+    .replace(/\\h/g, ' ')
+
+  return looksLikeAssDrawingPayload(decoded) ? '' : decoded
+}
+
+function stripAssOverrideBlocks(value: string): string {
+  let drawingMode = false
+  let cursor = 0
+  let output = ''
+
+  ASS_OVERRIDE_BLOCK.lastIndex = 0
+  for (const match of value.matchAll(ASS_OVERRIDE_BLOCK)) {
+    const start = match.index
+    if (start === undefined) {
+      continue
+    }
+
+    if (!drawingMode) {
+      output += value.slice(cursor, start)
+    }
+
+    for (const drawingTag of match[0].matchAll(/\\p(\d+)/gi)) {
+      drawingMode = Number(drawingTag[1]) > 0
+    }
+
+    cursor = start + match[0].length
+  }
+
+  if (!drawingMode) {
+    const remainder = value.slice(cursor)
+    const malformedOverrideStart = remainder.search(/\{\\/)
+    output += malformedOverrideStart >= 0 ? remainder.slice(0, malformedOverrideStart) : remainder
+  }
+
+  return output
+}
+
+function looksLikeAssDrawingPayload(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed || !/^[mnlbspc](?:\s|$)/i.test(trimmed)) {
+    return false
+  }
+
+  const tokens = trimmed.replace(/,/g, ' ').split(/\s+/)
+  let commandCount = 0
+  let numberCount = 0
+
+  for (const token of tokens) {
+    if (ASS_DRAWING_COMMAND.test(token)) {
+      commandCount += 1
+      continue
+    }
+
+    if (ASS_DRAWING_NUMBER.test(token)) {
+      numberCount += 1
+      continue
+    }
+
+    return false
+  }
+
+  return (commandCount >= 2 && numberCount >= 4) || (commandCount >= 1 && numberCount >= 6)
 }
 
 function decodeBasicEntities(value: string): string {

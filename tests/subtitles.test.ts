@@ -32,6 +32,47 @@ describe('parseSrtCues', () => {
     expect(parseSrtCues('1\n00:00:03,000 --> 00:00:02,000\nBackwards')).toEqual([])
   })
 
+  it('strips ASS override tags while preserving normal dialogue', () => {
+    const source = `1\n00:00:01,000 --> 00:00:03,000\n{\\an8}{\\i1}Hello{\\i0} world!`
+
+    const cues = parseSrtCues(source)
+
+    expect(cues).toHaveLength(1)
+    expect(cues[0].text).toBe('Hello world!')
+    expect(cues[0].tokens.map((token) => token.lookupTerm)).toEqual(['hello', 'world'])
+  })
+
+  it('drops FFmpeg-flattened ASS vector drawing payloads', () => {
+    const source = `1\n00:00:01,000 --> 00:00:03,000\n{\\an2}m -2 0 b -2 0 -2 0 -2 0 l -2 1 l 6 1 l 6 0`
+
+    expect(parseSrtCues(source)).toEqual([])
+  })
+
+  it('drops explicit ASS drawing-mode geometry but keeps text after drawing mode ends', () => {
+    const source = `1\n00:00:01,000 --> 00:00:03,000\n{\\p1}m 0 0 l 10 0 l 10 10 l 0 10{\\p0}Visible dialogue`
+
+    const cues = parseSrtCues(source)
+
+    expect(cues).toHaveLength(1)
+    expect(cues[0].text).toBe('Visible dialogue')
+  })
+
+  it('fails safely when an ASS override block is unterminated', () => {
+    const source = `1\n00:00:01,000 --> 00:00:03,000\n{\\p1 m 0 0 l 10 0`
+
+    expect(parseSrtCues(source)).toEqual([])
+  })
+
+  it('keeps proven dialogue before an unterminated ASS block and discards the unsafe remainder', () => {
+    const source = `1\n00:00:01,000 --> 00:00:03,000\nSafe dialogue {\\p1 m 0 0 l 10 0`
+
+    const cues = parseSrtCues(source)
+
+    expect(cues).toHaveLength(1)
+    expect(cues[0].text).toBe('Safe dialogue')
+    expect(cues[0].tokens.map((token) => token.lookupTerm)).toEqual(['safe', 'dialogue'])
+  })
+
   it('rejects subtitle models that exceed the configured cue limit', () => {
     expect(() =>
       parseSrtCues(SAMPLE_SRT, {
@@ -108,5 +149,47 @@ describe('findActiveCue', () => {
     expect(findActiveCue(cues, 4)).toBeNull()
     expect(findActiveCue(cues, 5.5)?.text).toBe("We're ready!")
     expect(findActiveCue(cues, 1.249)).toBeNull()
+  })
+
+  it('keeps the English dialogue visible over overlapping one-character ASS karaoke effects', () => {
+    const source = `1\n00:00:01,000 --> 00:00:05,000\nThrow the lonely courage into the torrent\n\n2\n00:00:02,000 --> 00:00:02,600\n孤\n\n3\n00:00:02,600 --> 00:00:03,200\n勇`
+    const cues = parseSrtCues(source)
+
+    expect(findActiveCue(cues, 2.2, 'en', true)?.text).toBe(
+      'Throw the lonely courage into the torrent'
+    )
+    expect(findActiveCue(cues, 2.8, 'English', true)?.text).toBe(
+      'Throw the lonely courage into the torrent'
+    )
+  })
+
+  it('suppresses non-English micro-cues when the selected ASS track is English', () => {
+    const source = `1\n00:00:01,000 --> 00:00:01,600\n孤`
+    const cues = parseSrtCues(source)
+
+    expect(findActiveCue(cues, 1.2, 'eng', true)).toBeNull()
+  })
+
+  it('does not suppress a legitimate one-word English ASS cue when it is the only active cue', () => {
+    const source = `1\n00:00:01,000 --> 00:00:01,600\nRun!`
+    const cues = parseSrtCues(source)
+
+    expect(findActiveCue(cues, 1.2, 'en', true)?.text).toBe('Run!')
+  })
+
+  it('prefers a stable English line over an overlapping one-word transient ASS effect', () => {
+    const source = `1\n00:00:01,000 --> 00:00:05,000\nTraveling through time and space with the wind\n\n2\n00:00:02,000 --> 00:00:02,500\nwind`
+    const cues = parseSrtCues(source)
+
+    expect(findActiveCue(cues, 2.2, 'en', true)?.text).toBe(
+      'Traveling through time and space with the wind'
+    )
+  })
+
+  it('keeps normal newest-cue behavior for overlapping SRT subtitles', () => {
+    const source = `1\n00:00:01,000 --> 00:00:05,000\nKeep moving forward.\n\n2\n00:00:02,000 --> 00:00:02,600\nRun!`
+    const cues = parseSrtCues(source)
+
+    expect(findActiveCue(cues, 2.2, 'en')?.text).toBe('Run!')
   })
 })
