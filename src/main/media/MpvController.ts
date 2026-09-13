@@ -1,16 +1,17 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { basename } from 'node:path'
 import { createConnection, type Socket } from 'node:net'
 import type { MediaTrack, PlaybackSnapshot, SubtitleCue } from '../../shared/media'
 import { createEmptySubtitleModel, normalizeMpvTracks } from '../../shared/media'
 import { diagnosticLog } from '../diagnostics'
 import { resolveMpvExecutable } from '../runtimeTools'
 import { SubtitleExtractor } from '../subtitles/SubtitleExtractor'
-import { findActiveCue } from '../subtitles/normalize'
+import { findActiveCue, tokenizeSubtitleText } from '../subtitles/normalize'
 
 const PIPE_PATH = `\\\\.\\pipe\\subtitle-bridge-mpv-${process.pid}`
 const CONNECT_RETRIES = 50
 const CONNECT_DELAY_MS = 100
+const MAX_LIVE_SUBTITLE_TOKENS = 500
+const MAX_LIVE_SUBTITLE_MATCHES = 2_000
 
 interface MpvEvent {
   event?: string
@@ -31,6 +32,11 @@ export class MpvController {
   private subtitleExtractionKey: string | null = null
   private subtitleExtractionVersion = 0
   private selectedSubtitleTrackId: number | null = null
+  private liveSubtitleText = ''
+  private liveSubtitleStart: number | null = null
+  private liveSubtitleEnd: number | null = null
+  private liveSubtitleSignature: string | null = null
+  private liveSubtitleCueCount = 0
   private state: PlaybackSnapshot = {
     status: 'idle',
     filePath: null,
@@ -50,7 +56,7 @@ export class MpvController {
     return structuredClone(this.state)
   }
 
-  async load(filePath: string, windowId: string): Promise<void> {
+  async load(mediaTarget: string, windowId: string, displayName: string): Promise<void> {
     if (process.platform !== 'win32') {
       this.patchState({
         status: 'unavailable',
@@ -63,17 +69,17 @@ export class MpvController {
       throw new Error('A valid Windows playback surface is required.')
     }
 
-    diagnosticLog('media.loadRequested', { fileName: basename(filePath) })
+    diagnosticLog('media.loadRequested', { fileName: displayName })
 
     try {
       await this.ensureStarted(windowId)
-      this.resetSubtitleExtraction()
+      this.resetSubtitleProcessing()
       this.selectedSubtitleTrackId = null
       this.paused = false
       this.patchState({
         status: 'loading',
-        filePath,
-        fileName: basename(filePath),
+        filePath: mediaTarget,
+        fileName: displayName,
         currentTime: 0,
         duration: null,
         speed: 1,
@@ -82,11 +88,13 @@ export class MpvController {
         error: null
       })
       this.sendCommand(['set_property', 'speed', 1])
-      this.sendCommand(['loadfile', filePath, 'replace'])
+      this.sendCommand(['set_property', 'sid', 'no'])
+      this.sendCommand(['set_property', 'sub-visibility', false])
+      this.sendCommand(['loadfile', mediaTarget, 'replace'])
       this.sendCommand(['set_property', 'pause', false])
     } catch (error) {
       const message = toUserMessage(error)
-      diagnosticLog('media.loadFailed', { fileName: basename(filePath), message })
+      diagnosticLog('media.loadFailed', { fileName: displayName, message })
       this.patchState({ status: 'unavailable', currentTime: null, error: message })
       throw error
     }
@@ -136,7 +144,8 @@ export class MpvController {
       throw new Error('That subtitle track is no longer available.')
     }
 
-    if (track.subtitleKind !== 'text' || track.ffIndex === null) {
+    const networkTarget = isHttpMediaTarget(this.state.filePath)
+    if (track.subtitleKind !== 'text' || (!networkTarget && track.ffIndex === null)) {
       throw new Error('Only embedded text subtitle tracks can be selected in the MVP.')
     }
 
@@ -149,7 +158,7 @@ export class MpvController {
     }
 
     this.selectedSubtitleTrackId = track.id
-    this.resetSubtitleExtraction()
+    this.resetSubtitleProcessing()
     await this.refreshSubtitleModel(this.state.tracks)
   }
 
@@ -194,6 +203,7 @@ export class MpvController {
         '--idle=yes',
         '--keep-open=yes',
         '--sid=no',
+        '--sub-visibility=no',
         '--no-terminal',
         '--no-osc',
         '--vo=gpu',
@@ -279,6 +289,9 @@ export class MpvController {
     this.sendCommand(['observe_property', 5, 'path'])
     this.sendCommand(['observe_property', 6, 'volume'])
     this.sendCommand(['observe_property', 7, 'speed'])
+    this.sendCommand(['observe_property', 8, 'sub-text'])
+    this.sendCommand(['observe_property', 9, 'sub-start/full'])
+    this.sendCommand(['observe_property', 10, 'sub-end/full'])
   }
 
   private handleSocketFailure(socket: Socket, child: ChildProcess, message: string): void {
@@ -340,7 +353,7 @@ export class MpvController {
 
       if (message.reason === 'error') {
         const detail = message.error ? ` (${message.error})` : ''
-        this.failPlayback(`This video could not be played${detail}. Try another MKV file.`)
+        this.failPlayback(`This video could not be played${detail}. Try another video or stream.`)
         return
       }
 
@@ -355,6 +368,11 @@ export class MpvController {
     switch (message.name) {
       case 'time-pos': {
         const currentTime = finiteNumberOrNull(message.data)
+        if (this.usesLiveSubtitles()) {
+          this.patchState({ currentTime })
+          return
+        }
+
         const applyAssEffectHeuristics = isAssSubtitleCodec(this.state.subtitle.trackCodec)
         const activeCue =
           this.state.subtitle.status === 'ready'
@@ -400,20 +418,33 @@ export class MpvController {
         void this.refreshSubtitleModel(tracks)
         break
       }
+      case 'sub-text':
+        this.liveSubtitleText = typeof message.data === 'string' ? message.data : ''
+        this.updateLiveSubtitleCue()
+        break
+      case 'sub-start/full':
+        this.liveSubtitleStart = finiteNumberOrNull(message.data)
+        this.updateLiveSubtitleCue()
+        break
+      case 'sub-end/full':
+        this.liveSubtitleEnd = finiteNumberOrNull(message.data)
+        this.updateLiveSubtitleCue()
+        break
       default:
         break
     }
   }
 
   private async refreshSubtitleModel(tracks: MediaTrack[]): Promise<void> {
-    const filePath = this.state.filePath
-    if (!filePath) {
+    const mediaTarget = this.state.filePath
+    if (!mediaTarget) {
       return
     }
 
+    const networkTarget = isHttpMediaTarget(mediaTarget)
     const subtitleTracks = tracks.filter((track) => track.type === 'subtitle')
     const textTracks = subtitleTracks.filter(
-      (track) => track.subtitleKind === 'text' && track.ffIndex !== null
+      (track) => track.subtitleKind === 'text' && (networkTarget || track.ffIndex !== null)
     )
 
     const selectedTrack =
@@ -421,9 +452,12 @@ export class MpvController {
         ? chooseSubtitleTrack(textTracks)
         : textTracks.find((track) => track.id === this.selectedSubtitleTrackId) ?? null
 
-    if (!selectedTrack || selectedTrack.ffIndex === null) {
-      this.resetSubtitleExtraction()
+    if (!selectedTrack || (!networkTarget && selectedTrack.ffIndex === null)) {
+      this.resetSubtitleProcessing()
       this.selectedSubtitleTrackId = null
+      if (networkTarget && this.socket && !this.socket.destroyed) {
+        this.sendCommand(['set_property', 'sid', 'no'])
+      }
 
       if (subtitleTracks.length === 0) {
         this.patchState({
@@ -431,7 +465,7 @@ export class MpvController {
             ...createEmptySubtitleModel(),
             status: 'missing',
             error:
-              'This MKV has no embedded subtitle tracks. Try another MKV with embedded SRT, ASS, or SSA subtitles.'
+              'This video has no embedded subtitle tracks. Try another video with embedded SRT, ASS, or SSA subtitles.'
           }
         })
         return
@@ -443,15 +477,54 @@ export class MpvController {
           ...createEmptySubtitleModel(),
           status: 'unsupported',
           error: imageOnly
-            ? 'This MKV only contains image-based subtitles such as PGS/VobSub. Image subtitles are not supported in the MVP.'
-            : 'No supported embedded text subtitle track was found. Use an MKV with SRT, ASS, or SSA subtitles.'
+            ? 'This video only contains image-based subtitles such as PGS/VobSub. Image subtitles are not supported in the MVP.'
+            : 'No supported embedded text subtitle track was found. Use a video with SRT, ASS, or SSA subtitles.'
         }
       })
       return
     }
 
+    if (
+      networkTarget &&
+      this.selectedSubtitleTrackId === selectedTrack.id &&
+      this.state.subtitle.trackId === selectedTrack.id &&
+      this.state.subtitle.status === 'ready'
+    ) {
+      return
+    }
+
     this.selectedSubtitleTrackId = selectedTrack.id
-    const extractionKey = `${filePath}\u0000${selectedTrack.id}\u0000${selectedTrack.ffIndex}`
+
+    if (networkTarget) {
+      this.resetSubtitleProcessing()
+      this.selectedSubtitleTrackId = selectedTrack.id
+      this.sendCommand(['set_property', 'sid', selectedTrack.id])
+      this.sendCommand(['set_property', 'sub-visibility', false])
+      diagnosticLog('subtitle.liveReady', {
+        codec: selectedTrack.codec,
+        language: selectedTrack.language
+      })
+      this.patchState({
+        subtitle: {
+          status: 'ready',
+          trackId: selectedTrack.id,
+          trackLanguage: selectedTrack.language,
+          trackTitle: selectedTrack.title,
+          trackCodec: selectedTrack.codec,
+          cueCount: 0,
+          activeCue: null,
+          error: null
+        }
+      })
+      return
+    }
+
+    const ffIndex = selectedTrack.ffIndex
+    if (ffIndex === null) {
+      return
+    }
+
+    const extractionKey = `${mediaTarget}\u0000${selectedTrack.id}\u0000${ffIndex}`
     if (this.subtitleExtractionKey === extractionKey) {
       return
     }
@@ -473,7 +546,7 @@ export class MpvController {
     })
 
     try {
-      const cues = await this.subtitleExtractor.extract(filePath, selectedTrack.ffIndex)
+      const cues = await this.subtitleExtractor.extract(mediaTarget, ffIndex)
       if (version !== this.subtitleExtractionVersion || this.subtitleExtractionKey !== extractionKey) {
         return
       }
@@ -507,7 +580,11 @@ export class MpvController {
       }
 
       const message = error instanceof Error ? error.message : 'Could not extract this subtitle track.'
-      diagnosticLog('subtitle.failed', { codec: selectedTrack.codec, language: selectedTrack.language, message })
+      diagnosticLog('subtitle.failed', {
+        codec: selectedTrack.codec,
+        language: selectedTrack.language,
+        reason: 'extractor-error'
+      })
       this.subtitleCues = []
       this.patchState({
         subtitle: {
@@ -524,12 +601,71 @@ export class MpvController {
     }
   }
 
+  private updateLiveSubtitleCue(): void {
+    if (!this.usesLiveSubtitles() || this.state.subtitle.status !== 'ready') {
+      return
+    }
+
+    const text = this.liveSubtitleText.trim()
+    if (!text) {
+      if (this.state.subtitle.activeCue) {
+        this.patchState({
+          subtitle: { ...this.state.subtitle, activeCue: null }
+        })
+      }
+      return
+    }
+
+    const fallbackTime = this.state.currentTime ?? 0
+    const startTime = this.liveSubtitleStart ?? fallbackTime
+    const rawEndTime = this.liveSubtitleEnd ?? startTime + 5
+    const endTime = rawEndTime > startTime ? rawEndTime : startTime + 5
+    const signature = `${this.state.subtitle.trackId}\u0000${startTime.toFixed(3)}\u0000${endTime.toFixed(3)}\u0000${text}`
+
+    if (signature !== this.liveSubtitleSignature) {
+      this.liveSubtitleSignature = signature
+      this.liveSubtitleCueCount += 1
+    }
+
+    let tokens: SubtitleCue['tokens']
+    try {
+      tokens = tokenizeSubtitleText(text, MAX_LIVE_SUBTITLE_TOKENS, MAX_LIVE_SUBTITLE_MATCHES)
+    } catch {
+      diagnosticLog('subtitle.liveCueRejected', { reason: 'tokenizer-limit' })
+      this.patchState({
+        subtitle: { ...this.state.subtitle, activeCue: null }
+      })
+      return
+    }
+
+    const cue: SubtitleCue = {
+      id: `live-${this.state.subtitle.trackId ?? 0}-${this.liveSubtitleCueCount}`,
+      startTime,
+      endTime,
+      text,
+      lines: text.split('\n'),
+      tokens
+    }
+
+    this.patchState({
+      subtitle: {
+        ...this.state.subtitle,
+        cueCount: this.liveSubtitleCueCount,
+        activeCue: cue
+      }
+    })
+  }
+
+  private usesLiveSubtitles(): boolean {
+    return isHttpMediaTarget(this.state.filePath)
+  }
+
   private failPlayback(message: string): void {
     diagnosticLog('playback.failed', { message })
     const subtitle = { ...this.state.subtitle, activeCue: null }
     const subtitleWasActive = subtitle.status === 'extracting' || subtitle.status === 'ready'
 
-    this.resetSubtitleExtraction()
+    this.resetSubtitleProcessing()
 
     if (subtitleWasActive) {
       subtitle.status = 'error'
@@ -545,11 +681,16 @@ export class MpvController {
     })
   }
 
-  private resetSubtitleExtraction(): void {
+  private resetSubtitleProcessing(): void {
     this.subtitleExtractor.cancel()
     this.subtitleExtractionVersion += 1
     this.subtitleExtractionKey = null
     this.subtitleCues = []
+    this.liveSubtitleText = ''
+    this.liveSubtitleStart = null
+    this.liveSubtitleEnd = null
+    this.liveSubtitleSignature = null
+    this.liveSubtitleCueCount = 0
   }
 
   private assertConnected(): void {
@@ -594,6 +735,19 @@ function chooseSubtitleTrack(tracks: MediaTrack[]): MediaTrack | null {
 function isAssSubtitleCodec(codec: string | null | undefined): boolean {
   const normalized = codec?.trim().toLocaleLowerCase('en-US')
   return normalized === 'ass' || normalized === 'ssa'
+}
+
+function isHttpMediaTarget(value: string | null | undefined): boolean {
+  if (!value) {
+    return false
+  }
+
+  try {
+    const protocol = new URL(value).protocol.toLowerCase()
+    return protocol === 'http:' || protocol === 'https:'
+  } catch {
+    return false
+  }
 }
 
 async function connectToPipe(): Promise<Socket> {
@@ -657,7 +811,7 @@ function finiteNumberOrNull(value: unknown): number | null {
 
 function toUserMessage(error: unknown): string {
   if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-    return 'mpv was not found. Install mpv and add it to PATH, set MPV_PATH to mpv.exe, or use a package that bundles mpv.exe.'
+    return 'mpv was not found. Install mpv and add it to PATH, or set MPV_PATH to mpv.exe before launching Subtitle Bridge.'
   }
 
   if (error instanceof Error) {

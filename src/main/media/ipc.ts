@@ -1,9 +1,10 @@
 import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron'
 import { stat } from 'node:fs/promises'
-import { extname } from 'node:path'
 import type { OpenVideoResult, PlaybackSnapshot } from '../../shared/media'
+import { parseMediaTarget } from './launchTarget'
 import { MpvController } from './MpvController'
 import { PlaybackSurface } from './PlaybackSurface'
+import { SerialTaskQueue } from './SerialTaskQueue'
 
 const MEDIA_STATE_CHANNEL = 'media:state'
 const OPEN_VIDEO_CHANNEL = 'media:open-video'
@@ -16,8 +17,14 @@ const SET_SPEED_CHANNEL = 'media:set-speed'
 const SELECT_SUBTITLE_TRACK_CHANNEL = 'media:select-subtitle-track'
 const TOGGLE_FULLSCREEN_CHANNEL = 'media:toggle-fullscreen'
 
+// mpv's own --log-file output can contain the complete media URL, including private
+// Stremio query parameters. Subtitle Bridge diagnostics must remain structured and
+// redacted, so raw mpv file logging is intentionally unsupported.
+delete process.env.MPV_LOG_FILE
+
 const controller = new MpvController(broadcastState)
 const playbackSurface = new PlaybackSurface()
+const openMediaQueue = new SerialTaskQueue()
 let registered = false
 
 export function registerMediaIpc(): void {
@@ -42,7 +49,7 @@ export function registerMediaIpc(): void {
       return { cancelled: true }
     }
 
-    return openVideoPath(result.filePaths[0])
+    return openMediaTarget(result.filePaths[0])
   })
 
   ipcMain.handle(OPEN_VIDEO_PATH_CHANNEL, async (_event, filePath: unknown): Promise<OpenVideoResult> => {
@@ -50,7 +57,7 @@ export function registerMediaIpc(): void {
       return { cancelled: false, error: 'The dropped file path was invalid.' }
     }
 
-    return openVideoPath(filePath)
+    return openMediaTarget(filePath)
   })
 
   ipcMain.handle(GET_STATE_CHANNEL, () => controller.getState())
@@ -79,6 +86,32 @@ export function registerMediaIpc(): void {
   ipcMain.handle(TOGGLE_FULLSCREEN_CHANNEL, () => playbackSurface.toggleFullscreen())
 }
 
+export function openMediaTarget(rawTarget: string): Promise<OpenVideoResult> {
+  return openMediaQueue.run(() => openMediaTargetNow(rawTarget))
+}
+
+async function openMediaTargetNow(rawTarget: string): Promise<OpenVideoResult> {
+  try {
+    // Defense in depth: never allow an environment change after module initialization to
+    // re-enable mpv's unsafe raw log-file output for a later media request.
+    delete process.env.MPV_LOG_FILE
+
+    const mediaTarget = parseMediaTarget(rawTarget)
+    if (mediaTarget.kind === 'file') {
+      await validateMkvFile(mediaTarget.target)
+    }
+
+    const windowId = await playbackSurface.ensure()
+    await controller.load(mediaTarget.target, windowId, mediaTarget.displayName)
+    return { cancelled: false }
+  } catch (error) {
+    return {
+      cancelled: false,
+      error: error instanceof Error ? error.message : 'Could not open the video.'
+    }
+  }
+}
+
 export function disposeMediaIpc(): void {
   controller.dispose()
   playbackSurface.dispose()
@@ -99,25 +132,7 @@ export function disposeMediaIpc(): void {
   registered = false
 }
 
-async function openVideoPath(filePath: string): Promise<OpenVideoResult> {
-  try {
-    await validateMkvFile(filePath)
-    const windowId = await playbackSurface.ensure()
-    await controller.load(filePath, windowId)
-    return { cancelled: false }
-  } catch (error) {
-    return {
-      cancelled: false,
-      error: error instanceof Error ? error.message : 'Could not open the video.'
-    }
-  }
-}
-
 async function validateMkvFile(filePath: string): Promise<void> {
-  if (extname(filePath).toLowerCase() !== '.mkv') {
-    throw new Error('Subtitle Bridge currently supports MKV files only.')
-  }
-
   let fileStats: Awaited<ReturnType<typeof stat>>
   try {
     fileStats = await stat(filePath)

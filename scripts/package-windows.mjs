@@ -68,10 +68,13 @@ writeFileSync(
   'utf8'
 )
 
-copyFileSync(
-  join(root, 'packaging', 'Install-SubtitleBridge.ps1'),
-  join(packageDir, 'Install-SubtitleBridge.ps1')
-)
+for (const helper of [
+  'Install-SubtitleBridge.ps1',
+  'Enable-StremioHandoff.ps1',
+  'Disable-StremioHandoff.ps1'
+]) {
+  copyFileSync(join(root, 'packaging', helper), join(packageDir, helper))
+}
 
 writeFileSync(
   join(packageDir, 'RUNTIME_DEPENDENCIES.txt'),
