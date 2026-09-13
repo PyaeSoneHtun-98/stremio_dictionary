@@ -16,9 +16,15 @@ const SET_SPEED_CHANNEL = 'media:set-speed'
 const SELECT_SUBTITLE_TRACK_CHANNEL = 'media:select-subtitle-track'
 const TOGGLE_FULLSCREEN_CHANNEL = 'media:toggle-fullscreen'
 
+// mpv's own --log-file output can contain the complete media URL, including private
+// Stremio query parameters. Subtitle Bridge diagnostics must remain structured and
+// redacted, so raw mpv file logging is intentionally unsupported.
+delete process.env.MPV_LOG_FILE
+
 const controller = new MpvController(broadcastState)
 const playbackSurface = new PlaybackSurface()
 let registered = false
+let openMediaTail: Promise<void> = Promise.resolve()
 
 export function registerMediaIpc(): void {
   if (registered) {
@@ -79,8 +85,21 @@ export function registerMediaIpc(): void {
   ipcMain.handle(TOGGLE_FULLSCREEN_CHANNEL, () => playbackSurface.toggleFullscreen())
 }
 
-export async function openMediaTarget(rawTarget: string): Promise<OpenVideoResult> {
+export function openMediaTarget(rawTarget: string): Promise<OpenVideoResult> {
+  const request = openMediaTail.then(() => openMediaTargetNow(rawTarget))
+  openMediaTail = request.then(
+    () => undefined,
+    () => undefined
+  )
+  return request
+}
+
+async function openMediaTargetNow(rawTarget: string): Promise<OpenVideoResult> {
   try {
+    // Defense in depth: never allow an environment change after module initialization to
+    // re-enable mpv's unsafe raw log-file output for a later media request.
+    delete process.env.MPV_LOG_FILE
+
     const mediaTarget = parseMediaTarget(rawTarget)
     if (mediaTarget.kind === 'file') {
       await validateMkvFile(mediaTarget.target)
