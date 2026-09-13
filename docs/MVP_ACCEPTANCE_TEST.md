@@ -48,16 +48,16 @@ The Windows CI workflow must pass both jobs:
 
 ## Manual acceptance matrix
 
-The media/interaction acceptance below was performed on Windows 11 using the packaged MVP before the post-review runtime-redistribution hardening. That build bundled locally discovered mpv/FFmpeg. The current release policy now keeps those tools external; a short current-head launch/playback spot check with external runtimes is required before merge, while the already completed subtitle/interaction/long-session results remain recorded as historical acceptance evidence. Clean Windows VM coverage was not performed for this MVP pass.
+The broader media/interaction acceptance below was performed on Windows 11 using the packaged MVP before the post-review runtime-redistribution hardening. That predecessor build bundled locally discovered mpv/FFmpeg. After hardening, a current-head Windows 11 spot check with external runtimes also passed for packaged launch, video/audio playback, clickable subtitles, Burmese lookup, installer upgrade, and installed-app launch. Clean Windows VM coverage was not performed for this MVP pass.
 
 | Test | Expected result | Result |
 | --- | --- | --- |
 | Clean Windows 10 install + launch | Installer copies the app and the installed app launches without crashing | Not run; deferred |
-| Clean Windows 11 install + launch | Installer copies the app and the installed app launches without crashing | Clean VM not run; local Windows 11 install + launch passed on predecessor package; current-head external-runtime spot check pending |
-| Embedded English SRT MKV | Video plays; subtitle stays synchronized; words are clickable | Pass on packaged predecessor build |
+| Clean Windows 11 install + launch | Installer copies the app and the installed app launches without crashing | Clean VM not run; local Windows 11 current-head install/upgrade + launch passed with external runtimes |
+| Embedded English SRT MKV | Video plays; subtitle stays synchronized; words are clickable | Pass on packaged predecessor build; current-head external-runtime spot check also passed clickable subtitle playback |
 | Embedded English ASS MKV | Video plays; dialogue is clickable; raw ASS drawing data is not exposed; karaoke micro-cues do not replace the main English line | Pass on packaged predecessor build with Tales of Herding Gods sample |
 | Embedded English SSA MKV | Video plays; readable dialogue is clickable and synchronized | Pass on packaged predecessor build with real SSA sample |
-| Clicked known word | Burmese local-dictionary translation appears | Pass on packaged predecessor build |
+| Clicked known word | Burmese local-dictionary translation appears | Pass on packaged predecessor build; current-head external-runtime spot check also passed Burmese lookup |
 | Repeated normalized lookup | Session cache prevents a duplicate provider lookup | Previously validated; no separate packaged instrumentation retest |
 | File with no subtitles | Clear no-subtitle recovery message appears | Pass on packaged predecessor build |
 | Image-only PGS/VobSub file | Clear unsupported-subtitle message appears | Pass on packaged predecessor build with VobSub sample |
