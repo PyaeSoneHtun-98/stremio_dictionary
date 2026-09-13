@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
+import { diagnosticLog, disposeDiagnostics, initializeDiagnostics } from './diagnostics'
 import { disposeMediaIpc, registerMediaIpc } from './media/ipc'
 import { disposeTranslationIpc, registerTranslationIpc } from './translation/ipc'
 
@@ -35,6 +36,21 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  const logPath = initializeDiagnostics()
+  diagnosticLog('diagnostics.initialized', { logPath: logPath.replace(app.getPath('home'), '~') })
+
+  app.on('render-process-gone', (_event, _contents, details) => {
+    diagnosticLog('renderer.gone', { reason: details.reason, exitCode: details.exitCode })
+  })
+  app.on('child-process-gone', (_event, details) => {
+    diagnosticLog('childProcess.gone', {
+      type: details.type,
+      reason: details.reason,
+      exitCode: details.exitCode,
+      serviceName: details.serviceName
+    })
+  })
+
   registerMediaIpc()
   registerTranslationIpc()
   createWindow()
@@ -49,6 +65,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   disposeTranslationIpc()
   disposeMediaIpc()
+  disposeDiagnostics()
 })
 
 app.on('window-all-closed', () => {
