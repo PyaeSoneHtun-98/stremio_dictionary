@@ -345,7 +345,13 @@ export class MpvController {
       case 'time-pos': {
         const currentTime = finiteNumberOrNull(message.data)
         const activeCue =
-          this.state.subtitle.status === 'ready' ? findActiveCue(this.subtitleCues, currentTime) : null
+          this.state.subtitle.status === 'ready'
+            ? findActiveCue(
+                this.subtitleCues,
+                currentTime,
+                this.state.subtitle.trackLanguage ?? this.state.subtitle.trackTitle
+              )
+            : null
         this.patchState({
           currentTime,
           subtitle: { ...this.state.subtitle, activeCue }
@@ -468,7 +474,11 @@ export class MpvController {
           trackTitle: selectedTrack.title,
           trackCodec: selectedTrack.codec,
           cueCount: cues.length,
-          activeCue: findActiveCue(cues, this.state.currentTime),
+          activeCue: findActiveCue(
+            cues,
+            this.state.currentTime,
+            selectedTrack.language ?? selectedTrack.title
+          ),
           error: null
         }
       })
