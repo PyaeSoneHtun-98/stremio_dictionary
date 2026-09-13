@@ -98,26 +98,26 @@ export class SubtitleExtractor {
 
           if (code !== 0) {
             const detail = Buffer.concat(stderr).toString('utf8').trim()
-            const message = detail || `FFmpeg exited with code ${code ?? 'unknown'}.`
             diagnosticLog('ffmpeg.extractFailed', {
+              reason: 'ffmpeg-nonzero-exit',
               ffIndex,
               code,
               hadStderr: detail.length > 0
             })
-            reject(new Error(message))
+            reject(
+              new Error(
+                `FFmpeg could not extract this subtitle track${code === null ? '' : ` (exit code ${code})`}.`
+              )
+            )
             return
           }
 
           let cues: SubtitleCue[]
           try {
             cues = parseSrtCues(Buffer.concat(stdout).toString('utf8'))
-          } catch (error) {
-            const message =
-              error instanceof Error
-                ? error.message
-                : 'The subtitle track could not be parsed safely.'
-            diagnosticLog('ffmpeg.parseFailed', { ffIndex, message })
-            reject(new Error(message))
+          } catch {
+            diagnosticLog('ffmpeg.parseFailed', { reason: 'subtitle-parse-error', ffIndex })
+            reject(new Error('The subtitle track could not be parsed safely.'))
             return
           }
 
@@ -154,9 +154,9 @@ export class SubtitleExtractor {
 function toExtractionError(error: Error): Error {
   if ('code' in error && error.code === 'ENOENT') {
     return new Error(
-      'FFmpeg was not found. Install ffmpeg and add it to PATH, set FFMPEG_PATH to ffmpeg.exe, or use a package that bundles ffmpeg.exe.'
+      'FFmpeg was not found. Install ffmpeg and add it to PATH, or set FFMPEG_PATH to ffmpeg.exe.'
     )
   }
 
-  return new Error(`Could not start FFmpeg: ${error.message}`)
+  return new Error('Could not start FFmpeg. Check the configured FFmpeg executable and try again.')
 }
