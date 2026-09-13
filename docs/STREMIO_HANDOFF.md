@@ -64,10 +64,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\Enable-StremioHandoff
 The helper:
 
 1. Locates Stremio's `server.js` automatically when possible.
-2. Verifies the expected external-player discovery anchor exists before writing anything.
-3. Creates `server.js.subtitle-bridge.backup` beside the original file.
-4. Inserts one idempotent `players.subtitleBridge` block pointing to the installed Subtitle Bridge executable.
-5. Refuses to patch an unrecognized Stremio server layout.
+2. Removes only a previously well-formed Subtitle Bridge marker block in memory, then validates the unpatched Stremio structure before creating a backup or writing anything.
+3. Requires the expected `players` table, the `Object.keys(players)` external-device discovery path, the platform-path iteration, and the external-device push logic to be present in the expected relationship.
+4. Refuses malformed, duplicate, or incomplete Subtitle Bridge markers instead of trying to repair them automatically.
+5. Creates a safety backup only after validation succeeds. The first backup uses `server.js.subtitle-bridge.backup`; if that backup already exists, it is preserved and a versioned backup is created instead of overwriting it.
+6. Inserts one idempotent `players.subtitleBridge` block pointing to the installed Subtitle Bridge executable.
+7. Writes the replacement through a verified temporary file and same-volume atomic file replacement so an interrupted write does not leave a partially written `server.js`.
 
 If automatic discovery fails, pass the server file explicitly:
 
@@ -85,11 +87,13 @@ From the installed Subtitle Bridge directory:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\Disable-StremioHandoff.ps1"
 ```
 
-The disable helper removes only the marked Subtitle Bridge block from `server.js`; it does not replace the whole file with an old backup. Fully exit and reopen Stremio afterward.
+The disable helper verifies that exactly one complete Subtitle Bridge marker block exists, removes only that block in memory, re-validates the resulting Stremio player-discovery structure, and atomically replaces `server.js`. It does **not** restore an old whole-file backup over a newer Stremio installation. Safety backups are retained for manual recovery.
+
+Fully exit and reopen Stremio afterward.
 
 ## Single-instance behavior
 
-Subtitle Bridge uses an Electron single-instance lock. If it is already running and Stremio launches another stream, the new target is delivered to the existing Subtitle Bridge instance instead of opening a duplicate app.
+Subtitle Bridge uses an Electron single-instance lock. Media-open requests are also serialized in the main process before they reach the playback controller. If Subtitle Bridge is already running and Stremio launches another stream, the new target is delivered to the existing app without racing another mpv startup against the same IPC pipe.
 
 ## Subtitle behavior
 
@@ -106,4 +110,4 @@ Not included yet:
 
 ## Compatibility warning
 
-The one-click menu integration modifies Stremio's installed `server.js`. It is deliberately opt-in and reversible, but Stremio updates can overwrite the patch. The helper validates the expected layout and creates a backup before first modification; it will fail rather than patch an unrecognized layout.
+The one-click menu integration modifies Stremio's installed `server.js`. It is deliberately opt-in and reversible, but Stremio updates can overwrite the patch. The helper validates a specific known external-player structure and fails closed when that structure or the patch markers are not recognized. Because this is still a compatibility patch against Stremio internals rather than a supported extension API, a future Stremio release may require updating the helper before it can be enabled again.
