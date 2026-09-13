@@ -4,6 +4,7 @@ import type { OpenVideoResult, PlaybackSnapshot } from '../../shared/media'
 import { parseMediaTarget } from './launchTarget'
 import { MpvController } from './MpvController'
 import { PlaybackSurface } from './PlaybackSurface'
+import { SerialTaskQueue } from './SerialTaskQueue'
 
 const MEDIA_STATE_CHANNEL = 'media:state'
 const OPEN_VIDEO_CHANNEL = 'media:open-video'
@@ -23,8 +24,8 @@ delete process.env.MPV_LOG_FILE
 
 const controller = new MpvController(broadcastState)
 const playbackSurface = new PlaybackSurface()
+const openMediaQueue = new SerialTaskQueue()
 let registered = false
-let openMediaTail: Promise<void> = Promise.resolve()
 
 export function registerMediaIpc(): void {
   if (registered) {
@@ -86,12 +87,7 @@ export function registerMediaIpc(): void {
 }
 
 export function openMediaTarget(rawTarget: string): Promise<OpenVideoResult> {
-  const request = openMediaTail.then(() => openMediaTargetNow(rawTarget))
-  openMediaTail = request.then(
-    () => undefined,
-    () => undefined
-  )
-  return request
+  return openMediaQueue.run(() => openMediaTargetNow(rawTarget))
 }
 
 async function openMediaTargetNow(rawTarget: string): Promise<OpenVideoResult> {
