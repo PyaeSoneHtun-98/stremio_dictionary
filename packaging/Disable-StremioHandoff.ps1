@@ -77,6 +77,12 @@ function Write-AtomicUtf8([string]$Path, [string]$Text) {
       throw 'Could not verify the temporary Stremio patch file.'
     }
 
+    # CI uses this fail-before-replace hook to prove that a failed removal leaves the
+    # currently patched server.js untouched. If a user sets it, failing closed is safe.
+    if ($env:SUBTITLE_BRIDGE_TEST_FORCE_STREMIO_REPLACE_FAILURE -eq '1') {
+      throw 'Simulated Stremio atomic replacement failure.'
+    }
+
     [System.IO.File]::Replace($tempPath, $Path, $null)
   } finally {
     if (Test-Path -LiteralPath $tempPath) {
