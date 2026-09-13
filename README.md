@@ -101,7 +101,7 @@ vlc://<http-or-https-stream-url>
 
 The Windows package includes `Enable-StremioHandoff.ps1` and `Disable-StremioHandoff.ps1`. The enable helper is **opt-in**: it registers Subtitle Bridge as the current user's `vlc://` protocol handler so Stremio's **VLC** external-player option opens Subtitle Bridge instead. If a current-user VLC handler already exists, it is backed up for restoration.
 
-This compatibility mode temporarily redirects other `vlc://` links for that Windows user too, so disable it when normal VLC protocol handling is wanted again.
+Run the helper from the installed Subtitle Bridge directory (normally `%LOCALAPPDATA%\Programs\Subtitle Bridge`) so the protocol registration points to a stable executable location. This compatibility mode temporarily redirects other `vlc://` links for that Windows user too, so disable it when normal VLC protocol handling is wanted again.
 
 The first handoff MVP supports embedded text subtitles in the selected media stream. Separate subtitle-addon URLs and watched/progress synchronization are later work.
 
