@@ -1,6 +1,6 @@
 # Windows MVP acceptance test
 
-This checklist is the release gate for Subtitle Bridge 0.1.0. Automated checks prove the build layout and project validation; media, subtitle, interaction, and long-session checks must still be exercised on real Windows machines before Issue #10 is closed.
+This checklist is the release gate for Subtitle Bridge 0.1.0. Automated checks prove the build layout and project validation; media, subtitle, interaction, and long-session checks are exercised on Windows and recorded below. Clean-VM coverage that was not performed is called out explicitly rather than inferred from local-machine results.
 
 ## Build artifact
 
@@ -42,33 +42,33 @@ The Windows CI workflow must pass both jobs:
 
 ## Manual acceptance matrix
 
-Record the exact Windows version and test-file details when completing each row.
+Current manual acceptance was performed on Windows 11 using the packaged build with bundled mpv and FFmpeg. Clean Windows VM coverage was not performed for this MVP pass.
 
-| Test | Expected result | Status before Issue #10 final acceptance |
+| Test | Expected result | Result |
 | --- | --- | --- |
-| Clean Windows 10 install + launch | Installer copies the app and the installed app launches without crashing | Pending |
-| Clean Windows 11 install + launch | Installer copies the app and the installed app launches without crashing | Pending |
-| Embedded English SRT MKV | Video plays; subtitle stays synchronized; words are clickable | Previously validated with multi-track SubRip media; packaged-build retest pending |
-| Embedded English ASS MKV | Video plays; dialogue is clickable; raw ASS drawing data is not exposed; karaoke micro-cues do not replace the main English line | Previously validated with Tales of Herding Gods; packaged-build retest pending |
-| Embedded English SSA MKV | Video plays; readable dialogue is clickable and synchronized | Pending real SSA sample |
-| Clicked known word | Burmese local-dictionary translation appears | Previously validated; packaged-build retest pending |
-| Repeated normalized lookup | Session cache prevents a duplicate provider lookup | Previously validated; packaged-build retest pending |
-| File with no subtitles | Clear no-subtitle recovery message appears | Pending final packaged-build test |
-| Image-only PGS/VobSub file | Clear unsupported-subtitle message appears | Pending final packaged-build test |
-| Unknown local-dictionary word | Short readable unavailable message appears and playback remains usable | Previously validated behavior; packaged-build retest pending |
-| Optional Google provider with no/invalid key | Short readable failure state; playback remains usable | Previously validated UI behavior; packaged-build retest pending |
-| API-key persistence | Reopening Settings never reveals the stored key value | Previously manually validated; packaged-build retest pending |
-| Fullscreen + keyboard + popup dismissal | Player controls and translation popup remain usable | Previously manually validated; packaged-build retest pending |
-| Long playback session | No obvious unbounded memory growth or progressive playback degradation | Pending; run at least 60 minutes and compare diagnostic memory samples |
+| Clean Windows 10 install + launch | Installer copies the app and the installed app launches without crashing | Not run; deferred |
+| Clean Windows 11 install + launch | Installer copies the app and the installed app launches without crashing | Clean VM not run; local Windows 11 install + launch passed |
+| Embedded English SRT MKV | Video plays; subtitle stays synchronized; words are clickable | Pass on packaged build |
+| Embedded English ASS MKV | Video plays; dialogue is clickable; raw ASS drawing data is not exposed; karaoke micro-cues do not replace the main English line | Pass on packaged build with Tales of Herding Gods sample |
+| Embedded English SSA MKV | Video plays; readable dialogue is clickable and synchronized | Pass on packaged build with real SSA sample |
+| Clicked known word | Burmese local-dictionary translation appears | Pass on packaged build |
+| Repeated normalized lookup | Session cache prevents a duplicate provider lookup | Previously validated; no separate packaged instrumentation retest |
+| File with no subtitles | Clear no-subtitle recovery message appears | Pass on packaged build |
+| Image-only PGS/VobSub file | Clear unsupported-subtitle message appears | Pass on packaged build with VobSub sample |
+| Unknown local-dictionary word | Short readable unavailable message appears and playback remains usable | Previously validated behavior |
+| Optional Google provider with no/invalid key | Short readable failure state; playback remains usable | Previously validated UI behavior |
+| API-key persistence | Reopening Settings never reveals the stored key value | Pass after packaged-app restart |
+| Fullscreen + keyboard + popup dismissal | Player controls and translation popup remain usable | Previously manually validated |
+| Long playback session | No obvious unbounded memory growth or progressive playback degradation | Pass; multiple 10-minute samples stabilized around ~127 MB private / ~136–148 MB resident during the continuous run |
 
 ## Long-session memory check
 
-The main process writes a `memory.sample` record at startup and every 10 minutes. Play a representative MKV for at least 60 minutes, use seek/translation/fullscreen periodically, then inspect the diagnostic log. Some fluctuation is normal; investigate steady, unbounded growth across successive samples or a large increase that never settles after activity stops.
+The main process writes a `memory.sample` record at startup and every 10 minutes. During the Windows 11 acceptance run, memory rose during playback warm-up and then stabilized across successive samples instead of growing without bound. Representative samples were approximately 104 MB → 128 MB private memory followed by ~127 MB steady-state private memory, while resident memory settled from ~145–148 MB down to ~136 MB. Later samples also remained stable rather than showing runaway growth.
 
-Diagnostic log location:
+Diagnostic log location observed in the packaged build:
 
 ```text
-%APPDATA%\subtitle-bridge\diagnostics\subtitle-bridge.log
+%APPDATA%\Subtitle Bridge\diagnostics\subtitle-bridge.log
 ```
 
 The exact Electron user-data folder can vary with package metadata, so if the file is not at that path, search `%APPDATA%` for `subtitle-bridge.log`.
@@ -79,7 +79,7 @@ Diagnostics intentionally avoid logging video contents, subtitle text, selected 
 
 ## Known MVP limitations
 
-- Windows 10/11 x64 only for the packaged MVP.
+- The packaged MVP targets Windows 10/11 x64, but this acceptance pass was manually exercised on Windows 11 only; clean Windows 10 and clean-VM Windows 11 coverage is deferred.
 - The default offline English → Burmese dictionary is intentionally small; unknown words are expected until the dataset is expanded.
 - Advanced ASS/SSA visual styling, positioning, karaoke animation, and drawings are not reproduced by the interactive overlay. Drawing/effect garbage is filtered defensively; normal dialogue remains the learning surface.
 - Image-based PGS/VobSub subtitles are detected but not rendered as clickable text.
