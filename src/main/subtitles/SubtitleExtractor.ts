@@ -1,5 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { SubtitleCue } from '../../shared/media'
+import { diagnosticLog } from '../diagnostics'
+import { resolveFfmpegExecutable } from '../runtimeTools'
 import { parseSrtCues } from './normalize'
 
 const MAX_SUBTITLE_BYTES = 16 * 1024 * 1024
@@ -11,9 +13,10 @@ export class SubtitleExtractor {
   async extract(filePath: string, ffIndex: number): Promise<SubtitleCue[]> {
     this.cancel()
 
-    const executable = process.env.FFMPEG_PATH?.trim() || 'ffmpeg'
+    const runtime = resolveFfmpegExecutable()
+    diagnosticLog('ffmpeg.extractStart', { source: runtime.source, ffIndex })
     const child = spawn(
-      executable,
+      runtime.executable,
       [
         '-v',
         'error',
@@ -58,6 +61,7 @@ export class SubtitleExtractor {
         stdoutBytes += chunk.byteLength
         if (stdoutBytes > MAX_SUBTITLE_BYTES) {
           child.kill()
+          diagnosticLog('ffmpeg.extractFailed', { reason: 'subtitle-too-large', ffIndex })
           finish(() => reject(new Error('The subtitle track is too large to process safely.')))
           return
         }
@@ -75,19 +79,28 @@ export class SubtitleExtractor {
       })
 
       child.once('error', (error) => {
-        finish(() => reject(toExtractionError(error)))
+        const extractionError = toExtractionError(error)
+        diagnosticLog('ffmpeg.spawnFailed', {
+          source: runtime.source,
+          ffIndex,
+          message: extractionError.message
+        })
+        finish(() => reject(extractionError))
       })
 
       child.once('close', (code, signal) => {
         finish(() => {
           if (signal) {
+            diagnosticLog('ffmpeg.extractCancelled', { ffIndex, signal })
             reject(new Error('Subtitle extraction was cancelled.'))
             return
           }
 
           if (code !== 0) {
             const detail = Buffer.concat(stderr).toString('utf8').trim()
-            reject(new Error(detail || `FFmpeg exited with code ${code ?? 'unknown'}.`))
+            const message = detail || `FFmpeg exited with code ${code ?? 'unknown'}.`
+            diagnosticLog('ffmpeg.extractFailed', { ffIndex, code, message })
+            reject(new Error(message))
             return
           }
 
@@ -95,19 +108,26 @@ export class SubtitleExtractor {
           try {
             cues = parseSrtCues(Buffer.concat(stdout).toString('utf8'))
           } catch (error) {
-            reject(
+            const message =
               error instanceof Error
-                ? error
-                : new Error('The subtitle track could not be parsed safely.')
-            )
+                ? error.message
+                : 'The subtitle track could not be parsed safely.'
+            diagnosticLog('ffmpeg.parseFailed', { ffIndex, message })
+            reject(new Error(message))
             return
           }
 
           if (cues.length === 0) {
+            diagnosticLog('ffmpeg.noReadableCues', { ffIndex })
             reject(new Error('No readable text subtitle cues were found in this track.'))
             return
           }
 
+          diagnosticLog('ffmpeg.extractComplete', {
+            ffIndex,
+            cueCount: cues.length,
+            outputBytes: stdoutBytes
+          })
           resolve(cues)
         })
       })
@@ -130,7 +150,7 @@ export class SubtitleExtractor {
 function toExtractionError(error: Error): Error {
   if ('code' in error && error.code === 'ENOENT') {
     return new Error(
-      'FFmpeg was not found. Install ffmpeg and add it to PATH, or set FFMPEG_PATH to ffmpeg.exe.'
+      'FFmpeg was not found. Install ffmpeg and add it to PATH, set FFMPEG_PATH to ffmpeg.exe, or use a package that bundles ffmpeg.exe.'
     )
   }
 
