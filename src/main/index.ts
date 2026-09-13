@@ -102,10 +102,12 @@ async function handleLaunchArguments(argv: readonly string[]): Promise<void> {
     return
   }
 
-  diagnosticLog('media.externalLaunchRequested', { source: target.toLowerCase().startsWith('vlc://') ? 'stremio-vlc' : 'direct' })
+  diagnosticLog('media.externalLaunchRequested', {
+    source: target.toLowerCase().startsWith('vlc://') ? 'stremio-vlc' : 'direct'
+  })
   const result = await openMediaTarget(target)
   if (result.error) {
-    diagnosticLog('media.externalLaunchRejected', { reason: result.error })
+    diagnosticLog('media.externalLaunchRejected', { reason: 'open-failed' })
     dialog.showErrorBox('Could not open media', result.error)
   }
 }
