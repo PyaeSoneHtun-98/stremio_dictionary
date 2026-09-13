@@ -1,6 +1,6 @@
 # Subtitle Bridge
 
-Subtitle Bridge is a Windows-first desktop video player for English learners. It opens local MKV files, renders supported embedded text subtitles as interactive words, and can translate a selected word into Burmese without leaving the player.
+Subtitle Bridge is a Windows-first desktop video player for English learners. It opens local MKV files and supported HTTP/HTTPS media streams, renders supported embedded text subtitles as interactive words, and can translate a selected word into Burmese without leaving the player.
 
 ## Stack
 
@@ -91,11 +91,27 @@ On the target Windows machine, install compatible Windows x64 builds of mpv and 
 
 For normal Start Menu use, configure those values in the Windows user/system environment rather than only in a temporary terminal session. The package includes `RUNTIME_DEPENDENCIES.txt` with the same requirement.
 
+## Stremio Windows handoff
+
+Subtitle Bridge accepts HTTP/HTTPS media URLs on the command line and understands Stremio's current Windows VLC external-player handoff format:
+
+```text
+vlc://<http-or-https-stream-url>
+```
+
+The Windows package includes `Enable-StremioHandoff.ps1` and `Disable-StremioHandoff.ps1`. The enable helper is **opt-in**: it registers Subtitle Bridge as the current user's `vlc://` protocol handler so Stremio's **VLC** external-player option opens Subtitle Bridge instead. If a current-user VLC handler already exists, it is backed up for restoration.
+
+This compatibility mode temporarily redirects other `vlc://` links for that Windows user too, so disable it when normal VLC protocol handling is wanted again.
+
+The first handoff MVP supports embedded text subtitles in the selected media stream. Separate subtitle-addon URLs and watched/progress synchronization are later work.
+
+Full setup, restore, and manual-test instructions are in [`docs/STREMIO_HANDOFF.md`](docs/STREMIO_HANDOFF.md).
+
 ## Diagnostics
 
 The desktop main process writes a small rotating diagnostic log under the Electron user-data directory in a `diagnostics\subtitle-bridge.log` file. It records lifecycle, controlled mpv/FFmpeg failure metadata, subtitle extraction status, and a main-process memory sample at startup and every 10 minutes.
 
-Diagnostics intentionally avoid subtitle text, selected dictionary words, raw FFmpeg stderr, and full media paths. Secret-shaped fields plus known API-key query/header patterns are redacted. Do not add provider request bodies, authorization headers, raw stored credentials, or third-party stderr/stdout text to logging.
+Diagnostics intentionally avoid subtitle text, selected dictionary words, raw FFmpeg stderr, and full media paths or stream URLs. Secret-shaped fields plus known API-key query/header patterns are redacted. Do not add provider request bodies, authorization headers, raw stored credentials, or third-party stderr/stdout text to logging.
 
 The full release checklist and known limitations are documented in [`docs/MVP_ACCEPTANCE_TEST.md`](docs/MVP_ACCEPTANCE_TEST.md).
 
@@ -103,6 +119,7 @@ The full release checklist and known limitations are documented in [`docs/MVP_AC
 
 ```text
 Electron main process
+├── launch-target parser / Stremio VLC compatibility handoff
 ├── mpv playback controller
 ├── FFmpeg subtitle extraction
 ├── translation provider adapters
