@@ -132,9 +132,9 @@ jobs:
           New-Item -ItemType Directory -Path $stremioFixtureDir -Force | Out-Null
           $serverJs = Join-Path $stremioFixtureDir 'server.js'
           $originalServerJs = @'
-var players = { vlc: { title: "VLC" } };
-devices.groups.external = [];
-'@
+          var players = { vlc: { title: "VLC" } };
+          devices.groups.external = [];
+          '@
           [System.IO.File]::WriteAllText($serverJs, $originalServerJs)
 
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $serverJs
