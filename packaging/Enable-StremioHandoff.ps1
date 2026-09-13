@@ -79,6 +79,12 @@ function Write-AtomicUtf8([string]$Path, [string]$Text) {
       throw 'Could not verify the temporary Stremio patch file.'
     }
 
+    # CI uses this fail-before-replace hook to prove that an interrupted/failed mutation
+    # leaves the original server.js untouched. It is intentionally fail-safe if set by a user.
+    if ($env:SUBTITLE_BRIDGE_TEST_FORCE_STREMIO_REPLACE_FAILURE -eq '1') {
+      throw 'Simulated Stremio atomic replacement failure.'
+    }
+
     [System.IO.File]::Replace($tempPath, $Path, $null)
   } finally {
     if (Test-Path -LiteralPath $tempPath) {
@@ -131,11 +137,23 @@ function Resolve-StremioServerJs([string]$ExplicitPath) {
   foreach ($candidate in ($candidates | Select-Object -Unique)) {
     try {
       $candidateContent = [System.IO.File]::ReadAllText($candidate)
+    } catch {
+      continue
+    }
+
+    # If our markers are present, do not hide a malformed patch by silently moving on to
+    # another Stremio installation. Marker corruption must fail closed and be handled explicitly.
+    if ($candidateContent.Contains($MarkerBegin) -or $candidateContent.Contains($MarkerEnd)) {
       $candidateBase = Remove-PatchBlock $candidateContent
       Assert-CompatibleStremioLayout $candidateBase
       return $candidate
+    }
+
+    try {
+      Assert-CompatibleStremioLayout $candidateContent
+      return $candidate
     } catch {
-      # Ignore unreadable or incompatible candidates and keep looking.
+      # Ignore incompatible unrelated candidates and keep looking.
     }
   }
 
