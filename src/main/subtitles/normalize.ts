@@ -164,7 +164,8 @@ export function normalizeLookupTerm(value: string): string {
 export function findActiveCue(
   cues: SubtitleCue[],
   time: number | null,
-  preferredLanguage?: string | null
+  preferredLanguage?: string | null,
+  applyAssEffectHeuristics = false
 ): SubtitleCue | null {
   if (time === null || !Number.isFinite(time) || cues.length === 0) {
     return null
@@ -202,7 +203,9 @@ export function findActiveCue(
     return null
   }
 
-  return choosePreferredActiveCue(activeCues, preferredLanguage)
+  return applyAssEffectHeuristics
+    ? choosePreferredActiveCue(activeCues, preferredLanguage)
+    : newestCue(activeCues)
 }
 
 function choosePreferredActiveCue(
