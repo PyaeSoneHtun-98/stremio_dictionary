@@ -15,6 +15,7 @@ export class PlaybackSurface {
       this.hostWindow.show()
       this.overlayWindow.show()
       this.syncOverlayBounds()
+      this.overlayWindow.focus()
       return getWin32WindowId(this.hostWindow)
     }
 
@@ -66,6 +67,10 @@ export class PlaybackSurface {
     hostWindow.on('focus', () => {
       if (!overlayWindow.isDestroyed()) {
         overlayWindow.moveTop()
+        // mpv is a native child HWND of the host window. Keep keyboard focus in the
+        // Electron overlay so player shortcuts continue to work after the host or
+        // its title bar receives focus.
+        overlayWindow.focus()
       }
     })
 
@@ -93,6 +98,7 @@ export class PlaybackSurface {
     this.syncOverlayBounds()
     overlayWindow.show()
     overlayWindow.moveTop()
+    overlayWindow.focus()
 
     return getWin32WindowId(hostWindow)
   }
