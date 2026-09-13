@@ -83,7 +83,7 @@ export class SubtitleExtractor {
         diagnosticLog('ffmpeg.spawnFailed', {
           source: runtime.source,
           ffIndex,
-          message: extractionError.message
+          code: 'code' in error ? error.code : undefined
         })
         finish(() => reject(extractionError))
       })
@@ -99,7 +99,11 @@ export class SubtitleExtractor {
           if (code !== 0) {
             const detail = Buffer.concat(stderr).toString('utf8').trim()
             const message = detail || `FFmpeg exited with code ${code ?? 'unknown'}.`
-            diagnosticLog('ffmpeg.extractFailed', { ffIndex, code, message })
+            diagnosticLog('ffmpeg.extractFailed', {
+              ffIndex,
+              code,
+              hadStderr: detail.length > 0
+            })
             reject(new Error(message))
             return
           }
