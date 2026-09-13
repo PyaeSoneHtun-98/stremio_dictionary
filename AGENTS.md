@@ -46,9 +46,10 @@ Preserve these unless the active issue explicitly changes them:
 
 - Never log API keys, authorization headers, secrets, provider request bodies, subtitle text, clicked lookup words, or full local media paths/stream URLs.
 - Do not persist raw FFmpeg stderr or other third-party output that may contain paths, subtitle content, or secrets.
+- Do not enable mpv `--log-file` output for Subtitle Bridge. Raw mpv logs can contain complete Stremio stream URLs, including private hashes or query credentials; use only the app's structured/redacted diagnostics.
 - Validate launch targets before forwarding them to mpv or FFmpeg. Only intended local-file and HTTP/HTTPS targets should be accepted.
 - Keep renderer Node integration disabled and context isolation enabled. Expose system capabilities through narrow preload/IPC APIs.
-- Any Stremio compatibility patch must be opt-in, reversible, idempotent, and conservative when the expected Stremio layout is not recognized.
+- Any Stremio compatibility patch must be opt-in, reversible, idempotent, crash-safe, preserve existing recovery backups, and fail closed when the expected Stremio layout or patch-marker state is not recognized.
 
 ## Testing expectations
 
