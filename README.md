@@ -2,6 +2,17 @@
 
 Subtitle Bridge is a Windows-first desktop video player for English learners. It opens local MKV files and supported HTTP/HTTPS media streams, renders supported embedded text subtitles as interactive words, and can translate a selected word into Burmese without leaving the player.
 
+## Project documentation
+
+Before substantial development work, read:
+
+- [`AGENTS.md`](AGENTS.md) — repository instructions for coding agents and reviewers
+- [`docs/PROJECT.md`](docs/PROJECT.md) — product goal, architecture, invariants, and limitations
+- [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) — required issue → branch → test → review → merge process
+- [`docs/STATUS.md`](docs/STATUS.md) — current stable state, active issue/PR, verified behavior, and next work
+
+These files are the project source of truth when chat history becomes stale or incomplete.
+
 ## Stack
 
 - Electron for the desktop shell and native playback window integration
@@ -142,9 +153,15 @@ The provider boundary is intentionally replaceable so the starter dictionary can
 
 ## Development workflow
 
-1. Pick the next GitHub issue.
+See [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) for the full process. In short:
+
+1. Define the next GitHub issue and acceptance criteria.
 2. Create an issue-specific feature branch.
 3. Implement only that issue's scope.
-4. Run `npm run check`.
-5. Open a pull request that closes the issue.
-6. Review the PR before merging to `master`.
+4. Run `npm run check` and relevant packaging checks.
+5. Open/maintain a Draft PR while testing is incomplete.
+6. Perform the required real Windows/manual tests.
+7. Record truthful results in the PR/docs.
+8. Send the current head to Codex for review.
+9. Fix all P1/P2 blockers and re-review when needed.
+10. Verify final head + CI, mark ready, squash merge, and confirm the issue closed.
