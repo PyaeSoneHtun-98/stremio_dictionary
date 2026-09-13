@@ -28,7 +28,7 @@ Release artifacts intentionally do not bundle mpv or FFmpeg; they are external r
 **Issue #24:** Add Stremio external-player handoff MVP on Windows  
 **PR #25:** Add Stremio external-player handoff MVP  
 **Branch:** `feat/issue-24-stremio-handoff`  
-**State:** Draft; implementation and manual testing are complete enough for Codex review after current CI/docs validation.
+**State:** Draft; manual feature testing passed. The first Codex review found four merge blockers; fixes are on the branch and require green CI plus Codex re-review before merge.
 
 ### Verified manually for Issue #24
 
@@ -50,15 +50,31 @@ Release artifacts intentionally do not bundle mpv or FFmpeg; they are external r
 - mpv's own subtitle rendering remains hidden while the React overlay displays interactive text.
 - The tested Stremio 6 beta Settings UI exposes only `Disabled` and `M3U Playlist` under external-player settings; the integration therefore targets Stremio's verified in-player external-device mechanism instead.
 - The Stremio integration is an opt-in reversible local compatibility patch, not native upstream Stremio support.
+- Media-open requests are serialized before reaching the playback controller so simultaneous external launches cannot race multiple mpv startups against the same IPC pipe.
+- Raw mpv file logging is intentionally disabled because mpv can write complete private Stremio stream URLs to such logs; Subtitle Bridge uses only its structured/redacted diagnostics.
+- Stremio patch enable/disable validates a specific external-player discovery structure and patch-marker integrity before writing.
+- Stremio patch writes use a verified temporary file plus atomic replacement. Existing safety backups are preserved instead of overwritten.
+
+### Codex review findings being addressed
+
+The first final review reported:
+
+1. P1 — raw mpv diagnostics could persist full Stremio URLs.
+2. P2 — concurrent launch requests could race multiple mpv processes against one named pipe.
+3. P2 — Stremio layout validation was too weak.
+4. P2 — enable/disable writes were non-atomic and backup handling could destroy the useful recovery copy.
+
+The current branch includes fixes for all four findings plus CI coverage for stronger Stremio layout validation, malformed-marker refusal, idempotency, exact disable restoration, and backup preservation. These fixes are not considered merge-ready until the latest CI is green and Codex confirms that no P1/P2 blockers remain.
 
 ### Remaining gate for PR #25
 
-1. Ensure the latest CI is green after documentation/helper changes.
-2. Send the current PR head to Codex for final review.
-3. Fix any P1/P2 blockers and re-review if necessary.
-4. Mark the PR ready only after Codex says no P1/P2 blockers remain.
-5. Verify final head + CI and squash merge.
-6. Confirm Issue #24 closes.
+1. Ensure the latest CI is green after the review fixes.
+2. Re-run the affected Stremio manual smoke test if the packaged helper behavior changed materially.
+3. Send the current PR head back to Codex for re-review of the four findings.
+4. Fix any remaining P1/P2 blockers and repeat affected validation as needed.
+5. Mark the PR ready only after Codex says no P1/P2 blockers remain.
+6. Verify final head + CI and squash merge.
+7. Confirm Issue #24 closes.
 
 ## Next planned issue
 
