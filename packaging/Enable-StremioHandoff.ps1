@@ -22,7 +22,11 @@ if (Test-Path -LiteralPath $ProtocolKey) {
   $Existing = Get-ItemProperty -LiteralPath $ProtocolKey -ErrorAction SilentlyContinue
   $ExistingIsOurs = $Existing.$MarkerName -eq '1'
 
-  if (-not $ExistingIsOurs -and -not (Test-Path -LiteralPath $BackupPath)) {
+  if (-not $ExistingIsOurs) {
+    if (Test-Path -LiteralPath $BackupPath) {
+      throw "A previous vlc:// protocol backup already exists at: $BackupPath. Restore or remove that backup before enabling the compatibility handler again."
+    }
+
     & reg.exe export $ProtocolRegistryPath $BackupPath /y | Out-Null
     if ($LASTEXITCODE -ne 0) {
       throw 'Could not back up the existing current-user vlc:// protocol registration.'
