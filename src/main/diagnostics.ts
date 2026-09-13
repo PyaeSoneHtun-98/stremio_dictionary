@@ -1,5 +1,6 @@
 import { app } from 'electron'
-import { appendFileSync, existsSync, mkdirSync, renameSync, statSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
 const MAX_LOG_BYTES = 2 * 1024 * 1024
@@ -103,10 +104,7 @@ function rotateIfNeeded(): void {
 
   const previous = `${logFilePath}.1`
   try {
-    if (existsSync(previous)) {
-      // renameSync cannot overwrite on Windows; the next append can continue safely if rotation fails.
-      return
-    }
+    rmSync(previous, { force: true })
     renameSync(logFilePath, previous)
   } catch {
     // Logging must remain non-fatal.
@@ -118,7 +116,10 @@ function isSecretKey(key: string): boolean {
 }
 
 function redactString(value: string): string {
-  return value
+  const home = homedir()
+  const withoutHome = home ? value.split(home).join('~') : value
+
+  return withoutHome
     .replace(/([?&](?:key|api_key|apikey)=)[^&\s]+/gi, '$1[REDACTED]')
     .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s]+/gi, '$1[REDACTED]')
     .replace(/(GOOGLE_TRANSLATE_API_KEY\s*=\s*)[^\s]+/gi, '$1[REDACTED]')
