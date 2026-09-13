@@ -7,8 +7,8 @@ Subtitle Bridge is a Windows-first desktop video player for English learners. It
 - Electron for the desktop shell and native playback window integration
 - React + TypeScript for the renderer UI
 - Vite through `electron-vite` for development and production builds
-- mpv for video playback
-- FFmpeg for embedded text subtitle extraction
+- mpv for video playback and live subtitle decoding on network streams
+- FFmpeg for full embedded text subtitle extraction from local files
 - a replaceable translation-provider interface with an offline English → Burmese dictionary as the default provider
 - Biome for linting/formatting
 - Vitest for tests
@@ -93,19 +93,13 @@ For normal Start Menu use, configure those values in the Windows user/system env
 
 ## Stremio Windows handoff
 
-Subtitle Bridge accepts HTTP/HTTPS media URLs on the command line and understands Stremio's current Windows VLC external-player handoff format:
+Subtitle Bridge accepts HTTP/HTTPS media URLs on the command line, including Stremio local streaming-server URLs such as `http://127.0.0.1:11470/...` while Stremio remains running.
 
-```text
-vlc://<http-or-https-stream-url>
-```
+For HTTP/HTTPS playback, Subtitle Bridge uses mpv's selected embedded text subtitle track as a **live subtitle source**. mpv keeps its own subtitle rendering hidden while exposing the current plain subtitle text, which is tokenized and shown through the existing clickable React overlay. This avoids waiting for FFmpeg to scan an entire torrent-backed stream before subtitles become usable. Local MKV files continue to use FFmpeg full-track extraction.
 
-The Windows package includes `Enable-StremioHandoff.ps1` and `Disable-StremioHandoff.ps1`. The enable helper is **opt-in**: it registers Subtitle Bridge as the current user's `vlc://` protocol handler so Stremio's **VLC** external-player option opens Subtitle Bridge instead. If a current-user VLC handler already exists, it is backed up for restoration.
+The Issue #24 draft also experimented with taking over the current user's `vlc://` protocol handler. Real Stremio Windows testing showed that the in-player **Play in VLC** menu item is actually driven by Stremio's playback-device/casting server and launches the detected player directly, so the protocol override is **not** considered the final one-click integration. Direct stream-URL playback is being validated first; the one-click handoff will be redesigned against Stremio's actual playback-device mechanism.
 
-Run the helper from the installed Subtitle Bridge directory (normally `%LOCALAPPDATA%\Programs\Subtitle Bridge`) so the protocol registration points to a stable executable location. This compatibility mode temporarily redirects other `vlc://` links for that Windows user too, so disable it when normal VLC protocol handling is wanted again.
-
-The first handoff MVP supports embedded text subtitles in the selected media stream. Separate subtitle-addon URLs and watched/progress synchronization are later work.
-
-Full setup, restore, and manual-test instructions are in [`docs/STREMIO_HANDOFF.md`](docs/STREMIO_HANDOFF.md).
+Separate subtitle-addon URLs and watched/progress synchronization are later work.
 
 ## Diagnostics
 
@@ -119,9 +113,10 @@ The full release checklist and known limitations are documented in [`docs/MVP_AC
 
 ```text
 Electron main process
-├── launch-target parser / Stremio VLC compatibility handoff
+├── launch-target parser
 ├── mpv playback controller
-├── FFmpeg subtitle extraction
+│   └── live text subtitles for HTTP/HTTPS streams
+├── FFmpeg full-track subtitle extraction for local MKV files
 ├── translation provider adapters
 │   ├── LocalDictionaryProvider  ← default/offline
 │   └── GoogleTranslationProvider  ← optional adapter
