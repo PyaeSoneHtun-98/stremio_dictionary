@@ -1,30 +1,88 @@
+param(
+  [string]$ServerJsPath
+)
+
 $ErrorActionPreference = 'Stop'
 
-$ProtocolKey = 'HKCU:\Software\Classes\vlc'
-$MarkerName = 'SubtitleBridgeCompatibility'
-$BackupDir = Join-Path $env:LOCALAPPDATA 'Subtitle Bridge\stremio-handoff'
-$BackupPath = Join-Path $BackupDir 'vlc-protocol-before-subtitle-bridge.reg'
+$MarkerBegin = '/* Subtitle Bridge external player BEGIN */'
+$MarkerEnd = '/* Subtitle Bridge external player END */'
+$ExternalDevicesPattern = 'devices\.groups\.external\s*=\s*\[\s*\]\s*;?'
 
-if (-not (Test-Path -LiteralPath $ProtocolKey)) {
-  Write-Host 'No current-user vlc:// protocol registration is present.'
+function Resolve-StremioServerJs([string]$ExplicitPath) {
+  if ($ExplicitPath) {
+    $resolved = [System.IO.Path]::GetFullPath($ExplicitPath)
+    if (-not (Test-Path -LiteralPath $resolved -PathType Leaf)) {
+      throw "Stremio server.js was not found: $resolved"
+    }
+    return $resolved
+  }
+
+  $candidates = New-Object System.Collections.Generic.List[string]
+
+  Get-Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.ProcessName -like 'Stremio*' } |
+    ForEach-Object {
+      try {
+        if ($_.Path) {
+          $candidate = Join-Path (Split-Path -Parent $_.Path) 'server.js'
+          if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            $candidates.Add([System.IO.Path]::GetFullPath($candidate))
+          }
+        }
+      } catch {
+        # Continue with filesystem discovery.
+      }
+    }
+
+  $roots = @(
+    (Join-Path $env:LOCALAPPDATA 'Programs\LNV'),
+    (Join-Path $env:LOCALAPPDATA 'Programs')
+  ) | Select-Object -Unique
+
+  foreach ($root in $roots) {
+    if (-not (Test-Path -LiteralPath $root -PathType Container)) {
+      continue
+    }
+
+    Get-ChildItem -LiteralPath $root -Filter 'server.js' -File -Recurse -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -match '(?i)stremio' } |
+      ForEach-Object { $candidates.Add([System.IO.Path]::GetFullPath($_.FullName)) }
+  }
+
+  foreach ($candidate in ($candidates | Select-Object -Unique)) {
+    try {
+      $content = [System.IO.File]::ReadAllText($candidate)
+      if ($content.Contains($MarkerBegin) -or [regex]::IsMatch($content, $ExternalDevicesPattern)) {
+        return $candidate
+      }
+    } catch {
+      # Ignore unreadable unrelated candidates and keep looking.
+    }
+  }
+
+  throw 'Could not locate Stremio server.js automatically. Pass -ServerJsPath with the full path to Stremio\server.js.'
+}
+
+$ServerJsPath = Resolve-StremioServerJs $ServerJsPath
+$content = [System.IO.File]::ReadAllText($ServerJsPath)
+$markerPattern = [regex]::Escape($MarkerBegin) + '.*?' + [regex]::Escape($MarkerEnd) + '\r?\n?'
+$cleaned = [regex]::Replace(
+  $content,
+  $markerPattern,
+  '',
+  [System.Text.RegularExpressions.RegexOptions]::Singleline
+)
+
+if ($cleaned -eq $content) {
+  Write-Host 'Subtitle Bridge is not currently patched into this Stremio server.js. Nothing was changed.'
   exit 0
 }
 
-$Existing = Get-ItemProperty -LiteralPath $ProtocolKey -ErrorAction SilentlyContinue
-if ($Existing.$MarkerName -ne '1') {
-  throw 'The current-user vlc:// protocol registration is not owned by Subtitle Bridge. Nothing was changed.'
-}
+[System.IO.File]::WriteAllText(
+  $ServerJsPath,
+  $cleaned,
+  [System.Text.UTF8Encoding]::new($false)
+)
 
-Remove-Item -LiteralPath $ProtocolKey -Recurse -Force
-
-if (Test-Path -LiteralPath $BackupPath) {
-  & reg.exe import $BackupPath | Out-Null
-  if ($LASTEXITCODE -ne 0) {
-    throw "Subtitle Bridge registration was removed, but the previous vlc:// registration could not be restored automatically. Backup retained at: $BackupPath"
-  }
-
-  Remove-Item -LiteralPath $BackupPath -Force
-  Write-Host 'Subtitle Bridge Stremio compatibility was disabled and the previous current-user vlc:// registration was restored.'
-} else {
-  Write-Host 'Subtitle Bridge Stremio compatibility was disabled. Windows will fall back to any system-level vlc:// registration.'
-}
+Write-Host "Removed Subtitle Bridge from Stremio external-player list: $ServerJsPath"
+Write-Host 'Fully exit and reopen Stremio for the change to take effect.'
