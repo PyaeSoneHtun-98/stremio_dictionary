@@ -1,64 +1,83 @@
 # Stremio Windows handoff
 
-Subtitle Bridge can accept HTTP/HTTPS media streams from the command line and can unwrap Stremio's current Windows VLC external-player handoff format (`vlc://<http-or-https-url>`).
+Subtitle Bridge can accept HTTP/HTTPS media streams from the command line, including Stremio's local streaming-server URLs such as `http://127.0.0.1:11470/...`.
 
-## Why the first integration uses the VLC option
+## Verified Stremio 6 beta behavior
 
-Current Stremio Windows exposes VLC and M3U as external-player choices; it does not expose MPV on Windows. Stremio Core generates the Windows VLC external-player URL as:
+On the tested Windows build (Stremio 6 beta), **Settings → Player → Play in external player** exposes only **Disabled** and **M3U Playlist**. VLC is not available in that settings dropdown.
+
+The in-player three-dot menu is different. Stremio's streaming server discovers installed desktop players and exposes entries such as **Play in VLC** through its casting/external-device list. Because that path is what the tested build actually uses, the Subtitle Bridge helper integrates there instead of relying on the disabled `vlc://` settings path.
+
+## Integration approach
+
+`Enable-StremioHandoff.ps1` makes a narrow, reversible patch to Stremio's local `server.js` external-player table. It inserts a new player entry that points to the installed `Subtitle Bridge.exe` before Stremio builds `devices.groups.external`.
+
+After Stremio restarts, the expected player menu is:
 
 ```text
-vlc://<stream-url>
+Copy stream link
+Copy magnet link
+Download this video
+Play in VLC
+Play in Subtitle Bridge
 ```
 
-The first Subtitle Bridge integration therefore provides an **opt-in compatibility handler** for the current-user `vlc://` URL protocol. While enabled, choosing **VLC** as Stremio's external player launches Subtitle Bridge instead.
+Selecting **Play in Subtitle Bridge** launches Subtitle Bridge with the same Stremio streaming URL that is already proven to work with mpv live subtitles, clickable words, and Burmese lookup.
 
-This is an MVP compatibility path, not a claim that Subtitle Bridge is VLC. A future clean integration should use a dedicated `subtitlebridge://` handoff if Stremio adds a native Subtitle Bridge player entry.
+This is an opt-in compatibility patch, not a native Stremio extension API. A Stremio update can replace `server.js`; if the menu entry disappears after an update, rerun the enable helper.
 
 ## Prerequisites
 
 - Windows x64
-- Subtitle Bridge installed or extracted
-- `mpv.exe` and `ffmpeg.exe` available through persistent `PATH`, `MPV_PATH`, and `FFMPEG_PATH` configuration
-- Stremio running while a Stremio-served stream is playing
+- Subtitle Bridge installed
+- `mpv.exe` available through persistent `PATH` or `MPV_PATH`
+- FFmpeg installed for the existing local-file workflow
+- Stremio running while its local `127.0.0.1:11470` stream is used
 
-## Test Subtitle Bridge with a stream URL first
+## Test the stream path directly first
 
-From Command Prompt or PowerShell, launch a direct HTTP/HTTPS stream:
-
-```cmd
-"C:\Users\<you>\AppData\Local\Programs\Subtitle Bridge\Subtitle Bridge.exe" "https://example.com/video.mkv"
-```
-
-A Stremio-style wrapper can also be tested directly:
-
-```cmd
-"C:\Users\<you>\AppData\Local\Programs\Subtitle Bridge\Subtitle Bridge.exe" "vlc://http://127.0.0.1:11470/..."
-```
-
-Only HTTP/HTTPS network targets are accepted. Arbitrary URL schemes are rejected before they are passed to mpv or FFmpeg.
-
-## Enable the Stremio compatibility handoff
-
-Run the helper from the **installed Subtitle Bridge directory** so the Windows protocol points to a stable executable path:
+In Stremio, use **Copy stream link**, then launch Subtitle Bridge with the clipboard URL:
 
 ```powershell
+$url = Get-Clipboard
+& "$env:LOCALAPPDATA\Programs\Subtitle Bridge\Subtitle Bridge.exe" $url
+```
+
+The verified Stremio stream path supports:
+
+- video/audio playback
+- embedded subtitle-track detection
+- live synchronized subtitle text through mpv
+- clickable subtitle words
+- Burmese lookup
+- embedded subtitle-track switching while paused
+
+## Enable the one-click Stremio menu entry
+
+Run the helper from the installed Subtitle Bridge directory:
+
+```powershell
+cd "$env:LOCALAPPDATA\Programs\Subtitle Bridge"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\Enable-StremioHandoff.ps1"
 ```
 
-The helper registers Subtitle Bridge as the current user's `vlc://` handler. If a current-user VLC protocol registration already exists, it is exported to a backup before Subtitle Bridge takes over.
+The helper:
 
-Then in Stremio:
+1. Locates Stremio's `server.js` automatically when possible.
+2. Verifies the expected external-player discovery anchor exists before writing anything.
+3. Creates `server.js.subtitle-bridge.backup` beside the original file.
+4. Inserts one idempotent `players.subtitleBridge` block pointing to the installed Subtitle Bridge executable.
+5. Refuses to patch an unrecognized Stremio server layout.
 
-```text
-Settings
-→ Player
-→ External Player
-→ VLC
+If automatic discovery fails, pass the server file explicitly:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\Enable-StremioHandoff.ps1" -ServerJsPath "C:\path\to\Stremio\server.js"
 ```
 
-Choose a stream. Stremio should hand its `vlc://...` URL to Windows, Subtitle Bridge should open (or reuse the existing Subtitle Bridge instance), unwrap the HTTP/HTTPS stream URL, and begin playback.
+Then **fully exit Stremio and reopen it**. Start any stream, open the three-dot player menu, and select **Play in Subtitle Bridge**.
 
-## Disable and restore the previous VLC URL handler
+## Disable the Stremio menu entry
 
 From the installed Subtitle Bridge directory:
 
@@ -66,25 +85,25 @@ From the installed Subtitle Bridge directory:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\Disable-StremioHandoff.ps1"
 ```
 
-If the enable helper backed up a previous current-user `vlc://` registration, the disable helper restores it. Otherwise, it removes Subtitle Bridge's current-user registration so Windows can fall back to any system-level VLC handler.
-
-The disable helper refuses to delete a current-user `vlc://` registration that is not marked as owned by Subtitle Bridge.
+The disable helper removes only the marked Subtitle Bridge block from `server.js`; it does not replace the whole file with an old backup. Fully exit and reopen Stremio afterward.
 
 ## Single-instance behavior
 
-Subtitle Bridge uses an Electron single-instance lock. If Subtitle Bridge is already running and Stremio launches another stream, the new command-line target is delivered to the existing app instead of creating a duplicate application instance.
+Subtitle Bridge uses an Electron single-instance lock. If it is already running and Stremio launches another stream, the new target is delivered to the existing Subtitle Bridge instance instead of opening a duplicate app.
 
 ## Subtitle behavior
 
-The Stremio handoff MVP supports **embedded text subtitles in the media stream**, using the same SRT/ASS/SSA extraction and clickable Burmese lookup path as local MKV playback.
+For HTTP/HTTPS Stremio streams, Subtitle Bridge uses mpv's live subtitle properties instead of waiting for FFmpeg to scan the complete torrent-backed stream. mpv's own subtitle rendering stays hidden while the current plain subtitle text feeds the interactive React overlay.
+
+Local MKV files keep the existing FFmpeg full-track extraction path.
 
 Not included yet:
 
 - Stremio subtitle-addon URLs that are separate from the video stream
 - watched/progress synchronization back to Stremio
-- a native `Subtitle Bridge` entry in Stremio's external-player settings
+- a native upstream `Subtitle Bridge` option in Stremio settings
 - image-based subtitles as clickable text
 
 ## Compatibility warning
 
-While the handoff helper is enabled, other `vlc://` links for the same Windows user will also open Subtitle Bridge. Disable the compatibility handoff when you want normal VLC protocol handling again.
+The one-click menu integration modifies Stremio's installed `server.js`. It is deliberately opt-in and reversible, but Stremio updates can overwrite the patch. The helper validates the expected layout and creates a backup before first modification; it will fail rather than patch an unrecognized layout.
