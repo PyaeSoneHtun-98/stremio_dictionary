@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MediaTrack, PlaybackSnapshot, SubtitleToken } from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
 import {
@@ -68,11 +68,11 @@ export function PolishedOverlay(): React.JSX.Element {
   const currentSubtitleTrackId = useRef<number | null>(null)
   const translationRequestVersion = useRef(0)
 
-  const dismissTranslation = (): void => {
+  const dismissTranslation = useCallback((): void => {
     translationRequestVersion.current += 1
     setSelectedWord(null)
     setTranslation({ status: 'idle' })
-  }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -203,7 +203,7 @@ export function PolishedOverlay(): React.JSX.Element {
 
     window.addEventListener('pointerdown', handleOutsidePointerDown, true)
     return () => window.removeEventListener('pointerdown', handleOutsidePointerDown, true)
-  }, [selectedWord])
+  }, [dismissTranslation, selectedWord])
 
   const canControl = Boolean(state.filePath) && !['loading', 'error', 'unavailable'].includes(state.status)
   const playing = state.status === 'playing'
@@ -218,14 +218,14 @@ export function PolishedOverlay(): React.JSX.Element {
     ? null
     : subtitleRecoveryMessage(state.subtitle.status, state.subtitle.error)
 
-  const runControl = async (action: () => Promise<void>): Promise<void> => {
+  const runControl = useCallback(async (action: () => Promise<void>): Promise<void> => {
     setControlError(null)
     try {
       await action()
     } catch (error) {
       setControlError(error instanceof Error ? error.message : 'The player control failed.')
     }
-  }
+  }, [])
 
   useEffect(() => {
     const handlePlayerShortcut = (event: KeyboardEvent): void => {
@@ -270,7 +270,8 @@ export function PolishedOverlay(): React.JSX.Element {
       }
 
       if (action.kind === 'seek') {
-        const maximum = duration > 0 ? duration : Math.max(0, currentTime + Math.abs(action.deltaSeconds))
+        const maximum =
+          duration > 0 ? duration : Math.max(0, currentTime + Math.abs(action.deltaSeconds))
         const nextTime = clampPlayerValue(currentTime + action.deltaSeconds, 0, maximum)
         void runControl(() => window.desktop.media.seek(nextTime))
         return
@@ -287,7 +288,17 @@ export function PolishedOverlay(): React.JSX.Element {
 
     window.addEventListener('keydown', handlePlayerShortcut, true)
     return () => window.removeEventListener('keydown', handlePlayerShortcut, true)
-  }, [canControl, currentTime, duration, playing, selectedWord, settingsOpen, state.volume])
+  }, [
+    canControl,
+    currentTime,
+    dismissTranslation,
+    duration,
+    playing,
+    runControl,
+    selectedWord,
+    settingsOpen,
+    state.volume
+  ])
 
   const updateTranslationSettings = async (
     update: TranslationSettingsUpdate
@@ -564,7 +575,7 @@ export function PolishedOverlay(): React.JSX.Element {
           </button>
         </div>
 
-        <div className="keyboard-shortcuts" aria-label="Keyboard shortcuts">
+        <div className="keyboard-shortcuts">
           <kbd>Space</kbd>/<kbd>K</kbd> play · <kbd>←</kbd>/<kbd>→</kbd> seek 5s · <kbd>↑</kbd>/<kbd>↓</kbd>{' '}
           volume · <kbd>F</kbd> fullscreen · <kbd>Esc</kbd> dismiss
         </div>
