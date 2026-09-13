@@ -57,7 +57,7 @@ npm run check
 
 ## Package the Windows MVP
 
-On Windows, create the distributable package with:
+On Windows x64, create the distributable package with:
 
 ```cmd
 npm ci
@@ -78,19 +78,24 @@ The unpacked/ZIP package contains `Subtitle Bridge.exe` and `Install-SubtitleBri
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-SubtitleBridge.ps1
 ```
 
-The installer defaults to `%LOCALAPPDATA%\Programs\Subtitle Bridge` and creates a Start Menu shortcut.
+The installer defaults to `%LOCALAPPDATA%\Programs\Subtitle Bridge`, creates a Start Menu shortcut, stages and validates upgrades before swapping them into place, and removes stale files from the previous installation.
 
 ### mpv and FFmpeg in packaged builds
 
-`npm run package:win` looks for mpv and FFmpeg using `MPV_PATH` / `FFMPEG_PATH` and then the Windows `PATH`. If found, the executable is copied into the package and the packaged app uses it automatically. If a tool is not bundled, install it on the target machine and add it to `PATH`, or set the corresponding environment variable before launching Subtitle Bridge.
+The release artifact intentionally **does not bundle or redistribute mpv or FFmpeg binaries**. Their license obligations depend on the exact third-party build configuration and provenance, so the MVP keeps them external rather than opportunistically copying whatever executable happens to be installed on the packaging machine.
 
-Third-party runtime binaries are not committed to this repository. Review their licenses separately before redistributing a release that bundles them.
+On the target Windows machine, install compatible Windows x64 builds of mpv and FFmpeg separately and either:
+
+- make `mpv.exe` and `ffmpeg.exe` available on `PATH`, or
+- set `MPV_PATH` and `FFMPEG_PATH` to the corresponding executable paths before launching Subtitle Bridge.
+
+For normal Start Menu use, configure those values in the Windows user/system environment rather than only in a temporary terminal session. The package includes `RUNTIME_DEPENDENCIES.txt` with the same requirement.
 
 ## Diagnostics
 
-The desktop main process writes a small rotating diagnostic log under the Electron user-data directory in a `diagnostics\subtitle-bridge.log` file. It records lifecycle, mpv/FFmpeg failures, subtitle extraction status, and a main-process memory sample at startup and every 10 minutes.
+The desktop main process writes a small rotating diagnostic log under the Electron user-data directory in a `diagnostics\subtitle-bridge.log` file. It records lifecycle, controlled mpv/FFmpeg failure metadata, subtitle extraction status, and a main-process memory sample at startup and every 10 minutes.
 
-Diagnostics intentionally avoid subtitle text, selected dictionary words, and full media paths. Secret-shaped fields plus known API-key query/header patterns are redacted. Do not add provider request bodies, authorization headers, or raw stored credentials to logging.
+Diagnostics intentionally avoid subtitle text, selected dictionary words, raw FFmpeg stderr, and full media paths. Secret-shaped fields plus known API-key query/header patterns are redacted. Do not add provider request bodies, authorization headers, raw stored credentials, or third-party stderr/stdout text to logging.
 
 The full release checklist and known limitations are documented in [`docs/MVP_ACCEPTANCE_TEST.md`](docs/MVP_ACCEPTANCE_TEST.md).
 
