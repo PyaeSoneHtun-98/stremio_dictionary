@@ -44,7 +44,7 @@ jobs:
       - name: Package Windows MVP
         run: npm run package:win
 
-      - name: Verify packaged install and upgrade behavior
+      - name: Verify packaged install, upgrade, and Stremio handoff
         shell: pwsh
         run: |
           $packageDir = Join-Path $PWD 'release\SubtitleBridge-win-x64'
@@ -58,6 +58,8 @@ jobs:
 
           $required = @(
             (Join-Path $installDir 'Subtitle Bridge.exe'),
+            (Join-Path $installDir 'Enable-StremioHandoff.ps1'),
+            (Join-Path $installDir 'Disable-StremioHandoff.ps1'),
             (Join-Path $installDir 'resources\app\package.json'),
             (Join-Path $installDir 'resources\app\out\main\index.js'),
             (Join-Path $installDir 'resources\app\out\preload\index.js'),
@@ -123,6 +125,43 @@ jobs:
           if ($nestedExitCode -eq 0) {
             throw 'Installer accepted a destination nested inside the source package.'
           }
+
+          $vlcKey = 'HKCU:\Software\Classes\vlc'
+          $vlcCommandKey = Join-Path $vlcKey 'shell\open\command'
+          $handoffBackupDir = Join-Path $env:LOCALAPPDATA 'Subtitle Bridge\stremio-handoff'
+          Remove-Item -LiteralPath $vlcKey -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $handoffBackupDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -Path $vlcCommandKey -Force | Out-Null
+          Set-Item -LiteralPath $vlcKey -Value 'URL:CI VLC handler'
+          New-ItemProperty -LiteralPath $vlcKey -Name 'URL Protocol' -Value '' -PropertyType String -Force | Out-Null
+          Set-Item -LiteralPath $vlcCommandKey -Value '"C:\CI\vlc.exe" "%1"'
+
+          $enableHandoff = Join-Path $installDir 'Enable-StremioHandoff.ps1'
+          $disableHandoff = Join-Path $installDir 'Disable-StremioHandoff.ps1'
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe')
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Stremio handoff enable helper failed.'
+          }
+          $enabled = Get-ItemProperty -LiteralPath $vlcKey
+          if ($enabled.SubtitleBridgeCompatibility -ne '1') {
+            throw 'Stremio handoff helper did not mark the vlc:// registration as owned by Subtitle Bridge.'
+          }
+          $enabledCommand = (Get-Item -LiteralPath $vlcCommandKey).GetValue('')
+          if ($enabledCommand -notlike '*Subtitle Bridge.exe*') {
+            throw "Unexpected Stremio handoff command: $enabledCommand"
+          }
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Stremio handoff disable helper failed.'
+          }
+          $restoredName = (Get-Item -LiteralPath $vlcKey).GetValue('')
+          $restoredCommand = (Get-Item -LiteralPath $vlcCommandKey).GetValue('')
+          if ($restoredName -ne 'URL:CI VLC handler' -or $restoredCommand -ne '"C:\CI\vlc.exe" "%1"') {
+            throw 'Stremio handoff disable helper did not restore the previous current-user vlc:// registration.'
+          }
+          Remove-Item -LiteralPath $vlcKey -Recurse -Force
+          Remove-Item -LiteralPath $handoffBackupDir -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Upload Windows MVP artifact
         uses: actions/upload-artifact@v4
