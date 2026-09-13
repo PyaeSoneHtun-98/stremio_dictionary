@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MediaTrack, PlaybackSnapshot, SubtitleToken } from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
 import {
@@ -8,6 +8,12 @@ import {
 } from '../../../../shared/settings'
 import type { TranslationResult } from '../../../../shared/translation'
 import './OverlayProbe.css'
+import './Issue9Polish.css'
+import {
+  clampPlayerValue,
+  resolvePlayerShortcut,
+  subtitleRecoveryMessage
+} from './playerInteraction'
 import { segmentSubtitleCue } from './subtitleSegments'
 
 const EMPTY_STATE: PlaybackSnapshot = {
@@ -46,7 +52,7 @@ type TranslationLookupState =
   | { status: 'ready'; word: string; result: TranslationResult }
   | { status: 'error'; word: string; error: string }
 
-export function OverlayProbe(): React.JSX.Element {
+export function PolishedOverlay(): React.JSX.Element {
   const [state, setState] = useState<PlaybackSnapshot>(EMPTY_STATE)
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null)
   const [translation, setTranslation] = useState<TranslationLookupState>({ status: 'idle' })
@@ -61,6 +67,12 @@ export function OverlayProbe(): React.JSX.Element {
   const currentCueId = useRef<string | null>(null)
   const currentSubtitleTrackId = useRef<number | null>(null)
   const translationRequestVersion = useRef(0)
+
+  const dismissTranslation = useCallback((): void => {
+    translationRequestVersion.current += 1
+    setSelectedWord(null)
+    setTranslation({ status: 'idle' })
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -171,6 +183,28 @@ export function OverlayProbe(): React.JSX.Element {
     return () => window.removeEventListener('keydown', handleKeyboardEntry, true)
   }, [state.subtitle.activeCue])
 
+  useEffect(() => {
+    if (!selectedWord) {
+      return
+    }
+
+    const handleOutsidePointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (!(target instanceof Element)) {
+        return
+      }
+
+      if (target.closest('.translation-popup') || target.closest('.subtitle-word')) {
+        return
+      }
+
+      dismissTranslation()
+    }
+
+    window.addEventListener('pointerdown', handleOutsidePointerDown, true)
+    return () => window.removeEventListener('pointerdown', handleOutsidePointerDown, true)
+  }, [dismissTranslation, selectedWord])
+
   const canControl = Boolean(state.filePath) && !['loading', 'error', 'unavailable'].includes(state.status)
   const playing = state.status === 'playing'
   const duration = state.duration ?? 0
@@ -180,15 +214,91 @@ export function OverlayProbe(): React.JSX.Element {
   const subtitleTracks = state.tracks.filter((track) => track.type === 'subtitle')
   const supportedSubtitleTracks = subtitleTracks.filter(isSelectableSubtitleTrack)
   const canChangeSubtitleTrack = state.status === 'paused' && supportedSubtitleTracks.length > 0
+  const subtitleMessage = activeCue
+    ? null
+    : subtitleRecoveryMessage(state.subtitle.status, state.subtitle.error)
 
-  const runControl = async (action: () => Promise<void>): Promise<void> => {
+  const runControl = useCallback(async (action: () => Promise<void>): Promise<void> => {
     setControlError(null)
     try {
       await action()
     } catch (error) {
       setControlError(error instanceof Error ? error.message : 'The player control failed.')
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    const handlePlayerShortcut = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented) {
+        return
+      }
+
+      const action = resolvePlayerShortcut(event.key, {
+        canControl,
+        interactiveTarget: isInteractiveKeyboardTarget(event.target),
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey
+      })
+
+      if (!action) {
+        return
+      }
+
+      if (action.kind === 'dismiss') {
+        if (selectedWord) {
+          event.preventDefault()
+          dismissTranslation()
+          return
+        }
+        if (settingsOpen) {
+          event.preventDefault()
+          setSettingsOpen(false)
+        }
+        return
+      }
+
+      if (event.repeat && (action.kind === 'toggle-playback' || action.kind === 'fullscreen')) {
+        return
+      }
+
+      event.preventDefault()
+
+      if (action.kind === 'toggle-playback') {
+        void runControl(() => window.desktop.media.setPaused(playing))
+        return
+      }
+
+      if (action.kind === 'seek') {
+        const maximum =
+          duration > 0 ? duration : Math.max(0, currentTime + Math.abs(action.deltaSeconds))
+        const nextTime = clampPlayerValue(currentTime + action.deltaSeconds, 0, maximum)
+        void runControl(() => window.desktop.media.seek(nextTime))
+        return
+      }
+
+      if (action.kind === 'volume') {
+        const nextVolume = clampPlayerValue(state.volume + action.delta, 0, 100)
+        void runControl(() => window.desktop.media.setVolume(nextVolume))
+        return
+      }
+
+      void runControl(() => window.desktop.media.toggleFullscreen())
+    }
+
+    window.addEventListener('keydown', handlePlayerShortcut, true)
+    return () => window.removeEventListener('keydown', handlePlayerShortcut, true)
+  }, [
+    canControl,
+    currentTime,
+    dismissTranslation,
+    duration,
+    playing,
+    runControl,
+    selectedWord,
+    settingsOpen,
+    state.volume
+  ])
 
   const updateTranslationSettings = async (
     update: TranslationSettingsUpdate
@@ -199,9 +309,7 @@ export function OverlayProbe(): React.JSX.Element {
       setTranslationSettings(nextSettings)
 
       if (update.provider !== undefined || update.targetLanguage !== undefined) {
-        translationRequestVersion.current += 1
-        setSelectedWord(null)
-        setTranslation({ status: 'idle' })
+        dismissTranslation()
       }
 
       return true
@@ -316,13 +424,19 @@ export function OverlayProbe(): React.JSX.Element {
                 translation={translation}
                 popupPosition={translationSettings.popupPosition}
                 targetLanguage={translationSettings.targetLanguage}
+                onDismiss={dismissTranslation}
               />
             ) : null}
           </div>
-        ) : state.subtitle.status === 'extracting' ? (
-          <div className="subtitle-transient-status">Loading subtitles…</div>
-        ) : state.subtitle.error ? (
-          <div className="subtitle-transient-status subtitle-transient-warning">{state.subtitle.error}</div>
+        ) : subtitleMessage ? (
+          <div
+            className={`subtitle-transient-status ${
+              state.subtitle.status === 'extracting' ? '' : 'subtitle-transient-warning'
+            }`}
+            role="status"
+          >
+            {subtitleMessage}
+          </div>
         ) : null}
       </section>
 
@@ -460,6 +574,11 @@ export function OverlayProbe(): React.JSX.Element {
             Fullscreen
           </button>
         </div>
+
+        <div className="keyboard-shortcuts">
+          <kbd>Space</kbd>/<kbd>K</kbd> play · <kbd>←</kbd>/<kbd>→</kbd> seek 5s · <kbd>↑</kbd>/<kbd>↓</kbd>{' '}
+          volume · <kbd>F</kbd> fullscreen · <kbd>Esc</kbd> dismiss
+        </div>
       </div>
     </main>
   )
@@ -469,12 +588,14 @@ function TranslationPopup({
   selectedWord,
   translation,
   popupPosition,
-  targetLanguage
+  targetLanguage,
+  onDismiss
 }: {
   selectedWord: SelectedWord
   translation: TranslationLookupState
   popupPosition: 'above' | 'below'
   targetLanguage: string
+  onDismiss: () => void
 }): React.JSX.Element {
   const resultLanguage = translation.status === 'ready' ? translation.result.targetLanguage : targetLanguage
 
@@ -483,10 +604,22 @@ function TranslationPopup({
       className={`translation-popup popup-${popupPosition} translation-${translation.status}`}
       role="status"
       aria-live="polite"
+      onPointerDown={(event) => event.stopPropagation()}
     >
       <div className="translation-popup-header">
-        <strong>{selectedWord.text}</strong>
-        <span>English → {languageLabel(resultLanguage)}</span>
+        <div className="translation-popup-heading">
+          <strong>{selectedWord.text}</strong>
+          <span>English → {languageLabel(resultLanguage)}</span>
+        </div>
+        <button
+          type="button"
+          className="translation-popup-close"
+          aria-label="Close translation"
+          title="Close translation (Esc)"
+          onClick={onDismiss}
+        >
+          ×
+        </button>
       </div>
 
       {translation.status === 'loading' ? (
@@ -505,7 +638,11 @@ function TranslationPopup({
       ) : null}
 
       {translation.status === 'error' ? (
-        <div className="translation-error">{translation.error}</div>
+        <div className="translation-error">
+          <strong>Translation unavailable</strong>
+          <span>{translation.error}</span>
+          <small>Playback and subtitles still work. Try another word or try again later.</small>
+        </div>
       ) : null}
     </div>
   )
@@ -614,7 +751,12 @@ function TranslationSettingsPanel({
               }}
             />
           </label>
-          <button type="button" className="control-button" disabled={!apiKeyDraft.trim()} onClick={onSaveApiKey}>
+          <button
+            type="button"
+            className="control-button"
+            disabled={!apiKeyDraft.trim()}
+            onClick={onSaveApiKey}
+          >
             Save key
           </button>
           {settings.apiKeyConfigured ? (
@@ -627,7 +769,12 @@ function TranslationSettingsPanel({
 
       <div className="translation-cache-row">
         <span>Session translation cache: {settings.cacheEntries} entries</span>
-        <button type="button" className="control-button" disabled={settings.cacheEntries === 0} onClick={onClearCache}>
+        <button
+          type="button"
+          className="control-button"
+          disabled={settings.cacheEntries === 0}
+          onClick={onClearCache}
+        >
           Clear cache
         </button>
       </div>
@@ -657,6 +804,18 @@ function translationErrorMessage(error: unknown): string {
 
 function languageLabel(code: string): string {
   return TARGET_LANGUAGE_OPTIONS.find((language) => language.code === code)?.label ?? code
+}
+
+function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  if (target.isContentEditable) {
+    return true
+  }
+
+  return ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'A'].includes(target.tagName)
 }
 
 function isSelectableSubtitleTrack(track: MediaTrack): boolean {
