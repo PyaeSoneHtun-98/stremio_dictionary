@@ -3,6 +3,8 @@ import { basename } from 'node:path'
 import { createConnection, type Socket } from 'node:net'
 import type { MediaTrack, PlaybackSnapshot, SubtitleCue } from '../../shared/media'
 import { createEmptySubtitleModel, normalizeMpvTracks } from '../../shared/media'
+import { diagnosticLog } from '../diagnostics'
+import { resolveMpvExecutable } from '../runtimeTools'
 import { SubtitleExtractor } from '../subtitles/SubtitleExtractor'
 import { findActiveCue } from '../subtitles/normalize'
 
@@ -61,6 +63,8 @@ export class MpvController {
       throw new Error('A valid Windows playback surface is required.')
     }
 
+    diagnosticLog('media.loadRequested', { fileName: basename(filePath) })
+
     try {
       await this.ensureStarted(windowId)
       this.resetSubtitleExtraction()
@@ -82,6 +86,7 @@ export class MpvController {
       this.sendCommand(['set_property', 'pause', false])
     } catch (error) {
       const message = toUserMessage(error)
+      diagnosticLog('media.loadFailed', { fileName: basename(filePath), message })
       this.patchState({ status: 'unavailable', currentTime: null, error: message })
       throw error
     }
@@ -180,9 +185,10 @@ export class MpvController {
       return
     }
 
-    const executable = process.env.MPV_PATH?.trim() || 'mpv'
+    const runtime = resolveMpvExecutable()
+    diagnosticLog('mpv.start', { source: runtime.source })
     const child = spawn(
-      executable,
+      runtime.executable,
       [
         '--no-config',
         '--idle=yes',
@@ -207,10 +213,12 @@ export class MpvController {
     await new Promise<void>((resolve, reject) => {
       const handleSpawn = (): void => {
         child.off('error', handleError)
+        diagnosticLog('mpv.spawned', { source: runtime.source })
         resolve()
       }
       const handleError = (error: Error): void => {
         child.off('spawn', handleSpawn)
+        diagnosticLog('mpv.spawnFailed', { source: runtime.source, message: error.message })
         reject(error)
       }
 
@@ -222,6 +230,7 @@ export class MpvController {
 
     child.on('exit', (code, signal) => {
       const wasExpected = this.expectedExits.has(child)
+      diagnosticLog('mpv.exit', { expected: wasExpected, code, signal })
       if (this.child !== child) {
         return
       }
@@ -277,6 +286,7 @@ export class MpvController {
       return
     }
 
+    diagnosticLog('mpv.ipcFailure', { message })
     this.socket = null
     if (!socket.destroyed) {
       socket.destroy()
@@ -318,6 +328,7 @@ export class MpvController {
     }
 
     if (message.event === 'file-loaded') {
+      diagnosticLog('media.fileLoaded', { fileName: this.state.fileName })
       this.patchState({ status: this.paused ? 'paused' : 'playing', error: null })
       return
     }
@@ -468,6 +479,11 @@ export class MpvController {
       }
 
       this.subtitleCues = cues
+      diagnosticLog('subtitle.ready', {
+        codec: selectedTrack.codec,
+        language: selectedTrack.language,
+        cueCount: cues.length
+      })
       this.patchState({
         subtitle: {
           status: 'ready',
@@ -490,6 +506,8 @@ export class MpvController {
         return
       }
 
+      const message = error instanceof Error ? error.message : 'Could not extract this subtitle track.'
+      diagnosticLog('subtitle.failed', { codec: selectedTrack.codec, language: selectedTrack.language, message })
       this.subtitleCues = []
       this.patchState({
         subtitle: {
@@ -500,13 +518,14 @@ export class MpvController {
           trackCodec: selectedTrack.codec,
           cueCount: 0,
           activeCue: null,
-          error: error instanceof Error ? error.message : 'Could not extract this subtitle track.'
+          error: message
         }
       })
     }
   }
 
   private failPlayback(message: string): void {
+    diagnosticLog('playback.failed', { message })
     const subtitle = { ...this.state.subtitle, activeCue: null }
     const subtitleWasActive = subtitle.status === 'extracting' || subtitle.status === 'ready'
 
@@ -638,7 +657,7 @@ function finiteNumberOrNull(value: unknown): number | null {
 
 function toUserMessage(error: unknown): string {
   if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-    return 'mpv was not found. Install mpv and add it to PATH, or set MPV_PATH to mpv.exe.'
+    return 'mpv was not found. Install mpv and add it to PATH, set MPV_PATH to mpv.exe, or use a package that bundles mpv.exe.'
   }
 
   if (error instanceof Error) {

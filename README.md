@@ -13,7 +13,7 @@ Subtitle Bridge is a Windows-first desktop video player for English learners. It
 - Biome for linting/formatting
 - Vitest for tests
 
-## Prerequisites
+## Development prerequisites
 
 - Windows 10 or Windows 11
 - Node.js 22 LTS or newer
@@ -32,7 +32,7 @@ Use `npm ci` for reproducible installs from the committed lockfile. The dev comm
 
 ## Offline Burmese dictionary
 
-Issue #7 uses `LocalDictionaryProvider` by default. It performs English → Burmese word lookup entirely inside the Electron main process, so normal translation lookup requires no account, API key, payment method, or internet connection.
+`LocalDictionaryProvider` is the default translation provider. It performs English → Burmese word lookup entirely inside the Electron main process, so normal translation lookup requires no account, API key, payment method, or internet connection.
 
 The starter dataset lives in `src/main/translation/localDictionary.ts`. It contains a small curated set of common words plus selected inflected aliases such as `running → run`, `treaties → treaty`, and `signed → sign`. The dataset is intentionally easy to replace or expand while a larger English → Burmese dictionary is developed.
 
@@ -55,7 +55,49 @@ Run every project check with:
 npm run check
 ```
 
-The production Electron bundle is written to `out/`. A Windows installer will be added during the packaging milestone.
+## Package the Windows MVP
+
+On Windows x64, create the distributable package with:
+
+```cmd
+npm ci
+npm run package:win
+```
+
+This writes:
+
+```text
+release\SubtitleBridge-win-x64\
+release\SubtitleBridge-win-x64.zip
+release\SubtitleBridge-win-x64.zip.sha256
+```
+
+The unpacked/ZIP package contains `Subtitle Bridge.exe` and `Install-SubtitleBridge.ps1`. The app can be run directly from the extracted folder, or installed for the current Windows user with:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-SubtitleBridge.ps1
+```
+
+The installer defaults to `%LOCALAPPDATA%\Programs\Subtitle Bridge`, creates a Start Menu shortcut, stages and validates upgrades before swapping them into place, and removes stale files from the previous installation.
+
+### mpv and FFmpeg in packaged builds
+
+The release artifact intentionally **does not bundle or redistribute mpv or FFmpeg binaries**. Their license obligations depend on the exact third-party build configuration and provenance, so the MVP keeps them external rather than opportunistically copying whatever executable happens to be installed on the packaging machine.
+
+On the target Windows machine, install compatible Windows x64 builds of mpv and FFmpeg separately and either:
+
+- make `mpv.exe` and `ffmpeg.exe` available on `PATH`, or
+- set `MPV_PATH` and `FFMPEG_PATH` to the corresponding executable paths before launching Subtitle Bridge.
+
+For normal Start Menu use, configure those values in the Windows user/system environment rather than only in a temporary terminal session. The package includes `RUNTIME_DEPENDENCIES.txt` with the same requirement.
+
+## Diagnostics
+
+The desktop main process writes a small rotating diagnostic log under the Electron user-data directory in a `diagnostics\subtitle-bridge.log` file. It records lifecycle, controlled mpv/FFmpeg failure metadata, subtitle extraction status, and a main-process memory sample at startup and every 10 minutes.
+
+Diagnostics intentionally avoid subtitle text, selected dictionary words, raw FFmpeg stderr, and full media paths. Secret-shaped fields plus known API-key query/header patterns are redacted. Do not add provider request bodies, authorization headers, raw stored credentials, or third-party stderr/stdout text to logging.
+
+The full release checklist and known limitations are documented in [`docs/MVP_ACCEPTANCE_TEST.md`](docs/MVP_ACCEPTANCE_TEST.md).
 
 ## Architecture
 
@@ -66,6 +108,7 @@ Electron main process
 ├── translation provider adapters
 │   ├── LocalDictionaryProvider  ← default/offline
 │   └── GoogleTranslationProvider  ← optional adapter
+├── redacted diagnostic logging
 └── secure preload bridge
     └── React renderer
         ├── player controls

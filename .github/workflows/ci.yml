@@ -24,3 +24,111 @@ jobs:
 
       - name: Validate project
         run: npm run check
+
+  package-windows:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package Windows MVP
+        run: npm run package:win
+
+      - name: Verify packaged install and upgrade behavior
+        shell: pwsh
+        run: |
+          $packageDir = Join-Path $PWD 'release\SubtitleBridge-win-x64'
+          $installDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeInstall'
+          $installer = Join-Path $packageDir 'Install-SubtitleBridge.ps1'
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Initial installer run failed.'
+          }
+
+          $required = @(
+            (Join-Path $installDir 'Subtitle Bridge.exe'),
+            (Join-Path $installDir 'resources\app\package.json'),
+            (Join-Path $installDir 'resources\app\out\main\index.js'),
+            (Join-Path $installDir 'resources\app\out\preload\index.js'),
+            (Join-Path $installDir 'resources\app\out\renderer\index.html'),
+            (Join-Path $packageDir 'RUNTIME_DEPENDENCIES.txt'),
+            (Join-Path $PWD 'release\SubtitleBridge-win-x64.zip'),
+            (Join-Path $PWD 'release\SubtitleBridge-win-x64.zip.sha256')
+          )
+
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "Missing packaged artifact: $path"
+            }
+          }
+
+          $buildInfo = Get-Content -LiteralPath (Join-Path $packageDir 'BUILD_INFO.json') -Raw | ConvertFrom-Json
+          if ($buildInfo.arch -ne 'x64') {
+            throw "Unexpected package architecture: $($buildInfo.arch)"
+          }
+          if ($buildInfo.runtimeDependencies.mpv.bundled -or $buildInfo.runtimeDependencies.ffmpeg.bundled) {
+            throw 'Release artifacts must not redistribute mpv or FFmpeg binaries.'
+          }
+
+          $unexpectedBundledTools = @(
+            (Join-Path $packageDir 'resources\tools\mpv\mpv.exe'),
+            (Join-Path $packageDir 'resources\tools\ffmpeg\ffmpeg.exe')
+          )
+          foreach ($path in $unexpectedBundledTools) {
+            if (Test-Path -LiteralPath $path) {
+              throw "Unexpected bundled third-party runtime: $path"
+            }
+          }
+
+          $staleSentinel = Join-Path $installDir 'obsolete-from-previous-install.txt'
+          Set-Content -LiteralPath $staleSentinel -Value 'stale'
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Upgrade installer run failed.'
+          }
+          if (Test-Path -LiteralPath $staleSentinel) {
+            throw 'Upgrade retained a stale file from the previous installation.'
+          }
+
+          $rollbackMarker = Join-Path $installDir 'existing-install.marker'
+          Set-Content -LiteralPath $rollbackMarker -Value 'keep-me'
+          $brokenPackageDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeBrokenPackage'
+          Copy-Item -LiteralPath $packageDir -Destination $brokenPackageDir -Recurse
+          Remove-Item -LiteralPath (Join-Path $brokenPackageDir 'resources\app\out\renderer\index.html') -Force
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $brokenPackageDir 'Install-SubtitleBridge.ps1') -InstallDir $installDir -NoShortcut -NoLaunch
+          $brokenExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($brokenExitCode -eq 0) {
+            throw 'Installer accepted an incomplete staged package.'
+          }
+          if (-not (Test-Path -LiteralPath $rollbackMarker)) {
+            throw 'Failed upgrade modified the existing installation.'
+          }
+
+          $nestedInstallDir = Join-Path $packageDir 'nested-install-should-fail'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $nestedInstallDir -NoShortcut -NoLaunch
+          $nestedExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($nestedExitCode -eq 0) {
+            throw 'Installer accepted a destination nested inside the source package.'
+          }
+
+      - name: Upload Windows MVP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: subtitle-bridge-windows-mvp
+          path: |
+            release/SubtitleBridge-win-x64.zip
+            release/SubtitleBridge-win-x64.zip.sha256
+          if-no-files-found: error
