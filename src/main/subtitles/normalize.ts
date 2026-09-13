@@ -4,6 +4,9 @@ const TIMING_LINE =
   /^(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})\s+-->\s+(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})(?:\s+.*)?$/
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu
 const HAS_LETTER = /\p{L}/u
+const ASS_OVERRIDE_BLOCK = /\{\\[^}]*\}/g
+const ASS_DRAWING_COMMAND = /^[mnlbspc]$/i
+const ASS_DRAWING_NUMBER = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/
 
 export interface SubtitleParseLimits {
   maxCues: number
@@ -237,7 +240,71 @@ function timestampToSeconds(parts: string[]): number {
 }
 
 function stripSubtitleMarkup(value: string): string {
-  return decodeBasicEntities(value.replace(/<\/?(?:b|i|u|s)>/gi, '').replace(/<font\b[^>]*>|<\/font>/gi, ''))
+  const withoutAssDrawing = stripAssOverrideBlocks(value)
+  const decoded = decodeBasicEntities(
+    withoutAssDrawing.replace(/<\/?(?:b|i|u|s)>/gi, '').replace(/<font\b[^>]*>|<\/font>/gi, '')
+  )
+    .replace(/\\[Nn]/g, '\n')
+    .replace(/\\h/g, ' ')
+
+  return looksLikeAssDrawingPayload(decoded) ? '' : decoded
+}
+
+function stripAssOverrideBlocks(value: string): string {
+  let drawingMode = false
+  let cursor = 0
+  let output = ''
+
+  ASS_OVERRIDE_BLOCK.lastIndex = 0
+  for (const match of value.matchAll(ASS_OVERRIDE_BLOCK)) {
+    const start = match.index
+    if (start === undefined) {
+      continue
+    }
+
+    if (!drawingMode) {
+      output += value.slice(cursor, start)
+    }
+
+    for (const drawingTag of match[0].matchAll(/\\p(\d+)/gi)) {
+      drawingMode = Number(drawingTag[1]) > 0
+    }
+
+    cursor = start + match[0].length
+  }
+
+  if (!drawingMode) {
+    output += value.slice(cursor)
+  }
+
+  return output
+}
+
+function looksLikeAssDrawingPayload(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed || !/^[mnlbspc](?:\s|$)/i.test(trimmed)) {
+    return false
+  }
+
+  const tokens = trimmed.replace(/,/g, ' ').split(/\s+/)
+  let commandCount = 0
+  let numberCount = 0
+
+  for (const token of tokens) {
+    if (ASS_DRAWING_COMMAND.test(token)) {
+      commandCount += 1
+      continue
+    }
+
+    if (ASS_DRAWING_NUMBER.test(token)) {
+      numberCount += 1
+      continue
+    }
+
+    return false
+  }
+
+  return (commandCount >= 2 && numberCount >= 4) || (commandCount >= 1 && numberCount >= 6)
 }
 
 function decodeBasicEntities(value: string): string {
