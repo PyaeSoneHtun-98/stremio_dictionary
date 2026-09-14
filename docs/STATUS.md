@@ -16,7 +16,7 @@ Stremio streams use mpv live subtitles. The opt-in Play in Subtitle Bridge helpe
 
 **Implementation:** Codex produced the initial redesign. After manual design review, ChatGPT implemented the refinement/fix passes and Codex returned to review-only duty.
 
-**State:** Draft PR #27. Manual Windows acceptance passed on the pre-review head. Codex review found two P2 presentation blockers plus one documentation P2 and one P3 cleanup item. The P2 layout fixes and regression tests are now implemented; a short targeted Windows recheck and Codex re-review are required before merge.
+**State:** Draft PR #27. Manual Windows acceptance passed on the pre-review head. Codex review found two P2 presentation blockers plus one documentation P2 and one P3 cleanup item. The P2 layout fixes, documentation correction, and regression checks are now implemented. A short targeted Windows recheck and Codex re-review are required before merge. The P3 source cleanup for the legacy popup-position setting is optional unless the re-review promotes it.
 
 ### UX changes
 
