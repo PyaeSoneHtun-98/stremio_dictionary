@@ -39,17 +39,22 @@ function buildDictionaryIndex(
 ): ReadonlyMap<string, LocalDictionaryEntry> {
   const index = new Map<string, LocalDictionaryEntry>()
 
+  // Register canonical headwords first so an exact dictionary entry always wins over another
+  // entry's inflected form (for example: warn -> warning, while warning is also a headword).
   for (const entry of dictionary) {
-    addDictionaryKey(index, entry.word, entry)
+    addHeadwordKey(index, entry.word, entry)
+  }
+
+  for (const entry of dictionary) {
     for (const form of entry.forms) {
-      addDictionaryKey(index, form, entry)
+      addFormKey(index, form, entry)
     }
   }
 
   return index
 }
 
-function addDictionaryKey(
+function addHeadwordKey(
   index: Map<string, LocalDictionaryEntry>,
   word: string,
   entry: LocalDictionaryEntry
@@ -61,9 +66,33 @@ function addDictionaryKey(
 
   const existing = index.get(normalized)
   if (existing && existing !== entry) {
-    throw new Error(
-      `Duplicate local dictionary word or form: ${normalized} (${existing.word}, ${entry.word})`
-    )
+    throw new Error(`Duplicate local dictionary headword: ${normalized}`)
+  }
+
+  index.set(normalized, entry)
+}
+
+function addFormKey(
+  index: Map<string, LocalDictionaryEntry>,
+  form: string,
+  entry: LocalDictionaryEntry
+): void {
+  const normalized = normalizeLookupWord(form)
+  if (!normalized) {
+    throw new Error('Local dictionary forms must use a non-empty word.')
+  }
+
+  const existing = index.get(normalized)
+  if (existing) {
+    const existingIsExactHeadword = normalizeLookupWord(existing.word) === normalized
+    if (existingIsExactHeadword) {
+      return
+    }
+    if (existing !== entry) {
+      throw new Error(
+        `Duplicate local dictionary form: ${normalized} (${existing.word}, ${entry.word})`
+      )
+    }
   }
 
   index.set(normalized, entry)
