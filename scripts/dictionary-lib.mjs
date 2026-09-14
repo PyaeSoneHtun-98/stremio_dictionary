@@ -32,30 +32,44 @@ export function validateDictionaryDocument(document, options = {}) {
     throw new Error(`${source}: entries must be an array.`)
   }
 
-  const headwords = new Set()
-  const keys = new Map()
+  const headwords = new Map()
 
   for (const [index, entry] of document.entries.entries()) {
     validateEntry(entry, `${source}: entries[${index}]`)
 
     const headwordKey = normalizeDictionaryKey(entry.word)
-    if (headwords.has(headwordKey)) {
+    const existing = headwords.get(headwordKey)
+    if (existing) {
       throw new Error(`${source}: duplicate headword “${entry.word}”.`)
     }
-    headwords.add(headwordKey)
-    addLookupKey(keys, headwordKey, entry.word, 'headword', source)
+    headwords.set(headwordKey, entry.word)
+  }
 
+  const formOwners = new Map()
+
+  for (const entry of document.entries) {
+    const headwordKey = normalizeDictionaryKey(entry.word)
     const localForms = new Set()
+
     for (const form of entry.forms) {
       const formKey = normalizeDictionaryKey(form)
       if (localForms.has(formKey)) {
         throw new Error(`${source}: “${entry.word}” contains duplicate form “${form}”.`)
       }
       localForms.add(formKey)
+
       if (formKey === headwordKey) {
         throw new Error(`${source}: “${entry.word}” must not include itself in forms.`)
       }
-      addLookupKey(keys, formKey, entry.word, 'form', source)
+
+      // A real headword always wins over another entry's inflected form. This is common in
+      // English (for example: warn -> warning, while warning is also its own headword).
+      const exactHeadword = headwords.get(formKey)
+      if (exactHeadword && exactHeadword !== entry.word) {
+        continue
+      }
+
+      addFormOwner(formOwners, formKey, entry.word, source, form)
     }
   }
 
@@ -68,9 +82,7 @@ export function mergeDictionaryBatches(documents) {
   }
 
   const batches = new Set()
-  const headwords = new Map()
-  const lookupKeys = new Map()
-  const entries = []
+  const items = []
 
   for (const item of documents) {
     const source = item.source ?? `batch ${item.document?.batch ?? '?'}`
@@ -82,31 +94,40 @@ export function mergeDictionaryBatches(documents) {
     batches.add(document.batch)
 
     for (const entry of document.entries) {
-      const headwordKey = normalizeDictionaryKey(entry.word)
-      const existingHeadword = headwords.get(headwordKey)
-      if (existingHeadword) {
-        throw new Error(
-          `Duplicate headword “${entry.word}” across ${existingHeadword.source} and ${source}.`
-        )
-      }
-      headwords.set(headwordKey, { source, word: entry.word })
-      addMergedLookupKey(lookupKeys, headwordKey, entry.word, 'headword', source)
-
-      for (const form of entry.forms) {
-        addMergedLookupKey(
-          lookupKeys,
-          normalizeDictionaryKey(form),
-          entry.word,
-          'form',
-          source,
-          form
-        )
-      }
-
-      entries.push(entry)
+      items.push({ entry, source })
     }
   }
 
+  const headwords = new Map()
+
+  for (const { entry, source } of items) {
+    const headwordKey = normalizeDictionaryKey(entry.word)
+    const existingHeadword = headwords.get(headwordKey)
+    if (existingHeadword) {
+      throw new Error(
+        `Duplicate headword “${entry.word}” across ${existingHeadword.source} and ${source}.`
+      )
+    }
+    headwords.set(headwordKey, { source, word: entry.word })
+  }
+
+  const formOwners = new Map()
+
+  for (const { entry, source } of items) {
+    for (const form of entry.forms) {
+      const formKey = normalizeDictionaryKey(form)
+      const exactHeadword = headwords.get(formKey)
+
+      // Exact dictionary entries take precedence over forms, regardless of batch order.
+      if (exactHeadword && exactHeadword.word !== entry.word) {
+        continue
+      }
+
+      addFormOwner(formOwners, formKey, entry.word, source, form)
+    }
+  }
+
+  const entries = items.map(({ entry }) => entry)
   entries.sort((left, right) => left.word.localeCompare(right.word, 'en-US'))
 
   return {
@@ -206,24 +227,14 @@ function requireNonEmptySingleWord(value, source) {
   }
 }
 
-function addLookupKey(keys, key, headword, kind, source) {
-  const existing = keys.get(key)
+function addFormOwner(formOwners, key, headword, source, displayKey = key) {
+  const existing = formOwners.get(key)
   if (existing && existing.headword !== headword) {
     throw new Error(
-      `${source}: lookup collision for “${key}” between ${existing.kind} of “${existing.headword}” and ${kind} of “${headword}”.`
+      `Form collision for “${displayKey}”: form of “${existing.headword}” (${existing.source}) conflicts with form of “${headword}” (${source}).`
     )
   }
-  keys.set(key, { headword, kind })
-}
-
-function addMergedLookupKey(keys, key, headword, kind, source, displayKey = key) {
-  const existing = keys.get(key)
-  if (existing && existing.headword !== headword) {
-    throw new Error(
-      `Lookup collision for “${displayKey}”: ${existing.kind} of “${existing.headword}” (${existing.source}) conflicts with ${kind} of “${headword}” (${source}).`
-    )
-  }
-  keys.set(key, { headword, kind, source })
+  formOwners.set(key, { headword, source })
 }
 
 function isPlainObject(value) {
