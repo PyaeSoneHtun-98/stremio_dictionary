@@ -28,4 +28,10 @@ describe('player presentation contracts', () => {
     expect(refinementCss).toMatch(/\.translation-popup\s*\{[\s\S]*?position:\s*fixed;/)
     expect(refinementCss).toMatch(/max-height:\s*calc\(100vh - 36px\);/)
   })
+
+  it('keeps the obsolete saved popup-position control out of the visible settings UI', () => {
+    expect(refinementCss).toMatch(
+      /\.translation-settings-grid\s*>\s*label:nth-of-type\(3\)\s*\{[\s\S]*?display:\s*none;/,
+    )
+  })
 })
