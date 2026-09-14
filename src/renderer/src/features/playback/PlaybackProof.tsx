@@ -13,7 +13,7 @@ const EMPTY_STATE: PlaybackSnapshot = {
   speed: 1,
   tracks: [],
   subtitle: createEmptySubtitleModel(),
-  error: null
+  error: null,
 }
 
 export function PlaybackProof(): React.JSX.Element {
@@ -125,16 +125,16 @@ export function PlaybackProof(): React.JSX.Element {
     >
       <div className="playback-proof-header">
         <div>
-          <span className="eyebrow">Issue #6 subtitle track selection</span>
-          <h2 id="playback-proof-title">Choose embedded text subtitles safely</h2>
+          <span className="eyebrow">Your next watch</span>
+          <h2 id="playback-proof-title">Settle in. Press play.</h2>
         </div>
         <span className={`status-pill status-${state.status}`}>{state.status}</span>
       </div>
 
       <div className="video-dropzone">
         <div>
-          <strong>{dragActive ? 'Drop the MKV to open it' : 'Drag an MKV anywhere onto this panel'}</strong>
-          <span>or choose a local file with the picker</span>
+          <strong>{dragActive ? 'Drop the MKV to open it' : 'Drop your movie here'}</strong>
+          <span>Choose an MKV file to start watching</span>
         </div>
         <button className="primary-action" type="button" onClick={openVideo} disabled={opening}>
           {opening ? 'Opening…' : 'Open video'}
@@ -142,97 +142,106 @@ export function PlaybackProof(): React.JSX.Element {
       </div>
 
       <p className="playback-help">
-        Embedded subtitle tracks are listed below with language, title, and codec. Pause playback in
-        the video window to change text subtitle tracks. PGS/VobSub and other image subtitles are
-        listed but remain unsupported in the MVP.
+        Watching with Stremio? Choose <strong>Play in Subtitle Bridge</strong> from its player menu
+        after enabling the handoff helper.
       </p>
 
-      {state.error || localError ? <div className="media-error">{localError ?? state.error}</div> : null}
+      {state.error || localError ? (
+        <div className="media-error">{localError ?? state.error}</div>
+      ) : null}
 
-      <div className="playback-metrics">
-        <Metric label="File" value={state.fileName ?? 'No video loaded'} />
-        <Metric label="Position" value={formatTime(state.currentTime)} />
-        <Metric label="Duration" value={formatTime(state.duration)} />
-        <Metric label="Tracks" value={String(state.tracks.length)} />
-        <Metric label="Subtitle cues" value={String(state.subtitle.cueCount)} />
-        <Metric label="Subtitle state" value={state.subtitle.status} />
-      </div>
-
-      <div className="subtitle-diagnostic" aria-live="polite">
-        <div className="subtitle-diagnostic-header">
-          <div>
-            <span className="eyebrow">Selected subtitle model</span>
-            <strong>{subtitleTrackLabel(state)}</strong>
-          </div>
-          <span className={`status-pill subtitle-status-${state.subtitle.status}`}>
-            {state.subtitle.status}
-          </span>
+      <details className="media-details">
+        <summary>Playback details{state.fileName ? ` · ${state.fileName}` : ''}</summary>
+        <div className="playback-metrics">
+          <Metric label="File" value={state.fileName ?? 'No video loaded'} />
+          <Metric label="Position" value={formatTime(state.currentTime)} />
+          <Metric label="Duration" value={formatTime(state.duration)} />
+          <Metric label="Tracks" value={String(state.tracks.length)} />
+          <Metric label="Subtitle cues" value={String(state.subtitle.cueCount)} />
+          <Metric label="Subtitle state" value={state.subtitle.status} />
         </div>
 
-        {state.subtitle.error ? <div className="media-error">{state.subtitle.error}</div> : null}
-
-        {state.subtitle.activeCue ? (
-          <div className="active-cue-card">
-            <div className="active-cue-time">
-              {formatTime(state.subtitle.activeCue.startTime)} → {formatTime(state.subtitle.activeCue.endTime)}
+        <div className="subtitle-diagnostic" aria-live="polite">
+          <div className="subtitle-diagnostic-header">
+            <div>
+              <span className="eyebrow">Selected subtitle model</span>
+              <strong>{subtitleTrackLabel(state)}</strong>
             </div>
-            <div className="active-cue-text">{state.subtitle.activeCue.text}</div>
-            <div className="token-preview">
-              {state.subtitle.activeCue.tokens.map((token) => (
-                <span className="token-chip" key={`${token.start}-${token.end}`}>
-                  <strong>{token.text}</strong>
-                  <small>{token.lookupTerm}</small>
-                </span>
-              ))}
-            </div>
+            <span className={`status-pill subtitle-status-${state.subtitle.status}`}>
+              {state.subtitle.status}
+            </span>
           </div>
-        ) : (
-          <div className="empty-subtitle-state">
-            {state.subtitle.status === 'ready'
-              ? 'No subtitle cue is active at the current playback position.'
-              : state.subtitle.error ?? 'Open an MKV with an embedded text subtitle track.'}
-          </div>
-        )}
-      </div>
 
-      <div className="track-table-wrap">
-        <table className="track-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Type</th>
-              <th>Language</th>
-              <th>Title</th>
-              <th>Codec</th>
-              <th>Subtitle mode</th>
-              <th>App selected</th>
-              <th>FFmpeg index</th>
-            </tr>
-          </thead>
-          <tbody>
-            {state.tracks.length > 0 ? (
-              state.tracks.map((track) => (
-                <tr key={`${track.type}-${track.id}`}>
-                  <td>{track.id}</td>
-                  <td>{track.type}</td>
-                  <td>{track.language ?? '—'}</td>
-                  <td>{track.title ?? '—'}</td>
-                  <td>{track.codec ?? 'unknown'}</td>
-                  <td>{track.subtitleKind ?? '—'}</td>
-                  <td>{track.type === 'subtitle' && state.subtitle.trackId === track.id ? 'yes' : '—'}</td>
-                  <td>{track.ffIndex ?? '—'}</td>
-                </tr>
-              ))
-            ) : (
+          {state.subtitle.error ? <div className="media-error">{state.subtitle.error}</div> : null}
+
+          {state.subtitle.activeCue ? (
+            <div className="active-cue-card">
+              <div className="active-cue-time">
+                {formatTime(state.subtitle.activeCue.startTime)} →{' '}
+                {formatTime(state.subtitle.activeCue.endTime)}
+              </div>
+              <div className="active-cue-text">{state.subtitle.activeCue.text}</div>
+              <div className="token-preview">
+                {state.subtitle.activeCue.tokens.map((token) => (
+                  <span className="token-chip" key={`${token.start}-${token.end}`}>
+                    <strong>{token.text}</strong>
+                    <small>{token.lookupTerm}</small>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="empty-subtitle-state">
+              {state.subtitle.status === 'ready'
+                ? 'No subtitle cue is active at the current playback position.'
+                : (state.subtitle.error ?? 'Open an MKV with an embedded text subtitle track.')}
+            </div>
+          )}
+        </div>
+
+        <div className="track-table-wrap">
+          <table className="track-table">
+            <thead>
               <tr>
-                <td colSpan={8} className="empty-table-cell">
-                  Open an MKV file to inspect its embedded tracks.
-                </td>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Language</th>
+                <th>Title</th>
+                <th>Codec</th>
+                <th>Subtitle mode</th>
+                <th>App selected</th>
+                <th>FFmpeg index</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {state.tracks.length > 0 ? (
+                state.tracks.map((track) => (
+                  <tr key={`${track.type}-${track.id}`}>
+                    <td>{track.id}</td>
+                    <td>{track.type}</td>
+                    <td>{track.language ?? '—'}</td>
+                    <td>{track.title ?? '—'}</td>
+                    <td>{track.codec ?? 'unknown'}</td>
+                    <td>{track.subtitleKind ?? '—'}</td>
+                    <td>
+                      {track.type === 'subtitle' && state.subtitle.trackId === track.id
+                        ? 'yes'
+                        : '—'}
+                    </td>
+                    <td>{track.ffIndex ?? '—'}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="empty-table-cell">
+                    Open an MKV file to inspect its embedded tracks.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </section>
   )
 }
@@ -255,7 +264,7 @@ function subtitleTrackLabel(state: PlaybackSnapshot): string {
     `Track ${state.subtitle.trackId}`,
     state.subtitle.trackLanguage,
     state.subtitle.trackTitle,
-    state.subtitle.trackCodec
+    state.subtitle.trackCodec,
   ].filter((value): value is string => Boolean(value))
 
   return parts.join(' · ')

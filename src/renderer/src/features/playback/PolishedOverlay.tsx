@@ -4,15 +4,16 @@ import { createEmptySubtitleModel } from '../../../../shared/media'
 import {
   DEFAULT_TRANSLATION_SETTINGS,
   type TranslationSettingsSnapshot,
-  type TranslationSettingsUpdate
+  type TranslationSettingsUpdate,
 } from '../../../../shared/settings'
 import type { TranslationResult } from '../../../../shared/translation'
-import './OverlayProbe.css'
-import './Issue9Polish.css'
+import './Player.css'
+import { PlayerIcon } from './PlayerIcon'
+import { usePlayerChrome } from './usePlayerChrome'
 import {
   clampPlayerValue,
   resolvePlayerShortcut,
-  subtitleRecoveryMessage
+  subtitleRecoveryMessage,
 } from './playerInteraction'
 import { segmentSubtitleCue } from './subtitleSegments'
 
@@ -26,7 +27,7 @@ const EMPTY_STATE: PlaybackSnapshot = {
   speed: 1,
   tracks: [],
   subtitle: createEmptySubtitleModel(),
-  error: null
+  error: null,
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
@@ -36,7 +37,7 @@ const TARGET_LANGUAGE_OPTIONS = [
   { code: 'ko', label: 'Korean' },
   { code: 'zh-cn', label: 'Chinese (Simplified)' },
   { code: 'es', label: 'Spanish' },
-  { code: 'fr', label: 'French' }
+  { code: 'fr', label: 'French' },
 ] as const
 
 interface SelectedWord {
@@ -57,9 +58,47 @@ export function PolishedOverlay(): React.JSX.Element {
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null)
   const [translation, setTranslation] = useState<TranslationLookupState>({ status: 'idle' })
   const [translationSettings, setTranslationSettings] = useState<TranslationSettingsSnapshot>(
-    DEFAULT_TRANSLATION_SETTINGS
+    DEFAULT_TRANSLATION_SETTINGS,
   )
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [panel, setPanel] = useState<'settings' | 'tracks' | 'help' | null>(null)
+  const settingsOpen = panel === 'settings'
+  const [controlsHovered, setControlsHovered] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const panelTrigger = useRef<HTMLElement | null>(null)
+  const panelRef = useRef<HTMLElement | null>(null)
+  const closePanel = useCallback((): void => {
+    setPanel(null)
+    panelTrigger.current?.focus()
+  }, [])
+  const togglePanel = (next: 'settings' | 'tracks' | 'help', trigger: HTMLElement): void => {
+    panelTrigger.current = trigger
+    setPanel((current) => (current === next ? null : next))
+  }
+  useEffect(() => {
+    if (!panel) return
+    panelRef.current?.focus()
+    const outside = (event: PointerEvent): void => {
+      if (
+        event.target instanceof Element &&
+        !event.target.closest('.player-panel, [data-panel-trigger]')
+      ) {
+        setPanel(null)
+      }
+    }
+    window.addEventListener('pointerdown', outside)
+    return () => window.removeEventListener('pointerdown', outside)
+  }, [panel])
+  useEffect(() => {
+    const release = (): void => setDragging(false)
+    window.addEventListener('pointerup', release)
+    window.addEventListener('pointercancel', release)
+    window.addEventListener('blur', release)
+    return () => {
+      window.removeEventListener('pointerup', release)
+      window.removeEventListener('pointercancel', release)
+      window.removeEventListener('blur', release)
+    }
+  }, [])
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [controlError, setControlError] = useState<string | null>(null)
@@ -161,14 +200,16 @@ export function PolishedOverlay(): React.JSX.Element {
 
       const activeElement = document.activeElement
       const startsFromDocument =
-        activeElement === null || activeElement === document.body || activeElement === document.documentElement
+        activeElement === null ||
+        activeElement === document.body ||
+        activeElement === document.documentElement
 
       if (!startsFromDocument) {
         return
       }
 
       const words = Array.from(
-        document.querySelectorAll<HTMLButtonElement>('.subtitle-word:not(:disabled)')
+        document.querySelectorAll<HTMLButtonElement>('.subtitle-word:not(:disabled)'),
       )
       const target = event.shiftKey ? words.at(-1) : words[0]
       if (!target) {
@@ -205,14 +246,26 @@ export function PolishedOverlay(): React.JSX.Element {
     return () => window.removeEventListener('pointerdown', handleOutsidePointerDown, true)
   }, [dismissTranslation, selectedWord])
 
-  const canControl = Boolean(state.filePath) && !['loading', 'error', 'unavailable'].includes(state.status)
+  const chromeVisible = usePlayerChrome(
+    state.status !== 'playing' ||
+      Boolean(panel) ||
+      Boolean(selectedWord) ||
+      Boolean(controlError || state.error) ||
+      controlsHovered ||
+      dragging,
+  )
+
+  const canControl =
+    Boolean(state.filePath) && !['loading', 'error', 'unavailable'].includes(state.status)
   const playing = state.status === 'playing'
   const duration = state.duration ?? 0
   const currentTime = Math.min(state.currentTime ?? 0, duration || Number.MAX_SAFE_INTEGER)
   const activeCue = state.subtitle.activeCue
   const subtitleSegments = activeCue ? segmentSubtitleCue(activeCue) : []
   const subtitleTracks = state.tracks.filter((track) => track.type === 'subtitle')
-  const supportedSubtitleTracks = subtitleTracks.filter(isSelectableSubtitleTrack)
+  const supportedSubtitleTracks = subtitleTracks.filter((track) =>
+    isSelectableSubtitleTrack(track, state.filePath),
+  )
   const canChangeSubtitleTrack = state.status === 'paused' && supportedSubtitleTracks.length > 0
   const subtitleMessage = activeCue
     ? null
@@ -238,7 +291,7 @@ export function PolishedOverlay(): React.JSX.Element {
         interactiveTarget: isInteractiveKeyboardTarget(event.target),
         altKey: event.altKey,
         ctrlKey: event.ctrlKey,
-        metaKey: event.metaKey
+        metaKey: event.metaKey,
       })
 
       if (!action) {
@@ -251,9 +304,9 @@ export function PolishedOverlay(): React.JSX.Element {
           dismissTranslation()
           return
         }
-        if (settingsOpen) {
+        if (panel) {
           event.preventDefault()
-          setSettingsOpen(false)
+          closePanel()
         }
         return
       }
@@ -296,13 +349,12 @@ export function PolishedOverlay(): React.JSX.Element {
     playing,
     runControl,
     selectedWord,
-    settingsOpen,
-    state.volume
+    panel,
+    closePanel,
+    state.volume,
   ])
 
-  const updateTranslationSettings = async (
-    update: TranslationSettingsUpdate
-  ): Promise<boolean> => {
+  const updateTranslationSettings = async (update: TranslationSettingsUpdate): Promise<boolean> => {
     setSettingsError(null)
     try {
       const nextSettings = await window.desktop.translation.updateSettings(update)
@@ -344,7 +396,7 @@ export function PolishedOverlay(): React.JSX.Element {
       cueId,
       tokenStart: token.start,
       text: token.text,
-      lookupTerm: token.lookupTerm
+      lookupTerm: token.lookupTerm,
     })
     setTranslation({ status: 'loading', word: token.text })
 
@@ -355,7 +407,7 @@ export function PolishedOverlay(): React.JSX.Element {
     void window.desktop.translation
       .translateWord({
         word: token.lookupTerm,
-        context
+        context,
       })
       .then((result) => {
         if (translationRequestVersion.current !== requestVersion) {
@@ -371,19 +423,29 @@ export function PolishedOverlay(): React.JSX.Element {
         setTranslation({
           status: 'error',
           word: token.text,
-          error: translationErrorMessage(error)
+          error: translationErrorMessage(error),
         })
       })
   }
 
   return (
-    <main className="overlay-probe" aria-label="Subtitle Bridge video controls">
-      <div className="overlay-topline">
-        <span className={`overlay-status status-${state.status}`}>{state.status}</span>
+    <main
+      className={`overlay-probe${chromeVisible ? '' : ' chrome-hidden'}`}
+      aria-label="Subtitle Bridge video controls"
+    >
+      <div className="overlay-topline" inert={!chromeVisible}>
+        <span className={`overlay-status status-${state.status}`}>
+          <span className="status-dot" />
+          {state.status}
+        </span>
         <strong title={state.fileName ?? undefined}>{state.fileName ?? 'No video loaded'}</strong>
       </div>
 
-      <section className="subtitle-overlay" aria-label="Interactive English subtitle" aria-live="polite">
+      <section
+        className="subtitle-overlay"
+        aria-label="Interactive English subtitle"
+        aria-live="polite"
+      >
         {activeCue ? (
           <div className="subtitle-cue" key={activeCue.id}>
             <div className="subtitle-text">
@@ -397,7 +459,8 @@ export function PolishedOverlay(): React.JSX.Element {
                 }
 
                 const selected =
-                  selectedWord?.cueId === activeCue.id && selectedWord.tokenStart === segment.token.start
+                  selectedWord?.cueId === activeCue.id &&
+                  selectedWord.tokenStart === segment.token.start
 
                 return (
                   <button
@@ -440,27 +503,144 @@ export function PolishedOverlay(): React.JSX.Element {
         ) : null}
       </section>
 
-      <div className="player-controls">
-        {settingsOpen ? (
-          <TranslationSettingsPanel
-            settings={translationSettings}
-            apiKeyDraft={apiKeyDraft}
-            error={settingsError}
-            onApiKeyDraftChange={setApiKeyDraft}
-            onUpdate={(update) => {
-              void updateTranslationSettings(update)
-            }}
-            onSaveApiKey={() => {
-              void saveApiKey()
-            }}
-            onClearApiKey={() => {
-              setApiKeyDraft('')
-              void updateTranslationSettings({ apiKey: null })
-            }}
-            onClearCache={() => {
-              void clearTranslationCache()
-            }}
-          />
+      <div
+        className="player-controls"
+        inert={!chromeVisible}
+        onPointerEnter={() => setControlsHovered(true)}
+        onPointerLeave={() => setControlsHovered(false)}
+        onPointerDown={() => setDragging(true)}
+      >
+        {panel ? (
+          <section
+            className="player-panel"
+            ref={panelRef}
+            tabIndex={-1}
+            aria-label={
+              panel === 'tracks'
+                ? 'Subtitle tracks'
+                : panel === 'help'
+                  ? 'Keyboard shortcuts'
+                  : 'Settings'
+            }
+          >
+            <div className="panel-heading">
+              <span>
+                {panel === 'tracks'
+                  ? 'Subtitles'
+                  : panel === 'help'
+                    ? 'Keyboard shortcuts'
+                    : 'Make it yours'}
+              </span>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="Close panel"
+                title="Close (Esc)"
+                onClick={closePanel}
+              >
+                <PlayerIcon name="close" />
+              </button>
+            </div>
+            {settingsOpen ? (
+              <TranslationSettingsPanel
+                settings={translationSettings}
+                apiKeyDraft={apiKeyDraft}
+                error={settingsError}
+                onApiKeyDraftChange={setApiKeyDraft}
+                onUpdate={(update) => {
+                  void updateTranslationSettings(update)
+                }}
+                onSaveApiKey={() => {
+                  void saveApiKey()
+                }}
+                onClearApiKey={() => {
+                  setApiKeyDraft('')
+                  void updateTranslationSettings({ apiKey: null })
+                }}
+                onClearCache={() => {
+                  void clearTranslationCache()
+                }}
+              />
+            ) : null}
+
+            {panel === 'tracks' ? (
+              <>
+                <p className="panel-note">{subtitleControlTitle(state, subtitleTracks)}</p>
+                <label
+                  className="subtitle-track-control"
+                  title={subtitleControlTitle(state, subtitleTracks)}
+                >
+                  <span>Subtitles</span>
+                  <select
+                    aria-label="Embedded subtitle track"
+                    value={state.subtitle.trackId === null ? '' : String(state.subtitle.trackId)}
+                    disabled={!canChangeSubtitleTrack}
+                    onChange={(event) => {
+                      const trackId = Number(event.currentTarget.value)
+                      void runControl(() => window.desktop.media.selectSubtitleTrack(trackId))
+                    }}
+                  >
+                    {supportedSubtitleTracks.length === 0 ? (
+                      <option value="">No text tracks</option>
+                    ) : null}
+                    {subtitleTracks.map((track) => (
+                      <option
+                        value={track.id}
+                        key={track.id}
+                        disabled={!isSelectableSubtitleTrack(track, state.filePath)}
+                      >
+                        {formatSubtitleTrack(track, state.filePath)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <p className="panel-note">
+                  Text subtitles are clickable. Image subtitles are listed as unsupported.
+                </p>
+              </>
+            ) : null}
+            {panel === 'help' ? (
+              <dl className="shortcut-list">
+                <div>
+                  <dt>Play / pause</dt>
+                  <dd>
+                    <kbd>Space</kbd> / <kbd>K</kbd>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Seek 5 seconds</dt>
+                  <dd>
+                    <kbd>←</kbd> <kbd>→</kbd>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Volume</dt>
+                  <dd>
+                    <kbd>↑</kbd> <kbd>↓</kbd>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Fullscreen</dt>
+                  <dd>
+                    <kbd>F</kbd>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Navigate / select word</dt>
+                  <dd>
+                    <kbd>Tab</kbd> / <kbd>Enter</kbd>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Dismiss popup / panel</dt>
+                  <dd>
+                    <kbd>Esc</kbd>
+                  </dd>
+                </div>
+              </dl>
+            ) : null}
+          </section>
         ) : null}
 
         {state.error || controlError ? (
@@ -480,6 +660,12 @@ export function PolishedOverlay(): React.JSX.Element {
             value={currentTime}
             disabled={!canControl || duration <= 0}
             aria-label="Seek position"
+            aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration)}`}
+            style={
+              {
+                '--seek-progress': `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
+              } as React.CSSProperties
+            }
             onChange={(event) => {
               void runControl(() => window.desktop.media.seek(Number(event.currentTarget.value)))
             }}
@@ -490,58 +676,102 @@ export function PolishedOverlay(): React.JSX.Element {
         <div className="control-row">
           <button
             type="button"
-            className="control-button control-button-primary"
+            className="icon-button play-button"
+            aria-label={playing ? 'Pause' : 'Play'}
+            title={playing ? 'Pause (Space)' : 'Play (Space)'}
             disabled={!canControl}
             onClick={() => {
               void runControl(() => window.desktop.media.setPaused(playing))
             }}
           >
-            {playing ? 'Pause' : 'Play'}
+            <PlayerIcon name={playing ? 'pause' : 'play'} />
           </button>
 
-          <label className="volume-control">
-            <span>Volume</span>
+          <button
+            type="button"
+            className="icon-button skip-button"
+            disabled={!canControl}
+            aria-label="Back 5 seconds"
+            title="Back 5 seconds (←)"
+            onClick={() =>
+              void runControl(() => window.desktop.media.seek(Math.max(0, currentTime - 5)))
+            }
+          >
+            <PlayerIcon name="back" />
+            <small>5</small>
+          </button>
+          <button
+            type="button"
+            className="icon-button skip-button"
+            disabled={!canControl}
+            aria-label="Forward 5 seconds"
+            title="Forward 5 seconds (→)"
+            onClick={() =>
+              void runControl(() =>
+                window.desktop.media.seek(
+                  Math.min(duration || Number.MAX_SAFE_INTEGER, currentTime + 5),
+                ),
+              )
+            }
+          >
+            <PlayerIcon name="forward" />
+            <small>5</small>
+          </button>
+          <label className="volume-control" title="Volume">
+            <PlayerIcon name="volume" />
+            <span className="sr-only">Volume</span>
             <input
               type="range"
               min={0}
               max={100}
               step={1}
               value={Math.round(state.volume)}
+              aria-label="Volume"
               disabled={!state.filePath || ['error', 'unavailable'].includes(state.status)}
               onChange={(event) => {
-                void runControl(() => window.desktop.media.setVolume(Number(event.currentTarget.value)))
+                void runControl(() =>
+                  window.desktop.media.setVolume(Number(event.currentTarget.value)),
+                )
               }}
             />
-            <strong>{Math.round(state.volume)}%</strong>
+            <output className="volume-value">{Math.round(state.volume)}%</output>
           </label>
 
-          <label className="subtitle-track-control" title={subtitleControlTitle(state, subtitleTracks)}>
-            <span>Subtitles</span>
-            <select
-              aria-label="Embedded subtitle track"
-              value={state.subtitle.trackId === null ? '' : String(state.subtitle.trackId)}
-              disabled={!canChangeSubtitleTrack}
-              onChange={(event) => {
-                const trackId = Number(event.currentTarget.value)
-                void runControl(() => window.desktop.media.selectSubtitleTrack(trackId))
-              }}
-            >
-              {supportedSubtitleTracks.length === 0 ? <option value="">No text tracks</option> : null}
-              {subtitleTracks.map((track) => (
-                <option value={track.id} key={track.id} disabled={!isSelectableSubtitleTrack(track)}>
-                  {formatSubtitleTrack(track)}
-                </option>
-              ))}
-            </select>
-          </label>
-
+          <span className="control-spacer" />
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Open video"
+            title="Open video"
+            onClick={() =>
+              void runControl(async () => {
+                const result = await window.desktop.media.openVideo()
+                if (result.error) throw new Error(result.error)
+              })
+            }
+          >
+            <PlayerIcon name="folder" />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            data-panel-trigger
+            aria-label="Subtitle tracks"
+            title="Subtitle tracks"
+            aria-expanded={panel === 'tracks'}
+            onClick={(event) => togglePanel('tracks', event.currentTarget)}
+          >
+            <PlayerIcon name="captions" />
+          </button>
           <label className="speed-control">
-            <span>Speed</span>
+            <span className="sr-only">Playback speed</span>
             <select
               value={String(state.speed)}
               disabled={!canControl}
               onChange={(event) => {
-                void runControl(() => window.desktop.media.setSpeed(Number(event.currentTarget.value)))
+                void runControl(() =>
+                  window.desktop.media.setSpeed(Number(event.currentTarget.value)),
+                )
               }}
             >
               {SPEED_OPTIONS.map((speed) => (
@@ -554,30 +784,36 @@ export function PolishedOverlay(): React.JSX.Element {
 
           <button
             type="button"
-            className="control-button"
+            className="icon-button"
+            data-panel-trigger
+            aria-label="Translation settings"
+            title="Translation settings"
             aria-expanded={settingsOpen}
-            onClick={() => {
-              setSettingsOpen((open) => !open)
-            }}
+            onClick={(event) => togglePanel('settings', event.currentTarget)}
           >
-            Settings
+            <PlayerIcon name="settings" />
           </button>
-
           <button
             type="button"
-            className="control-button"
-            disabled={!state.filePath}
-            onClick={() => {
-              void runControl(() => window.desktop.media.toggleFullscreen())
-            }}
+            className="icon-button help-button"
+            data-panel-trigger
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts"
+            aria-expanded={panel === 'help'}
+            onClick={(event) => togglePanel('help', event.currentTarget)}
           >
-            Fullscreen
+            <PlayerIcon name="keyboard" />
           </button>
-        </div>
-
-        <div className="keyboard-shortcuts">
-          <kbd>Space</kbd>/<kbd>K</kbd> play · <kbd>←</kbd>/<kbd>→</kbd> seek 5s · <kbd>↑</kbd>/<kbd>↓</kbd>{' '}
-          volume · <kbd>F</kbd> fullscreen · <kbd>Esc</kbd> dismiss
+          <button
+            type="button"
+            className="icon-button"
+            disabled={!state.filePath}
+            aria-label="Toggle fullscreen"
+            title="Fullscreen (F)"
+            onClick={() => void runControl(() => window.desktop.media.toggleFullscreen())}
+          >
+            <PlayerIcon name="fullscreen" />
+          </button>
         </div>
       </div>
     </main>
@@ -589,7 +825,7 @@ function TranslationPopup({
   translation,
   popupPosition,
   targetLanguage,
-  onDismiss
+  onDismiss,
 }: {
   selectedWord: SelectedWord
   translation: TranslationLookupState
@@ -597,7 +833,8 @@ function TranslationPopup({
   targetLanguage: string
   onDismiss: () => void
 }): React.JSX.Element {
-  const resultLanguage = translation.status === 'ready' ? translation.result.targetLanguage : targetLanguage
+  const resultLanguage =
+    translation.status === 'ready' ? translation.result.targetLanguage : targetLanguage
 
   return (
     <div
@@ -618,7 +855,7 @@ function TranslationPopup({
           title="Close translation (Esc)"
           onClick={onDismiss}
         >
-          ×
+          <PlayerIcon name="close" />
         </button>
       </div>
 
@@ -656,7 +893,7 @@ function TranslationSettingsPanel({
   onUpdate,
   onSaveApiKey,
   onClearApiKey,
-  onClearCache
+  onClearCache,
 }: {
   settings: TranslationSettingsSnapshot
   apiKeyDraft: string
@@ -682,7 +919,9 @@ function TranslationSettingsPanel({
           <select
             value={settings.provider}
             onChange={(event) => {
-              onUpdate({ provider: event.currentTarget.value as TranslationSettingsSnapshot['provider'] })
+              onUpdate({
+                provider: event.currentTarget.value as TranslationSettingsSnapshot['provider'],
+              })
             }}
           >
             <option value="local-dictionary">Local dictionary (offline)</option>
@@ -733,7 +972,8 @@ function TranslationSettingsPanel({
 
       {settings.provider === 'local-dictionary' && settings.targetLanguage !== 'my' ? (
         <div className="translation-settings-note">
-          The offline dictionary currently contains Burmese only. Choose Burmese for offline lookup or use a provider that supports the selected language.
+          The offline dictionary currently contains Burmese only. Choose Burmese for offline lookup
+          or use a provider that supports the selected language.
         </div>
       ) : null}
 
@@ -783,7 +1023,7 @@ function TranslationSettingsPanel({
 }
 
 async function refreshTranslationSettings(
-  setSettings: (settings: TranslationSettingsSnapshot) => void
+  setSettings: (settings: TranslationSettingsSnapshot) => void,
 ): Promise<void> {
   try {
     setSettings(await window.desktop.translation.getSettings())
@@ -811,22 +1051,25 @@ function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
     return false
   }
 
-  if (target.isContentEditable) {
+  if (target.isContentEditable || target.closest('.player-panel')) {
     return true
   }
 
   return ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'A'].includes(target.tagName)
 }
 
-function isSelectableSubtitleTrack(track: MediaTrack): boolean {
-  return track.subtitleKind === 'text' && track.ffIndex !== null
+function isSelectableSubtitleTrack(track: MediaTrack, filePath: string | null): boolean {
+  return (
+    track.subtitleKind === 'text' &&
+    (track.ffIndex !== null || /^https?:\/\//i.test(filePath ?? ''))
+  )
 }
 
-function formatSubtitleTrack(track: MediaTrack): string {
+function formatSubtitleTrack(track: MediaTrack, filePath: string | null): string {
   const language = track.language ?? 'und'
   const title = track.title ? ` · ${track.title}` : ''
   const codec = track.codec ?? 'unknown'
-  const unsupported = isSelectableSubtitleTrack(track) ? '' : ' · unsupported'
+  const unsupported = isSelectableSubtitleTrack(track, filePath) ? '' : ' · unsupported'
   return `${language}${title} · ${codec}${unsupported}`
 }
 

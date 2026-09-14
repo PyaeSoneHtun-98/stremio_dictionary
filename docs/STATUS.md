@@ -1,99 +1,52 @@
 # Project status
 
-This file is the short living summary of Subtitle Bridge development. Update it when a feature is merged or when the active issue changes materially.
+## Stable master
 
-## Stable `master`
+The standalone Windows MVP (Issues #1–#10) and Stremio handoff (Issue #24, PR #25) are merged.
 
-The standalone Windows MVP roadmap is complete through Issues #1–#10.
+Stable capabilities include local MKV playback, FFmpeg text-subtitle extraction, clickable SRT/ASS/SSA dialogue, offline Burmese lookup, translation settings/cache, and the Windows portable package/current-user installer. mpv and FFmpeg remain external dependencies.
 
-Stable capabilities on `master` include:
+Stremio streams use mpv live subtitles. The opt-in Play in Subtitle Bridge helper, serialized single-instance handoff, strict helper validation, retained backups, atomic replacement, and structured diagnostics are stable. PR #25 passed CI #149 and manual Windows retesting before merge.
 
-- Electron + React + TypeScript Windows desktop application
-- mpv video/audio playback
-- local MKV opening and player controls
-- embedded text subtitle extraction/normalization
-- synchronized clickable subtitle overlay
-- SRT/SubRip, ASS, and SSA text subtitle support
-- subtitle-track selection
-- defensive filtering for malformed/drawing/effect-heavy ASS content
-- offline English → Burmese dictionary translation
-- translation cache/settings and protected optional provider credentials
-- packaged Windows x64 portable build/current-user installer
-- privacy-conscious rotating diagnostics and memory sampling
+## Active work — Issue #26
 
-Release artifacts intentionally do not bundle mpv or FFmpeg; they are external runtime dependencies.
+**Issue:** Redesign player UI/UX for a modern subtitle-first viewing experience
 
-## Active work
+**Branch:** `feat/issue-26-player-redesign`
 
-**Issue #24:** Add Stremio external-player handoff MVP on Windows  
-**PR #25:** Add Stremio external-player handoff MVP  
-**Branch:** `feat/issue-24-stremio-handoff`  
-**State:** Draft; manual feature testing passed. The first Codex review found four merge blockers; fixes are on the branch and require green CI plus Codex re-review before merge.
+**Implementation:** Codex produced the initial redesign. After manual design review, ChatGPT implemented the refinement/fix passes and Codex returned to review-only duty.
 
-### Verified manually for Issue #24
+**State:** Draft PR #27. Manual Windows acceptance passed on the pre-review head, and the targeted Windows recheck after the review fixes also passed. Codex re-review at `89a9017` confirmed the subtitle-target and popup-stacking P2 findings are resolved and found no new functional P1/P2 regressions. The only remaining P2 was stale validation documentation; this update records the completed recheck. The legacy popup-position renderer plumbing remains a non-blocking P3 cleanup item.
 
-- Direct Stremio local stream URL opens in Subtitle Bridge.
-- Video/audio playback works from Stremio's `127.0.0.1:11470` stream.
-- Embedded text subtitle tracks are detected.
-- Network subtitles appear live instead of waiting for FFmpeg full-stream extraction.
-- Live subtitles are synchronized.
-- Subtitle words are clickable.
-- Burmese lookup works during Stremio playback.
-- Embedded subtitle-track switching works while paused.
-- The Stremio compatibility helper adds `Play in Subtitle Bridge` to the in-player external-device menu after restart.
-- One-click `Play in Subtitle Bridge` handoff was manually tested successfully.
+### UX changes
 
-### Important implementation decisions in PR #25
+- Compact icon controls over a bottom gradient; title and controls fade after 2.8 seconds of inactivity during playback.
+- Pointer movement and keyboard activity reveal controls. Pausing, errors, open panels, word lookup, control hover, slider dragging, and keyboard focus keep them visible. Hidden controls are inert until revealed.
+- Clickable subtitles use a cinematic shadow treatment without the heavy rounded background. Their safe-area position stays stationary while controls fade/reveal so pointer targets do not move underneath the user.
+- The selected word uses a soft green highlight. Translation lookup is always presented as a centered translucent glass-style card with bounded scrolling on small windows.
+- Subtitle selection, translation settings, and keyboard help use dismissible panels. Escape/close returns focus to the panel trigger; input/select/button keyboard actions remain isolated from playback shortcuts.
+- Play/pause, icon-only ±5-second seeking, volume, speed, fullscreen, and file opening remain available. Icon controls have accessible names and tooltips.
+- The launcher prioritizes opening a movie and Stremio guidance. Existing playback diagnostics remain available under a collapsed Playback details disclosure.
 
-- Local MKV files keep the existing FFmpeg full-track subtitle extraction path.
-- HTTP/HTTPS streams use mpv live subtitle text/timing.
-- mpv's own subtitle rendering remains hidden while the React overlay displays interactive text.
-- The tested Stremio 6 beta Settings UI exposes only `Disabled` and `M3U Playlist` under external-player settings; the integration therefore targets Stremio's verified in-player external-device mechanism instead.
-- The Stremio integration is an opt-in reversible local compatibility patch, not native upstream Stremio support.
-- Media-open requests are serialized before reaching the playback controller so simultaneous external launches cannot race multiple mpv startups against the same IPC pipe.
-- Raw mpv file logging is intentionally disabled because mpv can write complete private Stremio stream URLs to such logs; Subtitle Bridge uses only its structured/redacted diagnostics.
-- Stremio patch enable/disable validates a specific external-player discovery structure and patch-marker integrity before writing.
-- Stremio patch writes use a verified temporary file plus atomic replacement. Existing safety backups are preserved instead of overwritten.
+The native mpv/Electron surface, playback processes, Stremio helpers, IPC, parser, providers, cache, and stored settings architecture are unchanged. The subtitle menu follows the existing main-process rule allowing live HTTP tracks without an FFmpeg index.
 
-### Codex review findings being addressed
+### Validation
 
-The first final review reported:
+- Before review fixes, `npm run check` passed lint, both TypeScript checks, 65 tests, and the production build; CI #155 also passed.
+- Added inactivity-timer regression tests for activity reset, pinned controls, unpin delay, and cleanup.
+- Added presentation regression checks that prevent chrome visibility from changing subtitle target geometry and verify the centered popup layer remains above player controls.
+- Browser renderer smoke tests with a mocked preload bridge previously passed hide/reveal, Tab/Enter word selection, popup dismissal, paused track selection, settings, and safe-area geometry at 1280×720 and 640×360. These tests do not validate native mpv or Stremio playback.
+- Manual Windows acceptance passed for local MKV playback, control behavior, clickable subtitles/translation, subtitle track switching, fullscreen/keyboard interaction, settings, and Stremio one-click/single-instance handoff on the pre-review head.
+- CI #162 passed for review head `89a9017`.
+- Targeted Windows recheck after the review fixes passed: subtitle words stayed stationary while controls revealed; the centered popup remained above controls and interactive at roughly 640×360; the obsolete popup-position choice stayed hidden; seek, fullscreen, subtitle clicking, and one Stremio handoff all still worked.
 
-1. P1 — raw mpv diagnostics could persist full Stremio URLs.
-2. P2 — concurrent launch requests could race multiple mpv processes against one named pipe.
-3. P2 — Stremio layout validation was too weak.
-4. P2 — enable/disable writes were non-atomic and backup handling could destroy the useful recovery copy.
+### Targeted acceptance completed after review
 
-The current branch includes fixes for all four findings plus CI coverage for stronger Stremio layout validation, malformed-marker refusal, idempotency, exact disable restoration, and backup preservation. These fixes are not considered merge-ready until the latest CI is green and Codex confirms that no P1/P2 blockers remain.
+1. Passed — revealing controls while aiming at a subtitle word did not move the subtitle line, and the intended word remained clickable.
+2. Passed — at roughly 640×360, translation cards painted above the control bar and remained interactive.
+3. Passed — Settings did not expose the obsolete popup-position choice, and translation remained centered.
+4. Passed — seek buttons, fullscreen, subtitle clicking, and one Stremio handoff were reconfirmed without regression.
 
-### Remaining gate for PR #25
+## Later work
 
-1. Ensure the latest CI is green after the review fixes.
-2. Re-run the affected Stremio manual smoke test if the packaged helper behavior changed materially.
-3. Send the current PR head back to Codex for re-review of the four findings.
-4. Fix any remaining P1/P2 blockers and repeat affected validation as needed.
-5. Mark the PR ready only after Codex says no P1/P2 blockers remain.
-6. Verify final head + CI and squash merge.
-7. Confirm Issue #24 closes.
-
-## Next planned issue
-
-**Player UI/UX redesign** — create only after PR #25 is merged.
-
-The current player UI is functionally complete but visually and ergonomically MVP-quality. Known UX problems include controls that occupy too much video space, text-heavy controls, subtitle/control overlap risk, and insufficient auto-hide/visual hierarchy.
-
-For this one issue, Codex is planned to be the primary implementer. The issue/prompt should define the UX problems, functional constraints, and acceptance criteria while deliberately leaving room for Codex to choose the visual design and interaction details.
-
-The redesign must preserve playback, subtitle interaction, translation, keyboard behavior, and Stremio functionality unless the issue explicitly changes them.
-
-## Later work / known limitations
-
-Not yet scheduled as part of the current issue:
-
-- larger English → Burmese dictionary dataset
-- external Stremio subtitle-addon URL ingestion
-- watched/progress synchronization back to Stremio
-- native/upstream `Subtitle Bridge` Stremio external-player support
-- rich ASS/SSA visual fidelity with clickable styled/positioned text
-- self-contained redistribution strategy for properly licensed/pinned mpv and FFmpeg builds
-- broader Windows environment acceptance beyond the currently tested setup
+Dictionary expansion, subtitle delay/vertical-position/size controls, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, native upstream Stremio support, self-contained runtime redistribution, and broader Windows-environment acceptance remain separate work.
