@@ -835,6 +835,13 @@ function TranslationPopup({
 }): React.JSX.Element {
   const resultLanguage =
     translation.status === 'ready' ? translation.result.targetLanguage : targetLanguage
+  const dictionaryEntry =
+    translation.status === 'ready' ? translation.result.dictionaryEntry : undefined
+  const headingWord = dictionaryEntry?.word ?? selectedWord.text
+  const resolvedFromForm =
+    dictionaryEntry !== undefined &&
+    selectedWord.lookupTerm.normalize('NFKC').trim().toLocaleLowerCase('en-US') !==
+      dictionaryEntry.word.normalize('NFKC').trim().toLocaleLowerCase('en-US')
 
   return (
     <div
@@ -845,8 +852,12 @@ function TranslationPopup({
     >
       <div className="translation-popup-header">
         <div className="translation-popup-heading">
-          <strong>{selectedWord.text}</strong>
-          <span>English → {languageLabel(resultLanguage)}</span>
+          <strong>{headingWord}</strong>
+          <span>
+            {resolvedFromForm
+              ? `${selectedWord.text} → ${dictionaryEntry?.word}`
+              : `English → ${languageLabel(resultLanguage)}`}
+          </span>
         </div>
         <button
           type="button"
@@ -864,14 +875,30 @@ function TranslationPopup({
       ) : null}
 
       {translation.status === 'ready' ? (
-        <>
-          <div className="translation-burmese" lang={translation.result.targetLanguage}>
-            {translation.result.translation}
-          </div>
-          {translation.result.pronunciation ? (
-            <div className="translation-pronunciation">{translation.result.pronunciation}</div>
-          ) : null}
-        </>
+        dictionaryEntry ? (
+          <>
+            <div className="translation-pronunciation">{dictionaryEntry.pronunciation}</div>
+            <div className="translation-dictionary-meanings" lang="my">
+              {dictionaryEntry.meanings.map((meaning) => (
+                <section className="translation-dictionary-sense" key={meaning.partOfSpeech}>
+                  <span className="translation-part-of-speech">{meaning.partOfSpeech}</span>
+                  <div className="translation-dictionary-burmese">
+                    {meaning.burmese.join('၊ ')}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="translation-burmese" lang={translation.result.targetLanguage}>
+              {translation.result.translation}
+            </div>
+            {translation.result.pronunciation ? (
+              <div className="translation-pronunciation">{translation.result.pronunciation}</div>
+            ) : null}
+          </>
+        )
       ) : null}
 
       {translation.status === 'error' ? (
