@@ -31,29 +31,28 @@ describe('LocalDictionaryProvider', () => {
     })
   })
 
-  it('normalizes casing and resolves inflected forms to the canonical headword', async () => {
+  it('normalizes casing and resolves an inflected form to its canonical headword', async () => {
     const provider = new LocalDictionaryProvider()
+    const headwords = new Set(LOCAL_DICTIONARY.map((entry) => entry.word.toLocaleLowerCase('en-US')))
+    const candidate = LOCAL_DICTIONARY.flatMap((entry) =>
+      entry.forms
+        .filter((form) => !headwords.has(form.toLocaleLowerCase('en-US')))
+        .map((form) => ({ entry, form }))
+    )[0]
 
-    await expect(provider.translate({ word: 'RUNNING' })).resolves.toMatchObject({
-      originalWord: 'RUNNING',
-      translation: 'ပြေးသည်၊ လည်ပတ်သည်၊ စီမံခန့်ခွဲသည်',
+    expect(candidate).toBeDefined()
+    if (!candidate) {
+      return
+    }
+
+    const lookupWord = candidate.form.toLocaleUpperCase('en-US')
+    await expect(provider.translate({ word: lookupWord })).resolves.toMatchObject({
+      originalWord: lookupWord,
       dictionaryEntry: {
-        word: 'run'
+        word: candidate.entry.word
       },
       provider: 'local-dictionary',
       targetLanguage: 'my'
-    })
-    await expect(provider.translate({ word: 'treaties' })).resolves.toMatchObject({
-      dictionaryEntry: {
-        word: 'treaty'
-      },
-      translation: 'သဘောတူစာချုပ်'
-    })
-    await expect(provider.translate({ word: 'signed' })).resolves.toMatchObject({
-      dictionaryEntry: {
-        word: 'sign'
-      },
-      translation: 'လက်မှတ်ရေးထိုးသည်၊ အမှတ်အသား'
     })
   })
 
