@@ -1,0 +1,209 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "word": "abandon",
+      "pronunciation": "/əˈbændən/",
+      "forms": ["abandons", "abandoned", "abandoning"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["စွန့်ပစ်သည်", "လက်လျှော့သည်"]
+        }
+      ]
+    },
+    {
+      "word": "abduct",
+      "pronunciation": "/æbˈdʌkt/",
+      "forms": ["abducts", "abducted", "abducting"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["ပြန်ပေးဆွဲသည်"]
+        }
+      ]
+    },
+    {
+      "word": "abolish",
+      "pronunciation": "/əˈbɑlɪʃ/",
+      "forms": ["abolishes", "abolished", "abolishing"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["ဖျက်သိမ်းသည်"]
+        }
+      ]
+    },
+    {
+      "word": "absorb",
+      "pronunciation": "/əbˈzɔrb/",
+      "forms": ["absorbs", "absorbed", "absorbing"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["စုပ်ယူသည်", "နားလည်သဘောပေါက်သည်"]
+        }
+      ]
+    },
+    {
+      "word": "address",
+      "pronunciation": "/əˈdrɛs/",
+      "forms": ["addresses", "addressed", "addressing"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["ကိုင်တွယ်ဖြေရှင်းသည်"]
+        },
+        {
+          "partOfSpeech": "noun",
+          "burmese": ["လိပ်စာ"]
+        }
+      ]
+    },
+    {
+      "word": "admit",
+      "pronunciation": "/ədˈmɪt/",
+      "forms": ["admits", "admitted", "admitting"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["ဝန်ခံသည်", "ဝင်ခွင့်ပြုသည်"]
+        }
+      ]
+    },
+    {
+      "word": "ambush",
+      "pronunciation": "/ˈæmbʊʃ/",
+      "forms": ["ambushes", "ambushed", "ambushing"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["ချုံခိုတိုက်ခိုက်သည်"]
+        },
+        {
+          "partOfSpeech": "noun",
+          "burmese": ["ချုံခိုတိုက်ခိုက်မှု"]
+        }
+      ]
+    },
+    {
+      "word": "arrest",
+      "pronunciation": "/ɚˈrɛst/",
+      "forms": ["arrests", "arrested", "arresting"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["ဖမ်းဆီးသည်"]
+        },
+        {
+          "partOfSpeech": "noun",
+          "burmese": ["ဖမ်းဆီးမှု"]
+        }
+      ]
+    },
+    {
+      "word": "betray",
+      "pronunciation": "/bɪˈtreɪ/",
+      "forms": ["betrays", "betrayed", "betraying"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["သစ္စာဖောက်သည်"]
+        }
+      ]
+    },
+    {
+      "word": "charge",
+      "pronunciation": "/tʃɑrdʒ/",
+      "forms": ["charges", "charged", "charging"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["ငွေတောင်းသည်", "စွပ်စွဲသည်"]
+        },
+        {
+          "partOfSpeech": "noun",
+          "burmese": ["တာဝန်"]
+        }
+      ]
+    },
+    {
+      "word": "concern",
+      "pronunciation": "/kənˈsɝn/",
+      "forms": ["concerns", "concerned", "concerning"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["သက်ဆိုင်သည်", "စိုးရိမ်စေသည်"]
+        },
+        {
+          "partOfSpeech": "noun",
+          "burmese": ["စိုးရိမ်မှု"]
+        }
+      ]
+    },
+    {
+      "word": "correct",
+      "pronunciation": "/kɚˈrɛkt/",
+      "forms": ["corrects", "corrected", "correcting"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["ပြင်ဆင်သည်"]
+        },
+        {
+          "partOfSpeech": "adjective",
+          "burmese": ["မှန်ကန်သော"]
+        }
+      ]
+    },
+    {
+      "word": "emperor",
+      "pronunciation": "/ˈɛmpərɚ/",
+      "forms": ["emperors"],
+      "meanings": [
+        {
+          "partOfSpeech": "noun",
+          "burmese": ["ဧကရာဇ်"]
+        }
+      ]
+    },
+    {
+      "word": "run",
+      "pronunciation": "/rʌn/",
+      "forms": ["runs", "ran", "running"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["ပြေးသည်", "လည်ပတ်သည်", "စီမံခန့်ခွဲသည်"]
+        }
+      ]
+    },
+    {
+      "word": "sign",
+      "pronunciation": "/saɪn/",
+      "forms": ["signs", "signed", "signing"],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": ["လက်မှတ်ရေးထိုးသည်"]
+        },
+        {
+          "partOfSpeech": "noun",
+          "burmese": ["အမှတ်အသား"]
+        }
+      ]
+    },
+    {
+      "word": "treaty",
+      "pronunciation": "/ˈtriti/",
+      "forms": ["treaties"],
+      "meanings": [
+        {
+          "partOfSpeech": "noun",
+          "burmese": ["သဘောတူစာချုပ်"]
+        }
+      ]
+    }
+  ]
+}
