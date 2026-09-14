@@ -69,21 +69,50 @@ describe('dictionary validation', () => {
     expect(() => validateDictionaryDocument(document)).toThrow('group same-POS meanings together')
   })
 
-  it('rejects lookup collisions across separate batches', () => {
+  it('allows an exact headword to overlap another entry form', () => {
+    const document = {
+      version: 1,
+      entries: [
+        {
+          word: 'warn',
+          pronunciation: '/wɔrn/',
+          forms: ['warns', 'warned', 'warning'],
+          meanings: [{ partOfSpeech: 'verb', burmese: ['သတိပေးသည်'] }]
+        },
+        {
+          word: 'warning',
+          pronunciation: '/ˈwɔrnɪŋ/',
+          forms: ['warnings'],
+          meanings: [{ partOfSpeech: 'noun', burmese: ['သတိပေးချက်'] }]
+        }
+      ]
+    }
+
+    expect(() => validateDictionaryDocument(document)).not.toThrow()
+  })
+
+  it('rejects one form owned by two different headwords', () => {
     const batch1 = {
       version: 1,
       batch: 1,
-      entries: [validEntry]
+      entries: [
+        {
+          word: 'alpha',
+          pronunciation: '/ˈælfə/',
+          forms: ['sharedform'],
+          meanings: [{ partOfSpeech: 'noun', burmese: ['အယ်လ်ဖာ'] }]
+        }
+      ]
     }
     const batch2 = {
       version: 1,
       batch: 2,
       entries: [
         {
-          word: 'charged',
-          pronunciation: '/tʃɑrdʒd/',
-          forms: [],
-          meanings: [{ partOfSpeech: 'adjective', burmese: ['စွဲချက်တင်ခံထားရသော'] }]
+          word: 'beta',
+          pronunciation: '/ˈbeɪtə/',
+          forms: ['sharedform'],
+          meanings: [{ partOfSpeech: 'noun', burmese: ['ဘီတာ'] }]
         }
       ]
     }
@@ -93,7 +122,41 @@ describe('dictionary validation', () => {
         { source: 'batch-1', document: batch1 },
         { source: 'batch-2', document: batch2 }
       ])
-    ).toThrow('Lookup collision')
+    ).toThrow('Form collision')
+  })
+
+  it('allows headword/form overlap across separate batches regardless of order', () => {
+    const batch1 = {
+      version: 1,
+      batch: 1,
+      entries: [
+        {
+          word: 'warn',
+          pronunciation: '/wɔrn/',
+          forms: ['warning'],
+          meanings: [{ partOfSpeech: 'verb', burmese: ['သတိပေးသည်'] }]
+        }
+      ]
+    }
+    const batch2 = {
+      version: 1,
+      batch: 2,
+      entries: [
+        {
+          word: 'warning',
+          pronunciation: '/ˈwɔrnɪŋ/',
+          forms: ['warnings'],
+          meanings: [{ partOfSpeech: 'noun', burmese: ['သတိပေးချက်'] }]
+        }
+      ]
+    }
+
+    expect(() =>
+      mergeDictionaryBatches([
+        { source: 'batch-1', document: batch1 },
+        { source: 'batch-2', document: batch2 }
+      ])
+    ).not.toThrow()
   })
 
   it('merges valid batches deterministically by headword', () => {
