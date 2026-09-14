@@ -15,6 +15,11 @@
   display: none;
 }
 
+/* Translation lookup is now always centered, so the old above/below control is obsolete. */
+.translation-settings-grid > label:nth-of-type(3) {
+  display: none;
+}
+
 /* Subtitles should read like subtitles, not like a floating dark card. */
 .subtitle-overlay {
   transition: bottom 220ms ease;
