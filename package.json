@@ -18,7 +18,7 @@
     "test": "vitest run",
     "dictionary:validate": "node scripts/dictionary-tool.mjs validate src/main/translation/data/dictionary.json",
     "dictionary:build": "node scripts/dictionary-tool.mjs build dictionary/batches src/main/translation/data/dictionary.json",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run build:app"
+    "check": "npm run lint && npm run typecheck && npm run dictionary:validate && npm run test && npm run build:app"
   },
   "dependencies": {
     "react": "^19.1.0",
