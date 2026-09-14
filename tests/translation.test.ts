@@ -4,38 +4,63 @@ import { LocalDictionaryProvider } from '../src/main/translation/LocalDictionary
 import { LOCAL_DICTIONARY } from '../src/main/translation/localDictionary'
 
 describe('LocalDictionaryProvider', () => {
-  it('translates a known English word to Burmese without configuration', async () => {
+  it('returns a structured Burmese dictionary entry without configuration', async () => {
     const provider = new LocalDictionaryProvider()
 
-    await expect(provider.translate({ word: 'emperor' })).resolves.toEqual({
-      originalWord: 'emperor',
-      translation: 'ဧကရာဇ်',
+    await expect(provider.translate({ word: 'charge' })).resolves.toEqual({
+      originalWord: 'charge',
+      translation: 'ငွေတောင်းသည်၊ စွပ်စွဲသည်၊ တာဝန်',
+      pronunciation: '/tʃɑrdʒ/',
+      dictionaryEntry: {
+        word: 'charge',
+        pronunciation: '/tʃɑrdʒ/',
+        forms: ['charges', 'charged', 'charging'],
+        meanings: [
+          {
+            partOfSpeech: 'verb',
+            burmese: ['ငွေတောင်းသည်', 'စွပ်စွဲသည်']
+          },
+          {
+            partOfSpeech: 'noun',
+            burmese: ['တာဝန်']
+          }
+        ]
+      },
       provider: 'local-dictionary',
       targetLanguage: 'my'
     })
   })
 
-  it('normalizes casing and resolves inflected aliases', async () => {
+  it('normalizes casing and resolves inflected forms to the canonical headword', async () => {
     const provider = new LocalDictionaryProvider()
 
     await expect(provider.translate({ word: 'RUNNING' })).resolves.toMatchObject({
       originalWord: 'RUNNING',
-      translation: 'ပြေးသည်',
+      translation: 'ပြေးသည်၊ လည်ပတ်သည်၊ စီမံခန့်ခွဲသည်',
+      dictionaryEntry: {
+        word: 'run'
+      },
       provider: 'local-dictionary',
       targetLanguage: 'my'
     })
     await expect(provider.translate({ word: 'treaties' })).resolves.toMatchObject({
+      dictionaryEntry: {
+        word: 'treaty'
+      },
       translation: 'သဘောတူစာချုပ်'
     })
     await expect(provider.translate({ word: 'signed' })).resolves.toMatchObject({
-      translation: 'လက်မှတ်ရေးထိုးသည်'
+      dictionaryEntry: {
+        word: 'sign'
+      },
+      translation: 'လက်မှတ်ရေးထိုးသည်၊ အမှတ်အသား'
     })
   })
 
   it('rejects target languages not present in the offline dataset', async () => {
     const provider = new LocalDictionaryProvider()
 
-    await expect(provider.translate({ word: 'emperor', targetLanguage: 'ja' })).rejects.toThrow(
+    await expect(provider.translate({ word: 'charge', targetLanguage: 'ja' })).rejects.toThrow(
       'currently supports Burmese'
     )
   })
@@ -48,8 +73,15 @@ describe('LocalDictionaryProvider', () => {
     )
   })
 
-  it('ships a useful starter dictionary rather than a single demo word', () => {
-    expect(Object.keys(LOCAL_DICTIONARY).length).toBeGreaterThanOrEqual(75)
+  it('loads structured entries from the JSON dataset', () => {
+    expect(LOCAL_DICTIONARY.length).toBeGreaterThanOrEqual(15)
+    expect(LOCAL_DICTIONARY.find((entry) => entry.word === 'charge')).toMatchObject({
+      pronunciation: '/tʃɑrdʒ/',
+      meanings: [
+        { partOfSpeech: 'verb', burmese: ['ငွေတောင်းသည်', 'စွပ်စွဲသည်'] },
+        { partOfSpeech: 'noun', burmese: ['တာဝန်'] }
+      ]
+    })
   })
 })
 
