@@ -16,7 +16,7 @@ Stremio streams use mpv live subtitles. The opt-in Play in Subtitle Bridge helpe
 
 **Implementation:** Codex produced the initial redesign. After manual design review, ChatGPT implemented the refinement/fix passes and Codex returned to review-only duty.
 
-**State:** Draft PR #27. Manual Windows acceptance passed on the pre-review head. Codex review found two P2 presentation blockers plus one documentation P2 and one P3 cleanup item. The P2 layout fixes, documentation correction, and regression checks are now implemented. A short targeted Windows recheck and Codex re-review are required before merge. The P3 source cleanup for the legacy popup-position setting is optional unless the re-review promotes it.
+**State:** Draft PR #27. Manual Windows acceptance passed on the pre-review head, and the targeted Windows recheck after the review fixes also passed. Codex re-review at `89a9017` confirmed the subtitle-target and popup-stacking P2 findings are resolved and found no new functional P1/P2 regressions. The only remaining P2 was stale validation documentation; this update records the completed recheck. The legacy popup-position renderer plumbing remains a non-blocking P3 cleanup item.
 
 ### UX changes
 
@@ -37,14 +37,15 @@ The native mpv/Electron surface, playback processes, Stremio helpers, IPC, parse
 - Added presentation regression checks that prevent chrome visibility from changing subtitle target geometry and verify the centered popup layer remains above player controls.
 - Browser renderer smoke tests with a mocked preload bridge previously passed hide/reveal, Tab/Enter word selection, popup dismissal, paused track selection, settings, and safe-area geometry at 1280×720 and 640×360. These tests do not validate native mpv or Stremio playback.
 - Manual Windows acceptance passed for local MKV playback, control behavior, clickable subtitles/translation, subtitle track switching, fullscreen/keyboard interaction, settings, and Stremio one-click/single-instance handoff on the pre-review head.
-- Targeted Windows recheck of the review fixes is pending before final Codex re-review.
+- CI #162 passed for review head `89a9017`.
+- Targeted Windows recheck after the review fixes passed: subtitle words stayed stationary while controls revealed; the centered popup remained above controls and interactive at roughly 640×360; the obsolete popup-position choice stayed hidden; seek, fullscreen, subtitle clicking, and one Stremio handoff all still worked.
 
-### Targeted acceptance before final review
+### Targeted acceptance completed after review
 
-1. During playback, let controls hide and reveal them with pointer movement while aiming at a subtitle word. Confirm the subtitle line does not move and the intended word remains clickable.
-2. At a small window size (including roughly 640×360), open a translation result/error card and confirm it paints above the control bar and remains interactive.
-3. Confirm Settings still does not expose the obsolete popup-position choice; translation remains centered.
-4. Reconfirm seek buttons, fullscreen, subtitle clicking, and one Stremio handoff to catch any visual regression.
+1. Passed — revealing controls while aiming at a subtitle word did not move the subtitle line, and the intended word remained clickable.
+2. Passed — at roughly 640×360, translation cards painted above the control bar and remained interactive.
+3. Passed — Settings did not expose the obsolete popup-position choice, and translation remained centered.
+4. Passed — seek buttons, fullscreen, subtitle clicking, and one Stremio handoff were reconfirmed without regression.
 
 ## Later work
 
