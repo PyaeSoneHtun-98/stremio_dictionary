@@ -111,6 +111,39 @@
   color: rgb(231 241 236 / 0.72);
 }
 
+.translation-pronunciation {
+  margin-top: 7px;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+
+.translation-dictionary-meanings {
+  display: grid;
+  gap: 13px;
+  margin-top: 14px;
+  padding-top: 15px;
+  border-top: 1px solid rgb(255 255 255 / 0.12);
+}
+
+.translation-dictionary-sense {
+  display: grid;
+  gap: 4px;
+}
+
+.translation-part-of-speech {
+  color: rgb(225 237 232 / 0.62);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.translation-dictionary-burmese {
+  color: #e0fff1;
+  font-size: 22px;
+  line-height: 1.6;
+}
+
 @media (max-width: 720px) {
   .translation-popup {
     width: min(420px, calc(100vw - 32px));
@@ -126,9 +159,14 @@
     padding: 12px 16px;
   }
 
-  .translation-burmese {
+  .translation-burmese,
+  .translation-dictionary-meanings {
     margin-top: 8px;
     padding-top: 9px;
+  }
+
+  .translation-burmese,
+  .translation-dictionary-burmese {
     font-size: 20px;
   }
 }
