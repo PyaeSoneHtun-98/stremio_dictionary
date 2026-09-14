@@ -163,7 +163,7 @@ Diagnostics are intentionally small and privacy-conscious. They may record lifec
 - Stremio external subtitle-addon URLs are not yet ingested.
 - Watched/progress state is not synchronized back to Stremio.
 - Stremio compatibility currently depends on a reversible local patch rather than native upstream support.
-- Issue #26 redesigns the player controls, subtitle safe area, translation card, and launcher. The renderer redesign is awaiting manual Windows acceptance; native playback architecture remains unchanged.
+- Issue #26 redesigns the player controls, subtitle safe area, translation card, and launcher. Manual Windows acceptance and the targeted post-review recheck have passed; native playback architecture remains unchanged.
 
 ## Product priorities
 
