@@ -1,23 +1,18 @@
 /* Issue #26 review refinements.
    Keep this layer focused on presentation so playback/subtitle behavior stays unchanged. */
 
-/* Make the 5-second seek affordance read as one icon instead of an icon plus a loose label. */
+/* Keep 5-second seek controls clean and icon-only. The button title/aria-label explain the action. */
+.skip-button {
+  border-radius: 50%;
+}
+
 .skip-button svg {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
 }
 
 .skip-button small {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -44%);
-  font-size: 7px;
-  font-weight: 750;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  color: currentColor;
-  pointer-events: none;
+  display: none;
 }
 
 /* Subtitles should read like subtitles, not like a floating dark card. */
