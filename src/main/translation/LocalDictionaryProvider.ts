@@ -25,8 +25,9 @@ export class LocalDictionaryProvider implements TranslationProvider {
 
     return {
       originalWord,
-      translation: entry.translation,
-      ...(entry.pronunciation ? { pronunciation: entry.pronunciation } : {}),
+      translation: flattenBurmeseMeanings(entry),
+      pronunciation: entry.pronunciation,
+      dictionaryEntry: entry,
       provider: this.id,
       targetLanguage
     }
@@ -34,14 +35,14 @@ export class LocalDictionaryProvider implements TranslationProvider {
 }
 
 function buildDictionaryIndex(
-  dictionary: Readonly<Record<string, LocalDictionaryEntry>>
+  dictionary: readonly LocalDictionaryEntry[]
 ): ReadonlyMap<string, LocalDictionaryEntry> {
   const index = new Map<string, LocalDictionaryEntry>()
 
-  for (const [headword, entry] of Object.entries(dictionary)) {
-    addDictionaryKey(index, headword, entry)
-    for (const alias of entry.aliases ?? []) {
-      addDictionaryKey(index, alias, entry)
+  for (const entry of dictionary) {
+    addDictionaryKey(index, entry.word, entry)
+    for (const form of entry.forms) {
+      addDictionaryKey(index, form, entry)
     }
   }
 
@@ -60,10 +61,16 @@ function addDictionaryKey(
 
   const existing = index.get(normalized)
   if (existing && existing !== entry) {
-    throw new Error(`Duplicate local dictionary word: ${normalized}`)
+    throw new Error(
+      `Duplicate local dictionary word or form: ${normalized} (${existing.word}, ${entry.word})`
+    )
   }
 
   index.set(normalized, entry)
+}
+
+function flattenBurmeseMeanings(entry: LocalDictionaryEntry): string {
+  return entry.meanings.flatMap((meaning) => meaning.burmese).join('၊ ')
 }
 
 export function normalizeLookupWord(word: string): string {
