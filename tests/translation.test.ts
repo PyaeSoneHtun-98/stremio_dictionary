@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { GoogleTranslationProvider } from '../src/main/translation/GoogleTranslationProvider'
 import { LocalDictionaryProvider } from '../src/main/translation/LocalDictionaryProvider'
+import { LEGACY_LOCAL_DICTIONARY } from '../src/main/translation/legacyDictionary'
 import { LOCAL_DICTIONARY } from '../src/main/translation/localDictionary'
 
 describe('LocalDictionaryProvider', () => {
@@ -56,12 +57,27 @@ describe('LocalDictionaryProvider', () => {
     })
   })
 
-  it('keeps the previous starter dictionary available as a fallback', async () => {
+  it('keeps starter-dictionary coverage as a fallback until structured data supersedes it', async () => {
     const provider = new LocalDictionaryProvider()
+    const structuredKeys = new Set(
+      LOCAL_DICTIONARY.flatMap((entry) => [entry.word, ...entry.forms]).map((word) =>
+        word.toLocaleLowerCase('en-US')
+      )
+    )
+    const legacyHeadword = Object.keys(LEGACY_LOCAL_DICTIONARY).find(
+      (word) => !structuredKeys.has(word.toLocaleLowerCase('en-US'))
+    )
 
-    await expect(provider.translate({ word: 'hello' })).resolves.toEqual({
-      originalWord: 'hello',
-      translation: 'မင်္ဂလာပါ',
+    expect(legacyHeadword).toBeDefined()
+    if (!legacyHeadword) {
+      return
+    }
+
+    const legacyEntry = LEGACY_LOCAL_DICTIONARY[legacyHeadword]
+    await expect(provider.translate({ word: legacyHeadword })).resolves.toEqual({
+      originalWord: legacyHeadword,
+      translation: legacyEntry.translation,
+      ...(legacyEntry.pronunciation ? { pronunciation: legacyEntry.pronunciation } : {}),
       provider: 'local-dictionary',
       targetLanguage: 'my'
     })
@@ -78,7 +94,7 @@ describe('LocalDictionaryProvider', () => {
   it('returns a short readable failure for words not in the offline dictionary', async () => {
     const provider = new LocalDictionaryProvider()
 
-    await expect(provider.translate({ word: 'photosynthesis' })).rejects.toThrow(
+    await expect(provider.translate({ word: 'zzzxqvsubtitlebridgeunknown' })).rejects.toThrow(
       'No offline Burmese translation is available'
     )
   })
