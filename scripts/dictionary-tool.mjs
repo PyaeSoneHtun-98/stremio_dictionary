@@ -4,6 +4,7 @@ import process from 'node:process'
 import {
   dictionaryStats,
   mergeDictionaryBatches,
+  validateDictionaryBatchFile,
   validateDictionaryDocument
 } from './dictionary-lib.mjs'
 
@@ -51,7 +52,9 @@ async function buildDictionary(batchDirectory, outputFile) {
   const documents = []
   for (const name of names) {
     const source = path.join(batchDirectory, name)
-    documents.push({ source, document: await readJson(source) })
+    const document = await readJson(source)
+    validateDictionaryBatchFile(name, document, { source })
+    documents.push({ source, document })
   }
 
   const merged = mergeDictionaryBatches(documents)
