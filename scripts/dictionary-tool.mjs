@@ -5,6 +5,7 @@ import {
   dictionaryStats,
   mergeDictionaryBatches,
   validateDictionaryBatchFile,
+  validateDictionaryBatchNames,
   validateDictionaryBatchSequence,
   validateDictionaryDocument
 } from './dictionary-lib.mjs'
@@ -42,7 +43,10 @@ async function validateFile(filePath) {
 }
 
 async function buildDictionary(batchDirectory, outputFile) {
-  const names = (await readdir(batchDirectory))
+  const directoryNames = await readdir(batchDirectory)
+  validateDictionaryBatchNames(directoryNames)
+
+  const names = directoryNames
     .filter((name) => /^dictionary_batch_\d{3}\.json$/u.test(name))
     .sort((left, right) => left.localeCompare(right, 'en-US'))
 
