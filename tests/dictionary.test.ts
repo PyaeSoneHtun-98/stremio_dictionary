@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   mergeDictionaryBatches,
   validateDictionaryBatchFile,
+  validateDictionaryBatchSequence,
   validateDictionaryDocument
 } from '../scripts/dictionary-lib.mjs'
 
@@ -48,12 +49,19 @@ describe('dictionary validation', () => {
     ).not.toThrow()
   })
 
-  it('requires 500 entries and a batch number matching the filename', () => {
+  it('requires contiguous batches with 500 entries and matching filenames', () => {
     const validBatch = {
       version: 1,
       batch: 1,
       entries: createBatchEntries(500)
     }
+
+    expect(() =>
+      validateDictionaryBatchSequence(['dictionary_batch_001.json', 'dictionary_batch_002.json'])
+    ).not.toThrow()
+    expect(() =>
+      validateDictionaryBatchSequence(['dictionary_batch_001.json', 'dictionary_batch_003.json'])
+    ).toThrow('must be contiguous')
 
     expect(() =>
       validateDictionaryBatchFile('dictionary_batch_001.json', validBatch)
