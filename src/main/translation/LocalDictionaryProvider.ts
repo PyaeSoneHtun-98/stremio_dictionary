@@ -1,10 +1,15 @@
 import type { TranslationRequest, TranslationResult } from '../../shared/translation'
 import type { TranslationProvider } from './TranslationProvider'
+import {
+  LEGACY_LOCAL_DICTIONARY,
+  type LegacyLocalDictionaryEntry
+} from './legacyDictionary'
 import { LOCAL_DICTIONARY, type LocalDictionaryEntry } from './localDictionary'
 
 export class LocalDictionaryProvider implements TranslationProvider {
   readonly id = 'local-dictionary'
   private readonly index = buildDictionaryIndex(LOCAL_DICTIONARY)
+  private readonly legacyIndex = buildLegacyDictionaryIndex(LEGACY_LOCAL_DICTIONARY)
 
   async translate(request: TranslationRequest): Promise<TranslationResult> {
     const originalWord = request.word.trim()
@@ -19,18 +24,29 @@ export class LocalDictionaryProvider implements TranslationProvider {
 
     const lookupWord = normalizeLookupWord(originalWord)
     const entry = this.index.get(lookupWord)
-    if (!entry) {
-      throw new Error(`No offline Burmese translation is available for “${originalWord}” yet.`)
+    if (entry) {
+      return {
+        originalWord,
+        translation: flattenBurmeseMeanings(entry),
+        pronunciation: entry.pronunciation,
+        dictionaryEntry: entry,
+        provider: this.id,
+        targetLanguage
+      }
     }
 
-    return {
-      originalWord,
-      translation: flattenBurmeseMeanings(entry),
-      pronunciation: entry.pronunciation,
-      dictionaryEntry: entry,
-      provider: this.id,
-      targetLanguage
+    const legacyEntry = this.legacyIndex.get(lookupWord)
+    if (legacyEntry) {
+      return {
+        originalWord,
+        translation: legacyEntry.translation,
+        ...(legacyEntry.pronunciation ? { pronunciation: legacyEntry.pronunciation } : {}),
+        provider: this.id,
+        targetLanguage
+      }
     }
+
+    throw new Error(`No offline Burmese translation is available for “${originalWord}” yet.`)
   }
 }
 
@@ -93,6 +109,39 @@ function addFormKey(
         `Duplicate local dictionary form: ${normalized} (${existing.word}, ${entry.word})`
       )
     }
+  }
+
+  index.set(normalized, entry)
+}
+
+function buildLegacyDictionaryIndex(
+  dictionary: Readonly<Record<string, LegacyLocalDictionaryEntry>>
+): ReadonlyMap<string, LegacyLocalDictionaryEntry> {
+  const index = new Map<string, LegacyLocalDictionaryEntry>()
+
+  for (const [headword, entry] of Object.entries(dictionary)) {
+    addLegacyDictionaryKey(index, headword, entry)
+    for (const alias of entry.aliases ?? []) {
+      addLegacyDictionaryKey(index, alias, entry)
+    }
+  }
+
+  return index
+}
+
+function addLegacyDictionaryKey(
+  index: Map<string, LegacyLocalDictionaryEntry>,
+  word: string,
+  entry: LegacyLocalDictionaryEntry
+): void {
+  const normalized = normalizeLookupWord(word)
+  if (!normalized) {
+    throw new Error('Legacy local dictionary entries must use a non-empty word.')
+  }
+
+  const existing = index.get(normalized)
+  if (existing && existing !== entry) {
+    throw new Error(`Duplicate legacy local dictionary word: ${normalized}`)
   }
 
   index.set(normalized, entry)
