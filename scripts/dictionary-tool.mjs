@@ -5,6 +5,7 @@ import {
   dictionaryStats,
   mergeDictionaryBatches,
   validateDictionaryBatchFile,
+  validateDictionaryBatchSequence,
   validateDictionaryDocument
 } from './dictionary-lib.mjs'
 
@@ -48,6 +49,8 @@ async function buildDictionary(batchDirectory, outputFile) {
   if (names.length === 0) {
     throw new Error(`No dictionary_batch_###.json files found in ${batchDirectory}.`)
   }
+
+  validateDictionaryBatchSequence(names)
 
   const documents = []
   for (const name of names) {
