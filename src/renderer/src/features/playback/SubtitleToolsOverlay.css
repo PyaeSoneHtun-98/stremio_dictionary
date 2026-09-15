@@ -1,13 +1,13 @@
-.subtitle-overlay {
-  bottom: calc(112px + var(--subtitle-position-offset, 0px)) !important;
+.overlay-probe .subtitle-overlay {
+  bottom: calc(112px + var(--subtitle-position-offset, 0px));
 }
 
-.subtitle-text {
+.overlay-probe .subtitle-text {
   font-size: clamp(
     var(--subtitle-font-min, 19px),
     var(--subtitle-font-fluid, 2.65vw),
     var(--subtitle-font-max, 34px)
-  ) !important;
+  );
 }
 
 .subtitle-tools-root {
@@ -251,8 +251,8 @@
 }
 
 @media (max-width: 720px) {
-  .subtitle-overlay {
-    bottom: calc(104px + var(--subtitle-position-offset, 0px)) !important;
+  .overlay-probe .subtitle-overlay {
+    bottom: calc(104px + var(--subtitle-position-offset, 0px));
   }
 
   .subtitle-tools-chrome {
