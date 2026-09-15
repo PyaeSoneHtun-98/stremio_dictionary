@@ -16,7 +16,7 @@ PR #27 modernized the player controls, subtitle safe area, centered translation 
 
 **Branch:** `feat/issue-28-dictionary-v1`
 
-**State:** Implementation complete and local Windows acceptance is nearly complete. The agreed dictionary v1 schema uses a single General American IPA pronunciation, inflected `forms`, meanings grouped by part of speech, and at most three concise Burmese semantic meanings per headword. The first generated 500-entry batch is being used as the real local acceptance dataset while the full approximately 30,000-headword dataset is produced separately.
+**State:** Implementation and Windows acceptance are complete. The agreed dictionary v1 schema uses a single General American IPA pronunciation, inflected `forms`, meanings grouped by part of speech, and at most three concise Burmese semantic meanings per headword. The first generated 500-entry batch was used as the real local acceptance dataset while the full approximately 30,000-headword dataset is produced separately. PR #29 is ready for final review.
 
 ### Dictionary v1 goals
 
@@ -26,7 +26,7 @@ PR #27 modernized the player controls, subtitle safe area, centered translation 
 - Show headword, IPA pronunciation, part-of-speech groups, and Burmese meanings in the translation card.
 - Keep the local dictionary fully offline and near-instant through an in-memory lookup index.
 - Add deterministic batch validation and merge/build tooling for the planned 30,000-word dataset.
-- Reject duplicate headwords, conflicting forms, malformed entries, unsupported parts of speech, empty Burmese meanings, and entries exceeding the three-meaning limit.
+- Reject duplicate headwords, ambiguous form-vs-form collisions, malformed entries, unsupported parts of speech, empty Burmese meanings, and entries exceeding the three-meaning limit.
 - Permit legitimate headword-vs-form overlaps while giving an exact headword precedence at runtime.
 
 ### Dataset rules
@@ -39,14 +39,14 @@ PR #27 modernized the player controls, subtitle safe area, centered translation 
 - No examples, English definitions, synonyms, antonyms, etymology, separate UK pronunciation, or pronunciation audio in this issue.
 - Multi-word phrasal verbs and context-aware sense disambiguation remain later work.
 
-### Current validation
+### Validation completed
 
 - Batch 001 builds successfully as 500 entries, 1,152 forms, and 735 Burmese meanings.
 - `npm run dictionary:validate` passes on the merged 500-entry runtime dictionary.
 - Local `npm run check` passes: 13 test files, 76 tests, TypeScript checks, dictionary validation, and the production Electron/Vite build.
 - CI #171 and the Windows packaging regression passed earlier on the Issue #28 branch implementation.
-- Manual local-MKV acceptance passed on Windows: the structured popup renders the canonical headword, General American IPA, grouped part of speech, and Burmese meanings correctly; inflected-form resolution, exact-headword precedence, multi-POS grouping, and unknown-word fallback were user-tested successfully.
-- One Stremio live-subtitle lookup regression remains before final review and merge.
+- Manual local-MKV acceptance passed on Windows: the structured popup renders the canonical headword, General American IPA, grouped part of speech, and Burmese meanings correctly; inflected-form resolution, exact-headword precedence, multi-POS grouping, unknown-word fallback, and playback behavior were user-tested successfully.
+- Manual Stremio regression acceptance passed: a live Stremio stream played with clickable English subtitles and successful structured Burmese dictionary lookup.
 
 ## Later work
 
