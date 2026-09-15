@@ -16,17 +16,17 @@ PR #27 modernized the player controls, subtitle safe area, centered translation 
 
 **Branch:** `feat/issue-28-dictionary-v1`
 
-**State:** Implementation and Windows acceptance are complete. The agreed dictionary v1 schema uses a single General American IPA pronunciation, inflected `forms`, meanings grouped by part of speech, and at most three concise Burmese semantic meanings per headword. The first generated 500-entry batch was used as the real local acceptance dataset while the full approximately 30,000-headword dataset is produced separately. PR #29 is ready for final review.
+**State:** Implementation and Windows acceptance are complete. The agreed dictionary v1 schema uses a single General American IPA pronunciation, inflected `forms`, meanings grouped by part of speech, and at most three concise Burmese semantic meanings per headword. The first generated 500-entry batch was used as the real local acceptance dataset while the full approximately 30,000-headword dataset is produced separately. PR #29 is in final review.
 
 ### Dictionary v1 goals
 
-- Replace the legacy flat local dictionary entry with structured headword data.
+- Replace the primary local dictionary lookup with structured headword data while retaining the previous starter dictionary as a compatibility fallback until the full structured corpus supersedes it.
 - Resolve clicked inflected forms back to the canonical headword.
 - Return structured dictionary results through the existing translation/provider/IPC boundary.
 - Show headword, IPA pronunciation, part-of-speech groups, and Burmese meanings in the translation card.
-- Keep the local dictionary fully offline and near-instant through an in-memory lookup index.
+- Keep the local dictionary fully offline and near-instant through in-memory lookup indexes.
 - Add deterministic batch validation and merge/build tooling for the planned 30,000-word dataset.
-- Reject duplicate headwords, ambiguous form-vs-form collisions, malformed entries, unsupported parts of speech, empty Burmese meanings, and entries exceeding the three-meaning limit.
+- Reject duplicate headwords, ambiguous form-vs-form collisions, malformed entries, unsupported parts of speech, empty Burmese meanings, entries exceeding the three-meaning limit, incorrectly numbered batch files, and batches that do not contain exactly 500 entries.
 - Permit legitimate headword-vs-form overlaps while giving an exact headword precedence at runtime.
 
 ### Dataset rules
@@ -36,6 +36,7 @@ PR #27 modernized the player controls, subtitle safe area, centered translation 
 - Useful inflected forms only; the headword itself is not repeated in `forms`.
 - Maximum three important Burmese semantic meanings per headword overall.
 - Meanings with the same part of speech are grouped together.
+- Every `dictionary_batch_###.json` file must contain exactly 500 entries and its JSON `batch` value must match the filename.
 - No examples, English definitions, synonyms, antonyms, etymology, separate UK pronunciation, or pronunciation audio in this issue.
 - Multi-word phrasal verbs and context-aware sense disambiguation remain later work.
 
@@ -43,11 +44,12 @@ PR #27 modernized the player controls, subtitle safe area, centered translation 
 
 - Batch 001 builds successfully as 500 entries, 1,152 forms, and 735 Burmese meanings.
 - `npm run dictionary:validate` passes on the merged 500-entry runtime dictionary.
-- Local `npm run check` passes: 13 test files, 76 tests, TypeScript checks, dictionary validation, and the production Electron/Vite build.
+- Local `npm run check` passed before the final review fixes: 13 test files, 76 tests, TypeScript checks, dictionary validation, and the production Electron/Vite build.
 - CI #171 and the Windows packaging regression passed earlier on the Issue #28 branch implementation.
 - Manual local-MKV acceptance passed on Windows: the structured popup renders the canonical headword, General American IPA, grouped part of speech, and Burmese meanings correctly; inflected-form resolution, exact-headword precedence, multi-POS grouping, unknown-word fallback, and playback behavior were user-tested successfully.
 - Manual Stremio regression acceptance passed: a live Stremio stream played with clickable English subtitles and successful structured Burmese dictionary lookup.
+- Final review fixes preserve the pre-Issue-28 starter dictionary as a fallback and add automated checks for 500-entry batch size plus filename/batch-number consistency. Final CI is pending on the current head.
 
 ## Later work
 
-Dictionary expansion beyond the first 30,000-headword set, multi-word/phrasal-verb lookup, pronunciation audio/TTS, subtitle delay/vertical-position/size controls, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, native upstream Stremio support, self-contained runtime redistribution, and broader Windows-environment acceptance remain separate work.
+Dictionary expansion beyond the first 30,000-headword set, removal of the legacy fallback after structured coverage supersedes it, multi-word/phrasal-verb lookup, pronunciation audio/TTS, subtitle delay/vertical-position/size controls, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, native upstream Stremio support, self-contained runtime redistribution, and broader Windows-environment acceptance remain separate work.
