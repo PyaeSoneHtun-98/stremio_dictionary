@@ -56,6 +56,17 @@ describe('LocalDictionaryProvider', () => {
     })
   })
 
+  it('keeps the previous starter dictionary available as a fallback', async () => {
+    const provider = new LocalDictionaryProvider()
+
+    await expect(provider.translate({ word: 'hello' })).resolves.toEqual({
+      originalWord: 'hello',
+      translation: 'မင်္ဂလာပါ',
+      provider: 'local-dictionary',
+      targetLanguage: 'my'
+    })
+  })
+
   it('rejects target languages not present in the offline dataset', async () => {
     const provider = new LocalDictionaryProvider()
 
