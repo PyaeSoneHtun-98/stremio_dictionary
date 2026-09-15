@@ -13,6 +13,8 @@ import './SubtitleToolsOverlay.css'
 
 const SUBTITLE_EXTENSIONS = ['.srt', '.ass', '.ssa'] as const
 const DELAY_STEP = 0.1
+const SUCCESS_TOAST_MS = 3000
+const ERROR_TOAST_MS = 5000
 
 export function SubtitleToolsOverlay(): React.JSX.Element {
   const [state, setState] = useState<PlaybackSnapshot | null>(null)
@@ -67,6 +69,20 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
       root.style.removeProperty('--subtitle-position-offset')
     }
   }, [preferences])
+
+  useEffect(() => {
+    if (loadingExternal || (!message && !error)) return
+
+    const timeoutId = window.setTimeout(
+      () => {
+        setMessage(null)
+        setError(null)
+      },
+      error ? ERROR_TOAST_MS : SUCCESS_TOAST_MS,
+    )
+
+    return () => window.clearTimeout(timeoutId)
+  }, [error, loadingExternal, message])
 
   const loadDroppedSubtitle = useCallback(async (file: File): Promise<void> => {
     const requestVersion = ++externalLoadVersion.current
