@@ -10,6 +10,10 @@ const EXTERNAL_CUES = parseSrtCues(
   '1\n00:00:01,000 --> 00:00:03,000\nExternal dialogue here.\n\n2\n00:00:05,000 --> 00:00:07,000\nSecond line.',
 )
 
+const NON_LATIN_ASS_CUES = parseSrtCues(
+  '1\n00:00:01,000 --> 00:00:03,000\n你好，世界。',
+)
+
 function baseState(overrides: Partial<PlaybackSnapshot> = {}): PlaybackSnapshot {
   return {
     status: 'paused',
@@ -64,6 +68,13 @@ describe('external subtitle session', () => {
     })
     expect(state.subtitle.activeCue?.text).toBe('External dialogue here.')
     expect(broadcasts.at(-1)?.subtitle.trackId).toBe(EXTERNAL_SUBTITLE_TRACK_ID)
+  })
+
+  it('keeps non-Latin external ASS dialogue visible when language is unknown', () => {
+    const session = new SubtitleSession(() => undefined)
+    const state = session.setExternal(baseState(), 'movie.zh.ass', 'ass', NON_LATIN_ASS_CUES)
+
+    expect(state.subtitle.activeCue?.text).toBe('你好，世界。')
   })
 
   it('uses the media subtitle delay when resolving external cues', () => {
