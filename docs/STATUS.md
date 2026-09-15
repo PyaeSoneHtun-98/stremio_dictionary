@@ -2,58 +2,66 @@
 
 ## Stable master
 
-The standalone Windows MVP (Issues #1–#10), Stremio handoff (Issue #24, PR #25), and the subtitle-first player redesign (Issue #26, PR #27) are merged.
+The standalone Windows MVP (Issues #1–#10), Stremio handoff (Issue #24, PR #25), subtitle-first player redesign (Issue #26, PR #27), and structured offline dictionary v1 pipeline (Issue #28, PR #29) are merged.
 
-Stable capabilities include local MKV playback, FFmpeg text-subtitle extraction, clickable SRT/ASS/SSA dialogue, offline Burmese lookup, translation settings/cache, and the Windows portable package/current-user installer. mpv and FFmpeg remain external dependencies.
+Stable capabilities include local MKV playback, FFmpeg text-subtitle extraction, clickable SRT/ASS/SSA dialogue, structured offline Burmese lookup, translation settings/cache, and the Windows portable package/current-user installer. mpv and FFmpeg remain external dependencies.
 
 Stremio streams use mpv live subtitles. The opt-in Play in Subtitle Bridge helper, serialized single-instance handoff, strict helper validation, retained backups, atomic replacement, and structured diagnostics are stable. PR #25 passed CI #149 and manual Windows retesting before merge.
 
 PR #27 modernized the player controls, subtitle safe area, centered translation card, panels, launcher, focus behavior, and control auto-hide flow without changing the native playback architecture. Manual Windows acceptance and the targeted post-review recheck passed, Codex found no remaining P1/P2 blockers, and final CI #167 passed before squash merge.
 
-## Active work — Issue #28
+PR #29 added the structured dictionary v1 schema, JSON-backed lookup, form-to-headword resolution, grouped POS/Burmese rendering, deterministic 500-entry batch tooling, structured-first legacy fallback, and 30k-scale lookup indexing. Batch 001 was validated locally with 500 entries, 1,152 forms, and 735 Burmese meanings. Manual local-MKV and Stremio acceptance passed. Codex's P2 findings were resolved, CI #198 passed on the final head, and Issue #28 closed when PR #29 was squash merged.
 
-**Issue:** Support structured offline dictionary entries and 30k-word dataset pipeline
+## Active work — Issue #30
 
-**Branch:** `feat/issue-28-dictionary-v1`
+**Issue:** Add drag-and-drop external subtitles and subtitle controls
 
-**State:** Implementation and Windows acceptance are complete. The agreed dictionary v1 schema uses a single General American IPA pronunciation, inflected `forms`, meanings grouped by part of speech, and at most three concise Burmese semantic meanings per headword. The first generated 500-entry batch was used as the real local acceptance dataset while the full approximately 30,000-headword dataset is produced separately. PR #29 is in final review after resolving the two implementation P2 findings from Codex.
+**Branch:** `feat/issue-30-external-subtitles-controls`
 
-### Dictionary v1 goals
+**State:** Implementation starting. The issue combines external text-subtitle loading with live subtitle timing, size, and vertical-position controls while preserving the current mpv/FFmpeg architecture and clickable dictionary overlay.
 
-- Replace the primary local dictionary lookup with structured headword data while retaining the previous starter dictionary as a compatibility fallback until the full structured corpus supersedes it.
-- Resolve clicked inflected forms back to the canonical headword.
-- Return structured dictionary results through the existing translation/provider/IPC boundary.
-- Show headword, IPA pronunciation, part-of-speech groups, and Burmese meanings in the translation card.
-- Keep the local dictionary fully offline and near-instant through in-memory lookup indexes.
-- Add deterministic batch validation and merge/build tooling for the planned 30,000-word dataset.
-- Reject duplicate headwords, ambiguous form-vs-form collisions, malformed entries, unsupported parts of speech, empty Burmese meanings, entries exceeding the three-meaning limit, incorrectly numbered batch files, malformed batch-like JSON filenames, and batches that do not contain exactly 500 entries.
-- Permit legitimate headword-vs-form overlaps while giving an exact headword precedence at runtime.
+### Issue #30 goals
 
-### Dataset rules
+- Load an external `.srt`, `.ass`, or `.ssa` subtitle by dragging it onto the player without restarting video/audio playback.
+- Validate and parse external subtitle files through a narrow preload/IPC boundary; do not expose broad filesystem access to the renderer.
+- Make a successfully loaded external subtitle the active interactive subtitle source while keeping embedded/live subtitle sources available for switching back.
+- Keep external subtitle dialogue clickable so existing English → Burmese lookup works unchanged.
+- Add subtitle delay/sync adjustment with earlier/later control and reset to zero.
+- Add persistent subtitle font-size and vertical-position preferences.
+- Apply size/position controls to Subtitle Bridge-rendered subtitles regardless of source.
+- Apply delay to local embedded, external, and Stremio/live subtitle paths without altering video/audio playback time.
+- Keep mpv native subtitle rendering hidden when the interactive overlay is active.
+- Preserve renderer Node isolation, context isolation, privacy rules, packaging behavior, and existing translation/provider/cache behavior.
 
-- Single-word English headwords for v1.
-- One General American IPA pronunciation per headword.
-- Useful inflected forms only; the headword itself is not repeated in `forms`.
-- Maximum three important Burmese semantic meanings per headword overall.
-- Meanings with the same part of speech are grouped together.
-- Every `dictionary_batch_###.json` file must contain exactly 500 entries and its JSON `batch` value must match the filename.
-- Batch filenames must be contiguous from `dictionary_batch_001.json`, and malformed batch-like JSON filenames are rejected rather than ignored.
-- No examples, English definitions, synonyms, antonyms, etymology, separate UK pronunciation, or pronunciation audio in this issue.
-- Multi-word phrasal verbs and context-aware sense disambiguation remain later work.
+### Important constraints
 
-### Validation completed
+- Supported external v1 formats are SRT, ASS, and SSA text subtitles only.
+- PGS/VobSub and other image subtitles remain non-clickable/out of scope.
+- Full ASS/libass styling fidelity, online subtitle search/download, persistent per-media subtitle associations, dual subtitles, and advanced visual styling remain later work.
+- External subtitle failures must leave playback and the current working subtitle source intact.
+- Full dropped subtitle paths, subtitle text, clicked words, and stream URLs must not be written to diagnostics.
+- Subtitle delay resets for unrelated playback targets; font size and vertical position persist as normal user preferences.
 
-- Batch 001 builds successfully as 500 entries, 1,152 forms, and 735 Burmese meanings.
-- `npm run dictionary:validate` passes on the merged 500-entry runtime dictionary.
-- Local `npm run check` passed with the full Batch 001 dataset before final review: 13 test files, 76 tests, TypeScript checks, dictionary validation, and the production Electron/Vite build.
-- Manual local-MKV acceptance passed on Windows: the structured popup renders the canonical headword, General American IPA, grouped part of speech, and Burmese meanings correctly; inflected-form resolution, exact-headword precedence, multi-POS grouping, unknown-word fallback, and playback behavior were user-tested successfully.
-- Manual Stremio regression acceptance passed: a live Stremio stream played with clickable English subtitles and successful structured Burmese dictionary lookup.
-- Codex's initial final review found two P2 blockers: dictionary indexes were rebuilt per uncached lookup, and malformed batch-like filenames could be silently omitted. Both were fixed with regression coverage.
-- Structured and legacy lookup indexes are now built once at module load and reused for lookups.
-- Malformed batch-like JSON filenames are now rejected before filtering; contiguous numbering, filename/JSON batch matching, exact 500-entry size, collision checks, and exact-headword precedence remain enforced.
-- CI #197 passed on implementation head `1b2e2825d7d44617bca1f0026aa4e360ba8cd091`, including the validation job and Windows package/install/Stremio regression job.
-- Codex re-review confirmed the two original P2 blockers are resolved and found no P1 issues; the only remaining finding was this status-documentation correction.
+### Validation plan
+
+Automated validation will cover the external-subtitle file boundary, safe parsing/limits, source switching, subtitle-delay behavior, preference validation/persistence helpers where practical, and existing regression tests through `npm run check`.
+
+Manual Windows validation must still cover:
+
+- local MKV + embedded subtitle regression;
+- drag-and-drop external SRT during playback;
+- external ASS/SSA readable/clickable behavior;
+- switching embedded ↔ external subtitle source;
+- seek/pause/resume with an external subtitle active;
+- malformed/unsupported dropped-file failure;
+- subtitle delay earlier/later/reset;
+- subtitle size adjustment and persistence;
+- subtitle vertical-position adjustment and persistence;
+- clickable Burmese lookup from an external subtitle;
+- one Stremio live-subtitle regression with subtitle controls.
+
+No manual Issue #30 acceptance has been performed yet.
 
 ## Later work
 
-Dictionary expansion beyond the first 30,000-headword set, removal of the legacy fallback after structured coverage supersedes it, multi-word/phrasal-verb lookup, pronunciation audio/TTS, subtitle delay/vertical-position/size controls, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, native upstream Stremio support, self-contained runtime redistribution, and broader Windows-environment acceptance remain separate work.
+Dictionary expansion toward the first 30,000-headword set is continuing separately from application feature work; only completed validated batches should be imported when that work receives its own issue. Removal of the legacy dictionary fallback after structured coverage supersedes it, multi-word/phrasal-verb lookup, pronunciation audio/TTS, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, native upstream Stremio support, self-contained runtime redistribution, and broader Windows-environment acceptance remain separate work.
