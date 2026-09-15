@@ -123,14 +123,10 @@ export class SubtitleSession {
     }
 
     const delayedTime = adjustedSubtitleTime(baseState.currentTime, baseState.subtitleDelay)
+    const usesAssHeuristics = external.format === 'ass' || external.format === 'ssa'
     const activeCue = ['error', 'unavailable'].includes(baseState.status)
       ? null
-      : findActiveCue(
-          external.cues,
-          delayedTime,
-          null,
-          external.format === 'ass' || external.format === 'ssa'
-        )
+      : findActiveCue(external.cues, delayedTime, usesAssHeuristics ? 'en' : null, usesAssHeuristics)
 
     return {
       ...baseState,
