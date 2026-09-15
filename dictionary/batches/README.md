@@ -19,7 +19,7 @@ Each file must use the agreed v1 batch shape:
 }
 ```
 
-Each batch must contain exactly 500 entries, and the JSON `batch` number must match the filename. For example, `dictionary_batch_023.json` must contain `"batch": 23`.
+Each batch must contain exactly 500 entries, and the JSON `batch` number must match the filename. For example, `dictionary_batch_023.json` must contain `"batch": 23`. Batch files must also be contiguous from `001` with no gaps, so `001, 002, 003` is valid but `001, 003` is not.
 
 Validate the currently built runtime dictionary with:
 
