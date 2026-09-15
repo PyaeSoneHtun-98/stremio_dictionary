@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   mergeDictionaryBatches,
   validateDictionaryBatchFile,
+  validateDictionaryBatchNames,
   validateDictionaryBatchSequence,
   validateDictionaryDocument
 } from '../scripts/dictionary-lib.mjs'
@@ -55,6 +56,16 @@ describe('dictionary validation', () => {
       batch: 1,
       entries: createBatchEntries(500)
     }
+
+    expect(() =>
+      validateDictionaryBatchNames(['README.md', 'dictionary_batch_001.json'])
+    ).not.toThrow()
+    expect(() =>
+      validateDictionaryBatchNames(['dictionary_batch_001.json', 'dictionary_batch_02.json'])
+    ).toThrow('Malformed dictionary batch filename')
+    expect(() => validateDictionaryBatchNames(['dictionary_batch_001.JSON'])).toThrow(
+      'Malformed dictionary batch filename'
+    )
 
     expect(() =>
       validateDictionaryBatchSequence(['dictionary_batch_001.json', 'dictionary_batch_002.json'])
