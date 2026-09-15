@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   mergeDictionaryBatches,
+  validateDictionaryBatchFile,
   validateDictionaryDocument
 } from '../scripts/dictionary-lib.mjs'
 
@@ -20,6 +21,20 @@ const validEntry = {
   ]
 }
 
+function createBatchEntries(count: number): Array<{
+  word: string
+  pronunciation: string
+  forms: string[]
+  meanings: Array<{ partOfSpeech: string; burmese: string[] }>
+}> {
+  return Array.from({ length: count }, (_, index) => ({
+    word: `word${index}`,
+    pronunciation: '/wɝd/',
+    forms: [],
+    meanings: [{ partOfSpeech: 'noun', burmese: ['စကားလုံး'] }]
+  }))
+}
+
 describe('dictionary validation', () => {
   it('accepts the agreed v1 schema', () => {
     const document = {
@@ -31,6 +46,29 @@ describe('dictionary validation', () => {
     expect(() =>
       validateDictionaryDocument(document, { source: 'batch-1', requireBatch: true })
     ).not.toThrow()
+  })
+
+  it('requires 500 entries and a batch number matching the filename', () => {
+    const validBatch = {
+      version: 1,
+      batch: 1,
+      entries: createBatchEntries(500)
+    }
+
+    expect(() =>
+      validateDictionaryBatchFile('dictionary_batch_001.json', validBatch)
+    ).not.toThrow()
+
+    expect(() =>
+      validateDictionaryBatchFile('dictionary_batch_002.json', validBatch)
+    ).toThrow('filename declares batch 2')
+
+    expect(() =>
+      validateDictionaryBatchFile('dictionary_batch_001.json', {
+        ...validBatch,
+        entries: createBatchEntries(499)
+      })
+    ).toThrow('expected exactly 500 entries')
   })
 
   it('rejects more than three Burmese semantic meanings per headword', () => {
