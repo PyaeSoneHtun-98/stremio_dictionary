@@ -18,7 +18,7 @@ PR #29 added the structured dictionary v1 schema, JSON-backed lookup, form-to-he
 
 **Branch:** `feat/issue-30-external-subtitles-controls`
 
-**State:** Implementation starting. The issue combines external text-subtitle loading with live subtitle timing, size, and vertical-position controls while preserving the current mpv/FFmpeg architecture and clickable dictionary overlay.
+**State:** Implementation and manual Windows acceptance are complete. PR #31 is ready for final Codex review once the documentation-only head passes CI.
 
 ### Issue #30 goals
 
@@ -38,15 +38,15 @@ PR #29 added the structured dictionary v1 schema, JSON-backed lookup, form-to-he
 - Supported external v1 formats are SRT, ASS, and SSA text subtitles only.
 - PGS/VobSub and other image subtitles remain non-clickable/out of scope.
 - Full ASS/libass styling fidelity, online subtitle search/download, persistent per-media subtitle associations, dual subtitles, and advanced visual styling remain later work.
-- External subtitle failures must leave playback and the current working subtitle source intact.
-- Full dropped subtitle paths, subtitle text, clicked words, and stream URLs must not be written to diagnostics.
+- External subtitle failures leave playback and the current working subtitle source intact.
+- Full dropped subtitle paths, subtitle text, clicked words, and stream URLs are not written to diagnostics.
 - Subtitle delay resets for unrelated playback targets; font size and vertical position persist as normal user preferences.
 
-### Validation plan
+### Validation
 
-Automated validation will cover the external-subtitle file boundary, safe parsing/limits, source switching, subtitle-delay behavior, preference validation/persistence helpers where practical, and existing regression tests through `npm run check`.
+Automated validation passed before manual acceptance, including `npm run check`, Windows packaging, install/upgrade regression, and Stremio handoff. CI #224 passed on head `fd3893e48528aa6e1654c86e9e605ef11fe05f52` after the toast auto-dismiss regression fix.
 
-Manual Windows validation must still cover:
+Manual Windows acceptance passed for:
 
 - local MKV + embedded subtitle regression;
 - drag-and-drop external SRT during playback;
@@ -58,9 +58,10 @@ Manual Windows validation must still cover:
 - subtitle size adjustment and persistence;
 - subtitle vertical-position adjustment and persistence;
 - clickable Burmese lookup from an external subtitle;
-- one Stremio live-subtitle regression with subtitle controls.
+- one Stremio live-subtitle regression with subtitle controls;
+- success/error toast auto-dismiss behavior after the regression fix.
 
-No manual Issue #30 acceptance has been performed yet.
+No remaining manual Issue #30 acceptance item is pending.
 
 ## Later work
 
