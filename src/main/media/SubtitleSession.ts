@@ -126,7 +126,7 @@ export class SubtitleSession {
     const usesAssHeuristics = external.format === 'ass' || external.format === 'ssa'
     const activeCue = ['error', 'unavailable'].includes(baseState.status)
       ? null
-      : findActiveCue(external.cues, delayedTime, usesAssHeuristics ? 'en' : null, usesAssHeuristics)
+      : findActiveCue(external.cues, delayedTime, null, usesAssHeuristics)
 
     return {
       ...baseState,
