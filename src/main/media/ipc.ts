@@ -13,6 +13,7 @@ import { PlaybackSurface } from './PlaybackSurface'
 import { SerialTaskQueue } from './SerialTaskQueue'
 import { SubtitlePreferencesStore } from './SubtitlePreferencesStore'
 import { SubtitleSession } from './SubtitleSession'
+import { ExternalSubtitleLoadCoordinator } from './ExternalSubtitleLoadCoordinator'
 import { ExternalSubtitleExtractor } from '../subtitles/ExternalSubtitleExtractor'
 import {
   describeExternalSubtitle,
@@ -43,6 +44,14 @@ delete process.env.MPV_LOG_FILE
 const subtitleSession = new SubtitleSession(broadcastState)
 const controller = new MpvController((state) => subtitleSession.handleBaseState(state))
 const externalSubtitleExtractor = new ExternalSubtitleExtractor()
+const externalSubtitleLoadCoordinator = new ExternalSubtitleLoadCoordinator({
+  getState: () => controller.getState(),
+  validate: validateExternalSubtitleFile,
+  extract: (filePath, format) => externalSubtitleExtractor.extract(filePath, format),
+  setExternal: (state, fileName, format, cues) => {
+    subtitleSession.setExternal(state, fileName, format, cues)
+  }
+})
 const subtitlePreferencesStore = new SubtitlePreferencesStore()
 const playbackSurface = new PlaybackSurface()
 const openMediaQueue = new SerialTaskQueue()
@@ -88,32 +97,7 @@ export function registerMediaIpc(): void {
         return { loaded: false, error: 'The dropped subtitle path was invalid.' }
       }
 
-      const startingState = controller.getState()
-      if (!startingState.filePath) {
-        return { loaded: false, error: 'Open a video before loading an external subtitle.' }
-      }
-
-      try {
-        const descriptor = await validateExternalSubtitleFile(filePath)
-        const mediaKey = startingState.filePath
-        const cues = await externalSubtitleExtractor.extract(filePath, descriptor.format)
-        const latestState = controller.getState()
-
-        if (latestState.filePath !== mediaKey) {
-          return {
-            loaded: false,
-            error: 'The video changed before the subtitle finished loading. Drop the subtitle again.'
-          }
-        }
-
-        subtitleSession.setExternal(latestState, descriptor.fileName, descriptor.format, cues)
-        return { loaded: true, fileName: descriptor.fileName }
-      } catch (error) {
-        return {
-          loaded: false,
-          error: error instanceof Error ? error.message : 'Could not load this subtitle file.'
-        }
-      }
+      return externalSubtitleLoadCoordinator.load(filePath)
     }
   )
 
@@ -186,6 +170,7 @@ async function openMediaTargetNow(rawTarget: string): Promise<OpenVideoResult> {
     }
 
     const windowId = await playbackSurface.ensure()
+    externalSubtitleLoadCoordinator.invalidate()
     externalSubtitleExtractor.cancel()
     subtitleSession.clear(controller.getState())
     await controller.load(mediaTarget.target, windowId, mediaTarget.displayName)
@@ -199,6 +184,7 @@ async function openMediaTargetNow(rawTarget: string): Promise<OpenVideoResult> {
 }
 
 export function disposeMediaIpc(): void {
+  externalSubtitleLoadCoordinator.invalidate()
   externalSubtitleExtractor.dispose()
   controller.dispose()
   playbackSurface.dispose()
