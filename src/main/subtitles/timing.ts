@@ -17,11 +17,13 @@ export function normalizeSubtitleDelay(value: number): number {
 
 export function adjustedSubtitleTime(
   playbackTime: number | null,
-  delaySeconds: number
+  delaySeconds: number | null | undefined
 ): number | null {
   if (playbackTime === null || !Number.isFinite(playbackTime)) {
     return null
   }
 
-  return playbackTime - delaySeconds
+  const delay =
+    typeof delaySeconds === 'number' && Number.isFinite(delaySeconds) ? delaySeconds : 0
+  return playbackTime - delay
 }
