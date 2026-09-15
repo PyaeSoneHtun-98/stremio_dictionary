@@ -18,6 +18,18 @@ export function normalizeDictionaryKey(value) {
   return value.normalize('NFKC').trim().toLocaleLowerCase('en-US')
 }
 
+export function validateDictionaryBatchSequence(fileNames) {
+  for (const [index, fileName] of fileNames.entries()) {
+    const expected = `dictionary_batch_${String(index + 1).padStart(3, '0')}.json`
+    if (fileName !== expected) {
+      throw new Error(
+        `Dictionary batches must be contiguous from 001: expected ${expected}, found ${fileName}.`
+      )
+    }
+  }
+  return fileNames
+}
+
 export function validateDictionaryBatchFile(fileName, document, options = {}) {
   const { source = fileName } = options
   const match = /^dictionary_batch_(\d{3})\.json$/u.exec(fileName)
