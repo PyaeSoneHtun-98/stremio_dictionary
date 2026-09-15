@@ -6,10 +6,14 @@ import {
 } from './legacyDictionary'
 import { LOCAL_DICTIONARY, type LocalDictionaryEntry } from './localDictionary'
 
+// These indexes are immutable for the lifetime of the Electron main process. Build them once at
+// module load instead of once per provider instance/cache miss; the structured corpus is expected
+// to grow to roughly 30,000 headwords plus inflected forms.
+const STRUCTURED_DICTIONARY_INDEX = buildDictionaryIndex(LOCAL_DICTIONARY)
+const LEGACY_DICTIONARY_INDEX = buildLegacyDictionaryIndex(LEGACY_LOCAL_DICTIONARY)
+
 export class LocalDictionaryProvider implements TranslationProvider {
   readonly id = 'local-dictionary'
-  private readonly index = buildDictionaryIndex(LOCAL_DICTIONARY)
-  private readonly legacyIndex = buildLegacyDictionaryIndex(LEGACY_LOCAL_DICTIONARY)
 
   async translate(request: TranslationRequest): Promise<TranslationResult> {
     const originalWord = request.word.trim()
@@ -23,7 +27,7 @@ export class LocalDictionaryProvider implements TranslationProvider {
     }
 
     const lookupWord = normalizeLookupWord(originalWord)
-    const entry = this.index.get(lookupWord)
+    const entry = STRUCTURED_DICTIONARY_INDEX.get(lookupWord)
     if (entry) {
       return {
         originalWord,
@@ -35,7 +39,7 @@ export class LocalDictionaryProvider implements TranslationProvider {
       }
     }
 
-    const legacyEntry = this.legacyIndex.get(lookupWord)
+    const legacyEntry = LEGACY_DICTIONARY_INDEX.get(lookupWord)
     if (legacyEntry) {
       return {
         originalWord,
