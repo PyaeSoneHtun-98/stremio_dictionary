@@ -18,7 +18,7 @@ PR #29 added the structured dictionary v1 schema, JSON-backed lookup, form-to-he
 
 **Branch:** `feat/issue-30-external-subtitles-controls`
 
-**State:** Implementation and manual Windows acceptance are complete. PR #31 is ready for final Codex review once the documentation-only head passes CI.
+**State:** Implementation and manual Windows acceptance are complete. Codex's first final review found two P2 correctness issues; both are fixed with targeted regression coverage. PR #31 is awaiting final exact-head CI and Codex re-review.
 
 ### Issue #30 goals
 
@@ -44,7 +44,7 @@ PR #29 added the structured dictionary v1 schema, JSON-backed lookup, form-to-he
 
 ### Validation
 
-Automated validation passed before manual acceptance, including `npm run check`, Windows packaging, install/upgrade regression, and Stremio handoff. CI #224 passed on head `fd3893e48528aa6e1654c86e9e605ef11fe05f52` after the toast auto-dismiss regression fix.
+Automated validation passed before manual acceptance, including `npm run check`, Windows packaging, install/upgrade regression, and Stremio handoff. CI #224 passed on head `fd3893e48528aa6e1654c86e9e605ef11fe05f52` after the toast auto-dismiss regression fix, and CI #225 passed on the pre-review documentation head `2cdcdebf73180037b331656f25712e832fa45337`.
 
 Manual Windows acceptance passed for:
 
@@ -61,7 +61,12 @@ Manual Windows acceptance passed for:
 - one Stremio live-subtitle regression with subtitle controls;
 - success/error toast auto-dismiss behavior after the regression fix.
 
-No remaining manual Issue #30 acceptance item is pending.
+Codex's first final review found two P2 issues, both resolved:
+
+- external ASS/SSA no longer assumes English when language is unknown, so non-Latin dialogue remains visible; a non-Latin external ASS regression test was added;
+- external subtitle loading now establishes a main-process generation before async validation and enforces latest-request-wins before extraction/state mutation; reversed validation and extraction completion orders are covered by dedicated tests.
+
+CI #230 passed on the P2 implementation head `0de507059446a648e183ee9cb2410d246885bfe6`, including validation and Windows packaging. No remaining manual Issue #30 acceptance item is pending.
 
 ## Later work
 
