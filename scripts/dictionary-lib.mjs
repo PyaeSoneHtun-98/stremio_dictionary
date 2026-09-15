@@ -14,8 +14,26 @@ export const DICTIONARY_PARTS_OF_SPEECH = new Set([
 
 export const DICTIONARY_BATCH_SIZE = 500
 
+const DICTIONARY_BATCH_FILE_PATTERN = /^dictionary_batch_(\d{3})\.json$/u
+const DICTIONARY_BATCH_LIKE_PATTERN = /^dictionary_batch_.*\.json$/iu
+
 export function normalizeDictionaryKey(value) {
   return value.normalize('NFKC').trim().toLocaleLowerCase('en-US')
+}
+
+export function validateDictionaryBatchNames(fileNames) {
+  const malformed = fileNames.filter(
+    (fileName) =>
+      DICTIONARY_BATCH_LIKE_PATTERN.test(fileName) && !DICTIONARY_BATCH_FILE_PATTERN.test(fileName)
+  )
+
+  if (malformed.length > 0) {
+    throw new Error(
+      `Malformed dictionary batch filename${malformed.length === 1 ? '' : 's'}: ${malformed.join(', ')}. Expected dictionary_batch_###.json.`
+    )
+  }
+
+  return fileNames
 }
 
 export function validateDictionaryBatchSequence(fileNames) {
@@ -32,7 +50,7 @@ export function validateDictionaryBatchSequence(fileNames) {
 
 export function validateDictionaryBatchFile(fileName, document, options = {}) {
   const { source = fileName } = options
-  const match = /^dictionary_batch_(\d{3})\.json$/u.exec(fileName)
+  const match = DICTIONARY_BATCH_FILE_PATTERN.exec(fileName)
   if (!match) {
     throw new Error(`${source}: batch filename must match dictionary_batch_###.json.`)
   }
