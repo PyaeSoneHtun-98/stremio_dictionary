@@ -12,8 +12,35 @@ export const DICTIONARY_PARTS_OF_SPEECH = new Set([
   'auxiliary'
 ])
 
+export const DICTIONARY_BATCH_SIZE = 500
+
 export function normalizeDictionaryKey(value) {
   return value.normalize('NFKC').trim().toLocaleLowerCase('en-US')
+}
+
+export function validateDictionaryBatchFile(fileName, document, options = {}) {
+  const { source = fileName } = options
+  const match = /^dictionary_batch_(\d{3})\.json$/u.exec(fileName)
+  if (!match) {
+    throw new Error(`${source}: batch filename must match dictionary_batch_###.json.`)
+  }
+
+  validateDictionaryDocument(document, { source, requireBatch: true })
+
+  const expectedBatch = Number(match[1])
+  if (document.batch !== expectedBatch) {
+    throw new Error(
+      `${source}: filename declares batch ${expectedBatch}, but JSON declares batch ${document.batch}.`
+    )
+  }
+
+  if (document.entries.length !== DICTIONARY_BATCH_SIZE) {
+    throw new Error(
+      `${source}: expected exactly ${DICTIONARY_BATCH_SIZE} entries, found ${document.entries.length}.`
+    )
+  }
+
+  return document
 }
 
 export function validateDictionaryDocument(document, options = {}) {
