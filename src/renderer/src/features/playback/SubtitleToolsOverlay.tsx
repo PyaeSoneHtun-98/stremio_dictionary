@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   DEFAULT_SUBTITLE_PREFERENCES,
   EXTERNAL_SUBTITLE_TRACK_ID,
@@ -24,6 +24,7 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
   const [loadingExternal, setLoadingExternal] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const externalLoadVersion = useRef(0)
   const chromeVisible = usePlayerChrome(panelOpen || dragActive || loadingExternal)
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
 
     return () => {
       active = false
+      externalLoadVersion.current += 1
       unsubscribe()
     }
   }, [])
@@ -67,16 +69,19 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
   }, [preferences])
 
   const loadDroppedSubtitle = useCallback(async (file: File): Promise<void> => {
+    const requestVersion = ++externalLoadVersion.current
     setError(null)
     setMessage(null)
 
     if (!isSupportedSubtitleFile(file.name)) {
+      setLoadingExternal(false)
       setError('Choose an SRT, ASS, or SSA subtitle file.')
       return
     }
 
     const filePath = window.desktop.media.getPathForFile(file)
     if (!filePath) {
+      setLoadingExternal(false)
       setError('Could not access the dropped subtitle. Drop it again or choose another file.')
       return
     }
@@ -84,15 +89,21 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
     setLoadingExternal(true)
     try {
       const result = await window.desktop.media.loadExternalSubtitlePath(filePath)
+      if (requestVersion !== externalLoadVersion.current) return
+
       if (!result.loaded) {
         setError(result.error ?? 'Could not load this subtitle file.')
         return
       }
       setMessage(`${result.fileName ?? file.name} loaded`)
     } catch (reason) {
-      setError(cleanErrorMessage(reason, 'Could not load this subtitle file.'))
+      if (requestVersion === externalLoadVersion.current) {
+        setError(cleanErrorMessage(reason, 'Could not load this subtitle file.'))
+      }
     } finally {
-      setLoadingExternal(false)
+      if (requestVersion === externalLoadVersion.current) {
+        setLoadingExternal(false)
+      }
     }
   }, [])
 
@@ -113,6 +124,8 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
       const files = event.dataTransfer?.files
       if (!files || files.length === 0) return
       if (files.length !== 1) {
+        externalLoadVersion.current += 1
+        setLoadingExternal(false)
         setError('Drop one subtitle file at a time.')
         return
       }
