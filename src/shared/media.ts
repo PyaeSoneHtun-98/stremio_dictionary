@@ -77,7 +77,7 @@ export interface PlaybackSnapshot {
   duration: number | null
   volume: number
   speed: number
-  subtitleDelay: number
+  subtitleDelay?: number
   tracks: MediaTrack[]
   subtitle: SubtitleModelSnapshot
   error: string | null
