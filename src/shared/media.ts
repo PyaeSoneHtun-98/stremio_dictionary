@@ -14,6 +14,8 @@ export type MediaTrackType = 'video' | 'audio' | 'subtitle'
 export type SubtitleTrackKind = 'text' | 'image' | 'unknown'
 export type SubtitleModelStatus = 'idle' | 'missing' | 'extracting' | 'ready' | 'unsupported' | 'error'
 
+export const EXTERNAL_SUBTITLE_TRACK_ID = -1
+
 export interface MediaTrack {
   id: number
   type: MediaTrackType
@@ -52,6 +54,21 @@ export interface SubtitleModelSnapshot {
   error: string | null
 }
 
+export interface SubtitlePreferencesSnapshot {
+  fontScale: number
+  verticalOffset: number
+}
+
+export interface SubtitlePreferencesUpdate {
+  fontScale?: number
+  verticalOffset?: number
+}
+
+export const DEFAULT_SUBTITLE_PREFERENCES: SubtitlePreferencesSnapshot = {
+  fontScale: 1,
+  verticalOffset: 0
+}
+
 export interface PlaybackSnapshot {
   status: PlaybackStatus
   filePath: string | null
@@ -60,6 +77,7 @@ export interface PlaybackSnapshot {
   duration: number | null
   volume: number
   speed: number
+  subtitleDelay?: number
   tracks: MediaTrack[]
   subtitle: SubtitleModelSnapshot
   error: string | null
@@ -70,18 +88,30 @@ export interface OpenVideoResult {
   error?: string
 }
 
+export interface LoadExternalSubtitleResult {
+  loaded: boolean
+  fileName?: string
+  error?: string
+}
+
 export interface DesktopBridge {
   platform: string
   media: {
     openVideo: () => Promise<OpenVideoResult>
     openVideoPath: (filePath: string) => Promise<OpenVideoResult>
     getPathForFile: (file: unknown) => string
+    loadExternalSubtitlePath: (filePath: string) => Promise<LoadExternalSubtitleResult>
     getState: () => Promise<PlaybackSnapshot>
     setPaused: (paused: boolean) => Promise<void>
     seek: (seconds: number) => Promise<void>
     setVolume: (volume: number) => Promise<void>
     setSpeed: (speed: number) => Promise<void>
+    setSubtitleDelay: (seconds: number) => Promise<void>
     selectSubtitleTrack: (trackId: number) => Promise<void>
+    getSubtitlePreferences: () => Promise<SubtitlePreferencesSnapshot>
+    updateSubtitlePreferences: (
+      update: SubtitlePreferencesUpdate
+    ) => Promise<SubtitlePreferencesSnapshot>
     toggleFullscreen: () => Promise<void>
     onState: (listener: (state: PlaybackSnapshot) => void) => () => void
   }

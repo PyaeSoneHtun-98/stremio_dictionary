@@ -6,6 +6,7 @@ import { diagnosticLog } from '../diagnostics'
 import { resolveMpvExecutable } from '../runtimeTools'
 import { SubtitleExtractor } from '../subtitles/SubtitleExtractor'
 import { findActiveCue, tokenizeSubtitleText } from '../subtitles/normalize'
+import { adjustedSubtitleTime, normalizeSubtitleDelay } from '../subtitles/timing'
 
 const PIPE_PATH = `\\\\.\\pipe\\subtitle-bridge-mpv-${process.pid}`
 const CONNECT_RETRIES = 50
@@ -45,6 +46,7 @@ export class MpvController {
     duration: null,
     volume: 100,
     speed: 1,
+    subtitleDelay: 0,
     tracks: [],
     subtitle: createEmptySubtitleModel(),
     error: null
@@ -83,11 +85,13 @@ export class MpvController {
         currentTime: 0,
         duration: null,
         speed: 1,
+        subtitleDelay: 0,
         tracks: [],
         subtitle: createEmptySubtitleModel(),
         error: null
       })
       this.sendCommand(['set_property', 'speed', 1])
+      this.sendCommand(['set_property', 'sub-delay', 0])
       this.sendCommand(['set_property', 'sid', 'no'])
       this.sendCommand(['set_property', 'sub-visibility', false])
       this.sendCommand(['loadfile', mediaTarget, 'replace'])
@@ -127,6 +131,33 @@ export class MpvController {
     this.assertControllable()
     const nextSpeed = Math.min(Math.max(speed, 0.25), 3)
     this.sendCommand(['set_property', 'speed', nextSpeed])
+  }
+
+  setSubtitleDelay(seconds: number): void {
+    this.assertControllable()
+    const nextDelay = normalizeSubtitleDelay(seconds)
+
+    if (this.usesLiveSubtitles()) {
+      this.sendCommand(['set_property', 'sub-delay', nextDelay])
+      this.patchState({ subtitleDelay: nextDelay })
+      return
+    }
+
+    const applyAssEffectHeuristics = isAssSubtitleCodec(this.state.subtitle.trackCodec)
+    const activeCue =
+      this.state.subtitle.status === 'ready'
+        ? findActiveCue(
+            this.subtitleCues,
+            adjustedSubtitleTime(this.state.currentTime, nextDelay),
+            this.state.subtitle.trackLanguage ?? this.state.subtitle.trackTitle,
+            applyAssEffectHeuristics
+          )
+        : null
+
+    this.patchState({
+      subtitleDelay: nextDelay,
+      subtitle: { ...this.state.subtitle, activeCue }
+    })
   }
 
   async selectSubtitleTrack(trackId: number): Promise<void> {
@@ -378,7 +409,7 @@ export class MpvController {
           this.state.subtitle.status === 'ready'
             ? findActiveCue(
                 this.subtitleCues,
-                currentTime,
+                adjustedSubtitleTime(currentTime, this.state.subtitleDelay),
                 this.state.subtitle.trackLanguage ?? this.state.subtitle.trackTitle,
                 applyAssEffectHeuristics
               )
@@ -499,6 +530,7 @@ export class MpvController {
       this.resetSubtitleProcessing()
       this.selectedSubtitleTrackId = selectedTrack.id
       this.sendCommand(['set_property', 'sid', selectedTrack.id])
+      this.sendCommand(['set_property', 'sub-delay', this.state.subtitleDelay])
       this.sendCommand(['set_property', 'sub-visibility', false])
       diagnosticLog('subtitle.liveReady', {
         codec: selectedTrack.codec,
@@ -567,7 +599,7 @@ export class MpvController {
           cueCount: cues.length,
           activeCue: findActiveCue(
             cues,
-            this.state.currentTime,
+            adjustedSubtitleTime(this.state.currentTime, this.state.subtitleDelay),
             selectedTrack.language ?? selectedTrack.title,
             isAssSubtitleCodec(selectedTrack.codec)
           ),

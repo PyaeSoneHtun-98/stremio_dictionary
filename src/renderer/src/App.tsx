@@ -1,10 +1,18 @@
 import { AppShell } from './components/AppShell'
 import { PlaybackProof } from './features/playback/PlaybackProof'
 import { PolishedOverlay } from './features/playback/PolishedOverlay'
+import { SubtitleToolsOverlay } from './features/playback/SubtitleToolsOverlay'
 
 export function App(): React.JSX.Element {
-  if (new URLSearchParams(window.location.search).get('mode') === 'overlay')
-    return <PolishedOverlay />
+  if (new URLSearchParams(window.location.search).get('mode') === 'overlay') {
+    return (
+      <>
+        <PolishedOverlay />
+        <SubtitleToolsOverlay />
+      </>
+    )
+  }
+
   return (
     <AppShell>
       <section className="hero" aria-labelledby="hero-title">
