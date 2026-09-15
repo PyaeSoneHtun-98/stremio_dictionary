@@ -10,7 +10,7 @@ export interface ExternalSubtitleDescriptor {
 }
 
 export function describeExternalSubtitle(filePath: string): ExternalSubtitleDescriptor {
-  const fileName = path.basename(filePath)
+  const fileName = path.basename(filePath.replaceAll('\\', '/'))
   const extension = path.extname(fileName).toLocaleLowerCase('en-US')
 
   if (extension !== '.srt' && extension !== '.ass' && extension !== '.ssa') {
