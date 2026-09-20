@@ -18,7 +18,7 @@ PR #31 added external subtitle drag/drop and subtitle timing/appearance controls
 
 **Branch:** `feat/issue-32-production-dictionary`
 
-**State:** Implementation and manual Windows acceptance are complete. CI #243 passed on the documentation-complete implementation head; final Codex review is next.
+**State:** Codex found one P2 legacy-alias regression. The code fix and automated regression test are complete; one short Windows alias retest and final Codex re-review remain.
 
 ### Source dataset
 
@@ -40,7 +40,8 @@ PR #31 added external subtitle drag/drop and subtitle timing/appearance controls
 - A separate 16-entry structured core supplement preserves useful basic words intentionally absent from the frozen corpus:
   `bad`, `big`, `day`, `do`, `go`, `humiliating`, `love`, `man`, `new`, `no`, `run`, `say`, `see`, `thanks`, `wait`, `yes`.
 - The old flat `legacyDictionary.ts` fallback and legacy lookup path are removed.
-- Exact headwords are indexed before stored forms, preserving exact-headword precedence.
+- A separate collision-checked compatibility table restores the 11 starter-dictionary aliases that were not present in the frozen corpus forms: `children`, `fathers`, `friends`, `lifespans`, `mothers`, `nights`, `signed`, `signing`, `sisters`, `times`, and `women`.
+- Exact headwords are indexed before stored forms and compatibility aliases, preserving exact-headword precedence.
 - Runtime local dictionary size is 30,016 structured entries: the frozen 30,000 corpus plus the 16-entry structured core supplement.
 - Lookup remains fully offline.
 
@@ -55,7 +56,7 @@ CI #242 passed on implementation head `9dd21a89bd6a8631486ad60d94aa0949536b14cb`
 - Windows packaging passed;
 - packaged install/upgrade/Stremio-handoff regression passed.
 
-Automated regressions cover production corpus count, `chosen → choose`, exact-headword precedence using `warning`, structured-core `went → go`, unknown-word handling, and target-language behavior.
+Automated regressions cover production corpus count, `chosen → choose`, exact-headword precedence using `warning`, structured-core `went → go`, unknown-word handling, target-language behavior, and all 11 restored legacy compatibility aliases.
 
 ### Manual Windows acceptance
 
@@ -73,11 +74,31 @@ Manual acceptance passed on Windows using the Issue #32 branch/build:
 
 No manual Issue #32 acceptance item remains pending.
 
+### Codex P2 follow-up
+
+Codex's first final review found one P2: removing the flat legacy fallback dropped 11 common aliases that master previously supported.
+
+Resolution:
+- added a separate collision-checked compatibility alias table outside the frozen 30k artifact;
+- every compatibility target must exist as a structured headword;
+- compatibility aliases cannot overwrite another headword's stored form;
+- exact headwords still win over forms/compatibility aliases;
+- added a regression test that resolves all 11 restored aliases to their expected canonical headwords;
+- frozen production JSON remains byte-for-byte unchanged.
+
+CI #247 passed on code head `15fed17c9816578bdc9cd936685129542ad74821`:
+- production dictionary SHA verification passed;
+- dictionary validation passed;
+- 18 test files / 99 tests passed;
+- production build passed;
+- Windows packaging/install/upgrade/Stremio-handoff regression passed.
+
 ### Remaining gate
 
-- CI #243 passed on head `019a1807b408d4963911ebd1a4f0781a18549203`, including `validate` and `package-windows`.
-- Send PR #33 to Codex for final P1/P2 review.
-- Fix/retest/re-review any blocker findings before merge.
+- Short Windows manual retest of at least one restored compatibility alias.
+- Final exact-head CI after documentation/manual-result recording.
+- Codex re-review of the P2 fix.
+- Merge only if no P1/P2 blockers remain.
 
 ## Later work
 
