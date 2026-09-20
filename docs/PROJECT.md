@@ -85,6 +85,7 @@ The default translation provider is `LocalDictionaryProvider`.
 - The frozen corpus contains 30,000 unique headwords and 15,864 stored inflected forms.
 - Subtitle Bridge vendors the exact frozen artifact and verifies its SHA-256 during automated checks.
 - A separate 16-entry structured core supplement preserves useful basic words intentionally absent from the frozen 30,000-headword set.
+- A collision-checked compatibility alias table restores 11 historical starter-dictionary inflections that are intentionally absent from the frozen corpus forms, without modifying the frozen JSON.
 - All local results use the same structured dictionary model: canonical headword, pronunciation, grouped parts of speech, and Burmese meanings.
 - Canonical headwords are indexed before forms, so an exact headword wins over another entry's inflection.
 - The former flat starter/legacy fallback is no longer part of the translation path.
