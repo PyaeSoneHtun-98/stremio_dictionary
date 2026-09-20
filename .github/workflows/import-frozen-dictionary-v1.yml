@@ -1,0 +1,54 @@
+name: Import frozen dictionary v1
+
+on:
+  push:
+    branches:
+      - feat/issue-32-production-dictionary
+    paths:
+      - ".github/workflows/import-frozen-dictionary-v1.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+
+      - name: Download exact frozen v1.0 artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            "https://raw.githubusercontent.com/PyaeSoneHtun-98/dictionary-dataset/20c7ce3f35f0138fb84ded6ac337b7be647e3d87/dist/dictionary_v1.json" \
+            -o src/main/translation/data/dictionary.json
+
+      - name: Verify frozen artifact SHA and shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "fcdb26986ed62bfaa130732ed0e88cc2e30bbc7f964b4b16de47f809783ed325  src/main/translation/data/dictionary.json" | sha256sum -c -
+          node - <<'NODE'
+          const fs = require('fs')
+          const doc = JSON.parse(fs.readFileSync('src/main/translation/data/dictionary.json', 'utf8'))
+          if (doc.version !== 1) throw new Error('Expected dictionary version 1')
+          if (!Array.isArray(doc.entries) || doc.entries.length !== 30000) {
+            throw new Error(`Expected exactly 30,000 entries, found ${doc.entries?.length}`)
+          }
+          console.log('Frozen Dictionary v1.0 verified:', doc.entries.length, 'entries')
+          NODE
+
+      - name: Remove one-time import workflow
+        run: rm .github/workflows/import-frozen-dictionary-v1.yml
+
+      - name: Commit imported production dictionary
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/translation/data/dictionary.json .github/workflows/import-frozen-dictionary-v1.yml
+          git commit -m "Import frozen 30k Dictionary v1.0"
+          git push origin HEAD:feat/issue-32-production-dictionary
