@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CORE_LOCAL_DICTIONARY } from '../src/main/translation/coreDictionary'
 import { GoogleTranslationProvider } from '../src/main/translation/GoogleTranslationProvider'
+import { LEGACY_COMPATIBILITY_ALIASES } from '../src/main/translation/legacyCompatibilityAliases'
 import { LocalDictionaryProvider } from '../src/main/translation/LocalDictionaryProvider'
 import {
   LOCAL_DICTIONARY,
@@ -89,6 +90,26 @@ describe('LocalDictionaryProvider', () => {
         meanings: [{ partOfSpeech: 'interjection', burmese: ['ဟုတ်ကဲ့'] }]
       }
     })
+  })
+
+  it('preserves every legacy compatibility alias that is absent from the frozen corpus forms', async () => {
+    const provider = new LocalDictionaryProvider()
+    const compatibilityCases = Object.entries(LEGACY_COMPATIBILITY_ALIASES).flatMap(
+      ([headword, aliases]) => aliases.map((alias) => ({ alias, headword }))
+    )
+
+    expect(compatibilityCases).toHaveLength(11)
+
+    for (const { alias, headword } of compatibilityCases) {
+      await expect(provider.translate({ word: alias })).resolves.toMatchObject({
+        originalWord: alias,
+        dictionaryEntry: {
+          word: headword
+        },
+        provider: 'local-dictionary',
+        targetLanguage: 'my'
+      })
+    }
   })
 
   it('rejects target languages not present in the offline dataset', async () => {
