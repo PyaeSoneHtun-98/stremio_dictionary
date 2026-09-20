@@ -18,7 +18,7 @@ PR #31 added external subtitle drag/drop and subtitle timing/appearance controls
 
 **Branch:** `feat/issue-32-production-dictionary`
 
-**State:** Implementation and manual Windows acceptance are complete. Final exact-head CI and Codex review are next.
+**State:** Implementation and manual Windows acceptance are complete. CI #243 passed on the documentation-complete implementation head; final Codex review is next.
 
 ### Source dataset
 
@@ -75,7 +75,7 @@ No manual Issue #32 acceptance item remains pending.
 
 ### Remaining gate
 
-- Run final CI on the documentation-complete exact head.
+- CI #243 passed on head `019a1807b408d4963911ebd1a4f0781a18549203`, including `validate` and `package-windows`.
 - Send PR #33 to Codex for final P1/P2 review.
 - Fix/retest/re-review any blocker findings before merge.
 
