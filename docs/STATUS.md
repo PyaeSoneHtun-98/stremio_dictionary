@@ -18,12 +18,13 @@ PR #31 added external subtitle drag/drop and subtitle timing/appearance controls
 
 **Branch:** `feat/issue-32-production-dictionary`
 
-**State:** Integration started from stable master. The finalized dataset is frozen in `PyaeSoneHtun-98/dictionary-dataset` and will replace the tiny runtime development dictionary.
+**State:** Implementation and manual Windows acceptance are complete. Final exact-head CI and Codex review are next.
 
 ### Source dataset
 
 - Frozen version: `1.0.0`
 - Source artifact: `PyaeSoneHtun-98/dictionary-dataset/dist/dictionary_v1.json`
+- Frozen source artifact commit used for import: `20c7ce3f35f0138fb84ded6ac337b7be647e3d87`
 - Frozen headwords: 30,000
 - Stored forms: 15,864
 - Burmese semantic meanings: 38,001
@@ -32,27 +33,51 @@ PR #31 added external subtitle drag/drop and subtitle timing/appearance controls
 - Form-to-form collisions: 0
 - Exact headword/form overlaps are intentional; exact headwords remain authoritative.
 
-### Issue #32 goals
+### Issue #32 implementation
 
-- Vendor the frozen 30,000-entry artifact as the production runtime dictionary.
-- Verify the imported artifact against the frozen SHA/source provenance.
-- Preserve current structured popup behavior and exact-headword precedence.
-- Add a small structured core supplement for the 16 useful legacy-only words:
+- The exact frozen 30,000-entry artifact is vendored as the production runtime dictionary.
+- Normal repository validation verifies the production artifact SHA-256 and 30,000-entry shape.
+- A separate 16-entry structured core supplement preserves useful basic words intentionally absent from the frozen corpus:
   `bad`, `big`, `day`, `do`, `go`, `humiliating`, `love`, `man`, `new`, `no`, `run`, `say`, `see`, `thanks`, `wait`, `yes`.
-- Remove the old flat `legacyDictionary.ts` fallback once equivalent structured coverage is present.
-- Add regression tests for corpus size, representative inflections, structured-core coverage, and exact-headword precedence.
-- Keep normal dictionary lookup fully offline.
-- Validate practical startup/lookup behavior with the full corpus.
+- The old flat `legacyDictionary.ts` fallback and legacy lookup path are removed.
+- Exact headwords are indexed before stored forms, preserving exact-headword precedence.
+- Runtime local dictionary size is 30,016 structured entries: the frozen 30,000 corpus plus the 16-entry structured core supplement.
+- Lookup remains fully offline.
 
-### Pending validation
+### Automated validation
 
-- Automated `npm run check`.
-- Windows local-MKV lookup regression with several real dictionary words.
-- One inflected lookup resolving to its canonical headword.
-- One structured-core lookup such as `went → go`.
-- Unknown-word failure remains clean.
-- One Stremio live-subtitle Burmese lookup regression.
-- Codex final review and any required P1/P2 fixes.
+CI #242 passed on implementation head `9dd21a89bd6a8631486ad60d94aa0949536b14cb`:
+
+- production dictionary SHA/source provenance verification passed;
+- structured dictionary validator passed for 30,000 entries, 15,864 forms, and 38,001 Burmese meanings;
+- 18 test files / 98 tests passed;
+- production Electron build passed;
+- Windows packaging passed;
+- packaged install/upgrade/Stremio-handoff regression passed.
+
+Automated regressions cover production corpus count, `chosen → choose`, exact-headword precedence using `warning`, structured-core `went → go`, unknown-word handling, and target-language behavior.
+
+### Manual Windows acceptance
+
+Manual acceptance passed on Windows using the Issue #32 branch/build:
+
+- app startup with the full production dictionary;
+- local MKV structured Burmese lookup;
+- multiple real subtitle-word lookups;
+- inflected production lookup, including `proudest → proud`, with canonical headword, IPA, POS, and Burmese meanings;
+- structured-core lookup such as `went → go`;
+- clean unknown-word failure;
+- installed/package upgrade to the Issue #32 build;
+- Stremio `Play in Subtitle Bridge` launch with the upgraded installed app;
+- structured Burmese lookup during Stremio playback.
+
+No manual Issue #32 acceptance item remains pending.
+
+### Remaining gate
+
+- Run final CI on the documentation-complete exact head.
+- Send PR #33 to Codex for final P1/P2 review.
+- Fix/retest/re-review any blocker findings before merge.
 
 ## Later work
 
