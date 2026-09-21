@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { SubtitleCue } from '../src/shared/media'
-import { segmentSubtitleCue } from '../src/renderer/src/features/playback/subtitleSegments'
+import {
+  buildPhraseLookupContext,
+  segmentSubtitleCue
+} from '../src/renderer/src/features/playback/subtitleSegments'
 
 function makeCue(): SubtitleCue {
   return {
@@ -31,6 +34,16 @@ describe('segmentSubtitleCue', () => {
             : segment.text
       )
     ).toEqual(['[Hello]', ', ', '[world]', '!', '\n', '[Second]', ' ', '[line]', '?'])
+  })
+
+  it('builds a bounded phrase context with a relative clicked-token index', () => {
+    const cue = makeCue()
+    const context = buildPhraseLookupContext(cue.tokens, cue.tokens[2])
+
+    expect(context).toEqual({
+      contextTokens: ['hello', 'world', 'second', 'line'],
+      clickedTokenIndex: 2
+    })
   })
 
   it('preserves lookup terms and character offsets for independent word selection', () => {
