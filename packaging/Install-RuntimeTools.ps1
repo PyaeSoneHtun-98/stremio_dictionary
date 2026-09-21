@@ -1,7 +1,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$DestinationRoot,
   [Parameter(Mandatory = $true)][string]$ManifestPath,
-  [string]$CacheDir = (Join-Path $env:TEMP 'SubtitleBridge-runtime-cache')
+  [string]$CacheDir = (Join-Path $env:LOCALAPPDATA 'Subtitle Bridge\RuntimeCache')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,17 +64,41 @@ function Install-Runtime {
   }
 
   New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null
-  $archivePath = Join-Path $CacheDir "$Key.zip"
-  $extractDir = Join-Path $CacheDir "$Key-extracted"
-  Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
+  $archivePath = Join-Path $CacheDir "$Key-$expectedHash.zip"
+  $extractDir = Join-Path $CacheDir "$Key-extracted-$expectedHash"
   Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
 
   try {
-    Copy-OrDownloadArchive -Source $archiveUrl -Destination $archivePath
+    $archiveReady = $false
+    if (Test-Path -LiteralPath $archivePath -PathType Leaf) {
+      $cachedHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+      if ($cachedHash -eq $expectedHash) {
+        $archiveReady = $true
+        Write-Host "Using cached verified $displayName runtime archive."
+      } else {
+        Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
+      }
+    }
 
-    $actualHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualHash -ne $expectedHash) {
-      throw "$displayName runtime archive failed SHA-256 verification."
+    if (-not $archiveReady) {
+      $downloadPath = "$archivePath.download"
+      Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+      try {
+        Copy-OrDownloadArchive -Source $archiveUrl -Destination $downloadPath
+        $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualHash -ne $expectedHash) {
+          throw "$displayName runtime archive failed SHA-256 verification."
+        }
+        Move-Item -LiteralPath $downloadPath -Destination $archivePath -Force
+      } finally {
+        Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+      }
+    }
+
+    $verifiedHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($verifiedHash -ne $expectedHash) {
+      Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
+      throw "$displayName cached runtime archive failed SHA-256 verification."
     }
 
     New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
@@ -101,7 +125,6 @@ function Install-Runtime {
 
     Write-Host "Prepared managed $displayName runtime."
   } finally {
-    Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
   }
 }
