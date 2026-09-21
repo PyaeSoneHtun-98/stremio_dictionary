@@ -111,6 +111,57 @@ jobs:
             }
           } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $runtimeManifest -Encoding UTF8
 
+          # Safety: never replace or uninstall an arbitrary non-Subtitle Bridge directory.
+          $foreignInstallDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeForeignInstall'
+          Remove-Item -LiteralPath $foreignInstallDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $foreignInstallDir -Force | Out-Null
+          $foreignInstallSentinel = Join-Path $foreignInstallDir 'user-data.txt'
+          Set-Content -LiteralPath $foreignInstallSentinel -Value 'must-survive'
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $foreignInstallDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+          $foreignInstallExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($foreignInstallExitCode -eq 0) {
+            throw 'Installer accepted a non-empty directory without Subtitle Bridge ownership.'
+          }
+          if (-not (Test-Path -LiteralPath $foreignInstallSentinel)) {
+            throw 'Installer modified or deleted an unowned install directory.'
+          }
+          if (Test-Path -LiteralPath (Join-Path $foreignInstallDir '.subtitle-bridge-install.json')) {
+            throw 'Installer claimed ownership of an unrelated non-empty directory.'
+          }
+
+          $foreignCacheDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeForeignCache'
+          Remove-Item -LiteralPath $foreignCacheDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $foreignCacheDir -Force | Out-Null
+          $foreignCacheSentinel = Join-Path $foreignCacheDir 'personal-file.txt'
+          Set-Content -LiteralPath $foreignCacheSentinel -Value 'must-survive'
+          $cacheSafetyInstallDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeCacheSafetyInstall'
+          Remove-Item -LiteralPath $cacheSafetyInstallDir -Recurse -Force -ErrorAction SilentlyContinue
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $cacheSafetyInstallDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $foreignCacheDir
+          $foreignCacheInstallExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($foreignCacheInstallExitCode -eq 0) {
+            throw 'Installer accepted a non-empty unowned runtime-cache directory.'
+          }
+          if (-not (Test-Path -LiteralPath $foreignCacheSentinel)) {
+            throw 'Runtime provisioning modified or deleted data in an unowned cache directory.'
+          }
+          if (Test-Path -LiteralPath (Join-Path $foreignCacheDir '.subtitle-bridge-runtime-cache.json')) {
+            throw 'Runtime provisioning claimed ownership of an unrelated non-empty directory.'
+          }
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $packageDir 'Uninstall-SubtitleBridge.ps1') -InstallDir $foreignInstallDir -RuntimeCacheDir $foreignCacheDir -Quiet
+          $foreignUninstallExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($foreignUninstallExitCode -eq 0) {
+            throw 'Uninstaller accepted a directory without Subtitle Bridge ownership.'
+          }
+          if (-not (Test-Path -LiteralPath $foreignInstallSentinel) -or -not (Test-Path -LiteralPath $foreignCacheSentinel)) {
+            throw 'Uninstaller deleted data from an unowned directory.'
+          }
+
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
           if ($LASTEXITCODE -ne 0) {
             throw 'Initial installer run failed.'
@@ -187,6 +238,12 @@ jobs:
           }
           if ($uninstallInfo.RuntimeCacheDir -ne $runtimeCacheDir) {
             throw 'Installer did not register the managed runtime cache path.'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $installDir '.subtitle-bridge-install.json') -PathType Leaf)) {
+            throw 'Installer did not create the application ownership marker.'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $runtimeCacheDir '.subtitle-bridge-runtime-cache.json') -PathType Leaf)) {
+            throw 'Runtime provisioning did not create the cache ownership marker.'
           }
 
           $brokenPackageDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeBrokenPackage'
@@ -265,6 +322,44 @@ jobs:
           }
           Remove-ItemProperty -LiteralPath $uninstallKey -Name 'RollbackSentinel' -ErrorAction SilentlyContinue
           Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue
+
+          # A rollback failure must preserve the transaction marker/backup so the next run can recover.
+          $env:SUBTITLE_BRIDGE_TEST_FORCE_POST_INSTALL_FAILURE = '1'
+          $env:SUBTITLE_BRIDGE_TEST_FORCE_ROLLBACK_FAILURE = '1'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+          $forcedRollbackFailureExitCode = $LASTEXITCODE
+          Remove-Item Env:SUBTITLE_BRIDGE_TEST_FORCE_POST_INSTALL_FAILURE -ErrorAction SilentlyContinue
+          Remove-Item Env:SUBTITLE_BRIDGE_TEST_FORCE_ROLLBACK_FAILURE -ErrorAction SilentlyContinue
+          $global:LASTEXITCODE = 0
+          if ($forcedRollbackFailureExitCode -eq 0) {
+            throw 'Forced rollback failure unexpectedly succeeded.'
+          }
+
+          $installParent = Split-Path -Parent $installDir
+          $transactionMarkers = @(Get-ChildItem -LiteralPath $installParent -Filter '.SubtitleBridge-transaction-*.json' -File)
+          if ($transactionMarkers.Count -ne 1) {
+            throw "Rollback failure did not preserve exactly one transaction marker; found $($transactionMarkers.Count)."
+          }
+          $preservedTransaction = Get-Content -LiteralPath $transactionMarkers[0].FullName -Raw | ConvertFrom-Json
+          if (-not (Test-Path -LiteralPath ([string]$preservedTransaction.backupDir) -PathType Container)) {
+            throw 'Rollback failure did not preserve the previous installation backup.'
+          }
+          if (-not (Test-Path -LiteralPath ([string]$preservedTransaction.metadataDir) -PathType Container)) {
+            throw 'Rollback failure did not preserve shell metadata for recovery.'
+          }
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $brokenPackageDir 'Install-SubtitleBridge.ps1') -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+          $rollbackRecoveryExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($rollbackRecoveryExitCode -eq 0) {
+            throw 'Rollback recovery probe unexpectedly installed an intentionally incomplete package.'
+          }
+          if (-not (Test-Path -LiteralPath $rollbackMarker)) {
+            throw 'Next-run recovery after rollback failure did not restore the previous installation.'
+          }
+          if (@(Get-ChildItem -LiteralPath $installParent -Filter '.SubtitleBridge-transaction-*.json' -File).Count -ne 0) {
+            throw 'Recovery left a stale transaction marker behind.'
+          }
 
           $nestedInstallDir = Join-Path $packageDir 'nested-install-should-fail'
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $nestedInstallDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
@@ -525,6 +620,67 @@ jobs:
           if ($backupCount -lt 2) {
             throw 'Stremio handoff helper did not create a new versioned safety backup for the updated server.js.'
           }
+
+          # Auto-disable must find a patched Stremio installation even when another compatible
+          # unpatched installation is discovered first.
+          $multiStremioRootA = Join-Path $env:LOCALAPPDATA 'Programs\StremioSubtitleBridgeCI-A'
+          $multiStremioRootB = Join-Path $env:LOCALAPPDATA 'Programs\StremioSubtitleBridgeCI-B'
+          Remove-Item -LiteralPath $multiStremioRootA -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $multiStremioRootB -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $multiStremioRootA -Force | Out-Null
+          New-Item -ItemType Directory -Path $multiStremioRootB -Force | Out-Null
+          $multiServerA = Join-Path $multiStremioRootA 'server.js'
+          $multiServerB = Join-Path $multiStremioRootB 'server.js'
+          [System.IO.File]::WriteAllText($multiServerA, $originalServerJs)
+          [System.IO.File]::WriteAllText($multiServerB, $originalServerJs)
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $multiServerB
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not prepare the second Stremio installation for multi-install cleanup testing.'
+          }
+          if ([System.IO.File]::ReadAllText($multiServerB) -notmatch 'Subtitle Bridge external player BEGIN') {
+            throw 'Second Stremio fixture was not patched before multi-install cleanup testing.'
+          }
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -AllowMissing
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Automatic Stremio cleanup failed with multiple installations present.'
+          }
+          if ([System.IO.File]::ReadAllText($multiServerA) -ne $originalServerJs) {
+            throw 'Automatic cleanup modified an unpatched Stremio installation.'
+          }
+          if ([System.IO.File]::ReadAllText($multiServerB) -ne $originalServerJs) {
+            throw 'Automatic cleanup left a later discovered Stremio installation patched.'
+          }
+          Remove-Item -LiteralPath $multiStremioRootA -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $multiStremioRootB -Recurse -Force -ErrorAction SilentlyContinue
+
+          # A tampered/custom cache path must never make uninstall recursively delete user data.
+          $cacheTamperInstallDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeCacheTamperInstall'
+          $cacheTamperOwnedCache = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeCacheTamperOwnedCache'
+          Remove-Item -LiteralPath $cacheTamperInstallDir -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $cacheTamperOwnedCache -Recurse -Force -ErrorAction SilentlyContinue
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $cacheTamperInstallDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $cacheTamperOwnedCache
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not prepare cache-tamper uninstall fixture.'
+          }
+          Set-ItemProperty -LiteralPath $uninstallKey -Name 'RuntimeCacheDir' -Value $foreignCacheDir
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $cacheTamperInstallDir 'Uninstall-SubtitleBridge.ps1') -Quiet
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Uninstall failed when the registered runtime-cache path was unowned.'
+          }
+          if (Test-Path -LiteralPath $cacheTamperInstallDir) {
+            throw 'Cache-tamper fixture application was not uninstalled.'
+          }
+          if (-not (Test-Path -LiteralPath $foreignCacheSentinel)) {
+            throw 'Uninstall deleted user data from an unowned runtime-cache path.'
+          }
+          if (-not (Test-Path -LiteralPath $cacheTamperOwnedCache)) {
+            throw 'Uninstall unexpectedly deleted the real cache after its registry path was replaced.'
+          }
+          Remove-Item -LiteralPath $cacheTamperOwnedCache -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $foreignInstallDir -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $foreignCacheDir -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Upload Windows MVP artifact
         uses: actions/upload-artifact@v4
