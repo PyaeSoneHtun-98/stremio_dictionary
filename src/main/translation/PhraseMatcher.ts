@@ -35,9 +35,16 @@ export function createPhraseMatcher(entries: readonly PhraseEntry[]): PhraseMatc
 
   for (const entry of entries) {
     validatePhraseEntry(entry)
+    const entryVariants = new Set<string>()
 
     for (const rawVariant of [entry.phrase, ...entry.forms]) {
       const normalizedVariant = normalizePhrase(rawVariant)
+      if (entryVariants.has(normalizedVariant)) {
+        throw new Error(
+          `Duplicate phrase variant within ${entry.phrase}: ${normalizedVariant}`
+        )
+      }
+      entryVariants.add(normalizedVariant)
       const tokenCount = normalizedVariant.split(' ').length
       if (tokenCount < 2) {
         throw new Error(`Phrase variants must contain at least two tokens: ${rawVariant}`)
