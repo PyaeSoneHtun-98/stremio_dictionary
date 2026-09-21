@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "phrase": "give up",
+      "type": "phrasal_verb",
+      "forms": ["gives up", "gave up", "given up", "giving up"],
+      "burmese": ["လက်လျှော့သည်", "အရှုံးပေးသည်"]
+    },
+    {
+      "phrase": "look after",
+      "type": "phrasal_verb",
+      "forms": ["looks after", "looked after", "looking after"],
+      "burmese": ["စောင့်ရှောက်သည်", "ကြည့်ရှုစောင့်ရှောက်သည်"]
+    },
+    {
+      "phrase": "figure out",
+      "type": "phrasal_verb",
+      "forms": ["figures out", "figured out", "figuring out"],
+      "burmese": ["နားလည်သဘောပေါက်သည်", "အဖြေရှာသည်"]
+    },
+    {
+      "phrase": "run out of",
+      "type": "phrasal_verb",
+      "forms": ["runs out of", "ran out of", "running out of"],
+      "burmese": ["ကုန်သွားသည်", "လက်ကျန်မရှိတော့သည်"]
+    },
+    {
+      "phrase": "put up with",
+      "type": "phrasal_verb",
+      "forms": ["puts up with", "putting up with"],
+      "burmese": ["သည်းခံသည်", "အောင့်အည်းခံသည်"]
+    },
+    {
+      "phrase": "come up with",
+      "type": "phrasal_verb",
+      "forms": ["comes up with", "came up with", "coming up with"],
+      "burmese": ["စဉ်းစားထုတ်သည်", "အကြံရသည်"]
+    },
+    {
+      "phrase": "get away with",
+      "type": "phrasal_verb",
+      "forms": ["gets away with", "got away with", "gotten away with", "getting away with"],
+      "burmese": ["အပြစ်ပေးမခံရဘဲ လွတ်သွားသည်"]
+    },
+    {
+      "phrase": "run into",
+      "type": "phrasal_verb",
+      "forms": ["runs into", "ran into", "running into"],
+      "burmese": ["မမျှော်လင့်ဘဲ တွေ့သည်"]
+    },
+    {
+      "phrase": "come across",
+      "type": "phrasal_verb",
+      "forms": ["comes across", "came across", "coming across"],
+      "burmese": ["မမျှော်လင့်ဘဲ တွေ့သည်", "ရှာဖွေတွေ့ရှိသည်"]
+    },
+    {
+      "phrase": "take off",
+      "type": "phrasal_verb",
+      "forms": ["takes off", "took off", "taken off", "taking off"],
+      "burmese": ["ချွတ်သည်", "ပျံတက်သည်"]
+    },
+    {
+      "phrase": "find out",
+      "type": "phrasal_verb",
+      "forms": ["finds out", "found out", "finding out"],
+      "burmese": ["သိရှိသွားသည်", "ရှာဖွေတွေ့ရှိသည်"]
+    },
+    {
+      "phrase": "turn out",
+      "type": "phrasal_verb",
+      "forms": ["turns out", "turned out", "turning out"],
+      "burmese": ["နောက်ဆုံးတွင် ဖြစ်လာသည်", "ထွက်ပေါ်လာသည်"]
+    }
+  ]
+}
