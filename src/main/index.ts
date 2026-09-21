@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { diagnosticLog, disposeDiagnostics, initializeDiagnostics } from './diagnostics'
 import { disposeMediaIpc, openMediaTarget, registerMediaIpc } from './media/ipc'
 import { findLaunchTargetArgument } from './media/launchTarget'
+import { disposeStremioIpc, registerStremioIpc } from './stremio/ipc'
 import { disposeTranslationIpc, registerTranslationIpc } from './translation/ipc'
 
 // On some Windows x64 systems, Chromium's accelerated transparent windows render their
@@ -38,6 +39,7 @@ if (!hasSingleInstanceLock) {
     })
 
     registerMediaIpc()
+    registerStremioIpc()
     registerTranslationIpc()
     createWindow()
     void handleLaunchArguments(process.argv)
@@ -53,6 +55,7 @@ if (!hasSingleInstanceLock) {
 
   app.on('before-quit', () => {
     disposeTranslationIpc()
+    disposeStremioIpc()
     disposeMediaIpc()
     disposeDiagnostics()
   })
