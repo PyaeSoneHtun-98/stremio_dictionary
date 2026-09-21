@@ -92,6 +92,64 @@
   font-size: 0.8rem;
 }
 
+.stremio-integration {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.stremio-integration strong,
+.stremio-integration span {
+  display: block;
+}
+
+.stremio-integration > div > strong {
+  color: #f5f7fb;
+  font-size: 0.86rem;
+}
+
+.stremio-integration span {
+  margin-top: 4px;
+  color: #8f96a7;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.stremio-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.stremio-actions button {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #d8dbe4;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stremio-actions button:hover:not(:disabled),
+.stremio-actions button:focus-visible {
+  border-color: rgba(162, 143, 255, 0.65);
+  background: rgba(124, 92, 255, 0.12);
+}
+
+.stremio-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .playback-help {
   max-width: 790px;
   margin: 14px 0 0;
@@ -283,6 +341,19 @@
 
   .video-dropzone .primary-action {
     width: 100%;
+  }
+
+  .stremio-integration {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .stremio-actions {
+    width: 100%;
+  }
+
+  .stremio-actions button {
+    flex: 1;
   }
 
   .playback-metrics {
