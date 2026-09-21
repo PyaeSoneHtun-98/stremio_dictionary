@@ -270,7 +270,9 @@ if ([string]::IsNullOrWhiteSpace($RuntimeManifestPath)) {
   $RuntimeManifestPath = Get-NormalizedPath $RuntimeManifestPath
 }
 
-if (-not [string]::IsNullOrWhiteSpace($RuntimeCacheDir)) {
+if ([string]::IsNullOrWhiteSpace($RuntimeCacheDir)) {
+  $RuntimeCacheDir = Get-NormalizedPath (Join-Path $env:LOCALAPPDATA 'Subtitle Bridge\RuntimeCache')
+} else {
   $RuntimeCacheDir = Get-NormalizedPath $RuntimeCacheDir
 }
 
@@ -294,9 +296,29 @@ if (Test-InstalledAppRunning -ExecutablePath $ExistingExePath) {
   throw 'Subtitle Bridge is currently running from the install directory. Close it before upgrading.'
 }
 
+$StartMenuDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+$ShortcutPath = Join-Path $StartMenuDir 'Subtitle Bridge.lnk'
+$UninstallRegistryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SubtitleBridge'
+$TransactionMarkerPath = Join-Path $InstallParent ('.SubtitleBridge-transaction-' + (Get-PathToken $InstallDir) + '.json')
+
+Recover-InterruptedTransaction -MarkerPath $TransactionMarkerPath -ExpectedInstallDir $InstallDir -InstallParent $InstallParent -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
+
 $transactionId = [System.Guid]::NewGuid().ToString('N')
 $StageDir = Join-Path $InstallParent ".SubtitleBridge-stage-$transactionId"
 $BackupDir = Join-Path $InstallParent ".SubtitleBridge-backup-$transactionId"
+$MetadataDir = Join-Path $InstallParent ".SubtitleBridge-metadata-$transactionId"
+
+Save-ShellMetadata -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
+Write-TransactionMarker -MarkerPath $TransactionMarkerPath -Data @{
+  version = 1
+  installDir = $InstallDir
+  stageDir = $StageDir
+  backupDir = $BackupDir
+  metadataDir = $MetadataDir
+}
+
+$oldInstallMoved = $false
+$newInstallMoved = $false
 
 Write-Host "Installing Subtitle Bridge to $InstallDir"
 
@@ -316,9 +338,7 @@ try {
     $runtimeParameters = @{
       DestinationRoot = (Join-Path $StageDir 'resources\tools')
       ManifestPath = $RuntimeManifestPath
-    }
-    if (-not [string]::IsNullOrWhiteSpace($RuntimeCacheDir)) {
-      $runtimeParameters['CacheDir'] = $RuntimeCacheDir
+      CacheDir = $RuntimeCacheDir
     }
 
     & $runtimeInstaller @runtimeParameters
@@ -346,13 +366,15 @@ try {
     }
   }
 
-  $oldInstallMoved = $false
-  $newInstallMoved = $false
-
   try {
     if (Test-Path -LiteralPath $InstallDir) {
       Move-Item -LiteralPath $InstallDir -Destination $BackupDir
       $oldInstallMoved = $true
+
+      if ($env:SUBTITLE_BRIDGE_TEST_FORCE_SWAP_TERMINATION -eq '1') {
+        [System.Diagnostics.Process]::GetCurrentProcess().Kill()
+        Start-Sleep -Seconds 30
+      }
     }
 
     Move-Item -LiteralPath $StageDir -Destination $InstallDir
@@ -360,14 +382,8 @@ try {
   } catch {
     $swapError = $_
 
-    if ($newInstallMoved -and (Test-Path -LiteralPath $InstallDir)) {
-      Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-
-    if ($oldInstallMoved -and (Test-Path -LiteralPath $BackupDir) -and -not (Test-Path -LiteralPath $InstallDir)) {
-      Move-Item -LiteralPath $BackupDir -Destination $InstallDir -ErrorAction SilentlyContinue
-    }
-
+    Restore-PreviousInstallation -InstallDir $InstallDir -BackupDir $BackupDir -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
+    Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction SilentlyContinue
     throw $swapError
   }
 
@@ -375,6 +391,8 @@ try {
   if (Test-Path -LiteralPath $StageDir) {
     Remove-Item -LiteralPath $StageDir -Recurse -Force -ErrorAction SilentlyContinue
   }
+  Remove-Item -LiteralPath $MetadataDir -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction SilentlyContinue
 
   throw
 }
