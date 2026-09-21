@@ -246,6 +246,49 @@ jobs:
             throw 'Runtime provisioning did not create the cache ownership marker.'
           }
 
+          # A tampered transaction marker must never turn the install parent into a recursive-delete target.
+          $installParent = Split-Path -Parent $installDir
+          $transactionParentSentinel = Join-Path $installParent 'subtitle-bridge-transaction-parent-sentinel.txt'
+          Set-Content -LiteralPath $transactionParentSentinel -Value 'must-survive'
+
+          $normalizedInstallForToken = [System.IO.Path]::GetFullPath($installDir).TrimEnd('\').TrimEnd('/').ToLowerInvariant()
+          $tokenSha = [System.Security.Cryptography.SHA256]::Create()
+          try {
+            $tokenBytes = [System.Text.Encoding]::UTF8.GetBytes($normalizedInstallForToken)
+            $tokenHash = $tokenSha.ComputeHash($tokenBytes)
+            $installPathToken = ([System.BitConverter]::ToString($tokenHash)).Replace('-', '').Substring(0, 16).ToLowerInvariant()
+          } finally {
+            $tokenSha.Dispose()
+          }
+
+          $transactionMarkerPath = Join-Path $installParent ".SubtitleBridge-transaction-$installPathToken.json"
+          $fakeTransactionId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+          @{
+            version = 2
+            transactionId = $fakeTransactionId
+            phase = 'prepared'
+            hadPreviousInstall = $true
+            installDir = $installDir
+            stageDir = $installParent
+            backupDir = (Join-Path $installParent ".SubtitleBridge-backup-$fakeTransactionId")
+            metadataDir = (Join-Path $installParent ".SubtitleBridge-metadata-$fakeTransactionId")
+          } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $transactionMarkerPath -Encoding UTF8
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+          $tamperedTransactionExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($tamperedTransactionExitCode -eq 0) {
+            throw 'Installer accepted a tampered transaction path.'
+          }
+          if (-not (Test-Path -LiteralPath $transactionParentSentinel)) {
+            throw 'Tampered recovery metadata caused deletion inside the install parent.'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $installDir 'Subtitle Bridge.exe'))) {
+            throw 'Tampered recovery metadata damaged the working installation.'
+          }
+          Remove-Item -LiteralPath $transactionMarkerPath -Force
+          Remove-Item -LiteralPath $transactionParentSentinel -Force
+
           $brokenPackageDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeBrokenPackage'
           Remove-Item -LiteralPath $brokenPackageDir -Recurse -Force -ErrorAction SilentlyContinue
           Copy-Item -LiteralPath $packageDir -Destination $brokenPackageDir -Recurse
@@ -360,6 +403,63 @@ jobs:
           if (@(Get-ChildItem -LiteralPath $installParent -Filter '.SubtitleBridge-transaction-*.json' -File).Count -ne 0) {
             throw 'Recovery left a stale transaction marker behind.'
           }
+
+          # If app restoration succeeds but shell-metadata restoration fails, next-run recovery
+          # must resume from app-restored even though the backup directory has already been moved.
+          [System.IO.File]::WriteAllText($shortcutPath, 'phase-recovery-shortcut')
+          New-ItemProperty -Path $uninstallKey -Name 'PhaseRecoverySentinel' -Value 'phase-recovery-registry' -PropertyType String -Force | Out-Null
+
+          $env:SUBTITLE_BRIDGE_TEST_FORCE_POST_INSTALL_FAILURE = '1'
+          $env:SUBTITLE_BRIDGE_TEST_FORCE_SHELL_METADATA_FAILURE = '1'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+          $shellRollbackFailureExitCode = $LASTEXITCODE
+          Remove-Item Env:SUBTITLE_BRIDGE_TEST_FORCE_POST_INSTALL_FAILURE -ErrorAction SilentlyContinue
+          Remove-Item Env:SUBTITLE_BRIDGE_TEST_FORCE_SHELL_METADATA_FAILURE -ErrorAction SilentlyContinue
+          $global:LASTEXITCODE = 0
+
+          if ($shellRollbackFailureExitCode -eq 0) {
+            throw 'Forced shell-metadata rollback failure unexpectedly succeeded.'
+          }
+
+          $phaseMarkers = @(Get-ChildItem -LiteralPath $installParent -Filter '.SubtitleBridge-transaction-*.json' -File)
+          if ($phaseMarkers.Count -ne 1) {
+            throw "Shell-metadata rollback failure did not preserve one transaction marker; found $($phaseMarkers.Count)."
+          }
+          $phaseTransaction = Get-Content -LiteralPath $phaseMarkers[0].FullName -Raw | ConvertFrom-Json
+          if ($phaseTransaction.phase -ne 'app-restored') {
+            throw "Unexpected preserved rollback phase: $($phaseTransaction.phase)"
+          }
+          if (Test-Path -LiteralPath ([string]$phaseTransaction.backupDir)) {
+            throw 'Shell-metadata rollback fixture expected the previous app to have already been restored from backup.'
+          }
+          if (-not (Test-Path -LiteralPath ([string]$phaseTransaction.metadataDir) -PathType Container)) {
+            throw 'Shell-metadata rollback failure did not preserve the metadata snapshot.'
+          }
+          if (-not (Test-Path -LiteralPath $rollbackMarker)) {
+            throw 'Shell-metadata rollback failure did not leave the previous application restored.'
+          }
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $brokenPackageDir 'Install-SubtitleBridge.ps1') -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+          $phaseRecoveryExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($phaseRecoveryExitCode -eq 0) {
+            throw 'Phase-recovery probe unexpectedly installed an intentionally incomplete package.'
+          }
+          if (-not (Test-Path -LiteralPath $rollbackMarker)) {
+            throw 'Phase recovery did not preserve the restored previous application.'
+          }
+          if ([System.IO.File]::ReadAllText($shortcutPath) -ne 'phase-recovery-shortcut') {
+            throw 'Phase recovery did not restore the previous Start Menu shortcut.'
+          }
+          $phaseRecoveredRegistry = Get-ItemProperty -LiteralPath $uninstallKey
+          if ($phaseRecoveredRegistry.PhaseRecoverySentinel -ne 'phase-recovery-registry') {
+            throw 'Phase recovery did not restore the previous uninstall registry metadata.'
+          }
+          if (@(Get-ChildItem -LiteralPath $installParent -Filter '.SubtitleBridge-transaction-*.json' -File).Count -ne 0) {
+            throw 'Phase recovery left a stale transaction marker behind.'
+          }
+          Remove-ItemProperty -LiteralPath $uninstallKey -Name 'PhaseRecoverySentinel' -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue
 
           $nestedInstallDir = Join-Path $packageDir 'nested-install-should-fail'
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $nestedInstallDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
@@ -654,6 +754,82 @@ jobs:
           }
           Remove-Item -LiteralPath $multiStremioRootA -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item -LiteralPath $multiStremioRootB -Recurse -Force -ErrorAction SilentlyContinue
+
+          # Explicit Stremio paths outside standard discovery roots must be persisted and cleaned
+          # later without requiring the same -ServerJsPath to be supplied again.
+          $stremioStatePath = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeStremioTargets.json'
+          Remove-Item -LiteralPath $stremioStatePath -Force -ErrorAction SilentlyContinue
+          $env:SUBTITLE_BRIDGE_STREMIO_TARGETS_PATH = $stremioStatePath
+
+          $externalStremioDir = Join-Path $env:RUNNER_TEMP 'CustomPortableStremio'
+          Remove-Item -LiteralPath $externalStremioDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $externalStremioDir -Force | Out-Null
+          $externalServerJs = Join-Path $externalStremioDir 'server.js'
+          [System.IO.File]::WriteAllText($externalServerJs, $originalServerJs)
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $externalServerJs
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not enable Stremio handoff on the custom persisted target fixture.'
+          }
+          if (-not (Test-Path -LiteralPath $stremioStatePath -PathType Leaf)) {
+            throw 'Enable helper did not persist the explicitly patched Stremio target.'
+          }
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -AllowMissing
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Disable helper could not clean a persisted Stremio target outside discovery roots.'
+          }
+          if ([System.IO.File]::ReadAllText($externalServerJs) -ne $originalServerJs) {
+            throw 'Persisted custom Stremio target remained patched after automatic cleanup.'
+          }
+          if (Test-Path -LiteralPath $stremioStatePath) {
+            throw 'Successful exhaustive Stremio cleanup left the target record behind.'
+          }
+
+          # An unreadable recorded target must abort cleanup and retain the target record.
+          [System.IO.File]::WriteAllText($externalServerJs, $originalServerJs)
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $externalServerJs
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not prepare the unreadable Stremio target fixture.'
+          }
+
+          $lockedStremioStream = [System.IO.File]::Open(
+            $externalServerJs,
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::None
+          )
+          try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -AllowMissing
+            $lockedCleanupExitCode = $LASTEXITCODE
+            $global:LASTEXITCODE = 0
+          } finally {
+            $lockedStremioStream.Dispose()
+          }
+
+          if ($lockedCleanupExitCode -eq 0) {
+            throw 'Stremio cleanup unexpectedly succeeded while a recorded target was unreadable.'
+          }
+          if (-not (Test-Path -LiteralPath $stremioStatePath -PathType Leaf)) {
+            throw 'Failed Stremio cleanup discarded its persisted target record.'
+          }
+          if ([System.IO.File]::ReadAllText($externalServerJs) -notmatch 'Subtitle Bridge external player BEGIN') {
+            throw 'Unreadable-target cleanup unexpectedly modified the patched Stremio file.'
+          }
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -AllowMissing
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Stremio cleanup did not recover after the recorded target became readable again.'
+          }
+          if ([System.IO.File]::ReadAllText($externalServerJs) -ne $originalServerJs) {
+            throw 'Recovered Stremio cleanup did not restore the custom target.'
+          }
+          if (Test-Path -LiteralPath $stremioStatePath) {
+            throw 'Recovered Stremio cleanup left a stale persisted target record.'
+          }
+
+          Remove-Item Env:SUBTITLE_BRIDGE_STREMIO_TARGETS_PATH -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $externalStremioDir -Recurse -Force -ErrorAction SilentlyContinue
 
           # A tampered/custom cache path must never make uninstall recursively delete user data.
           $cacheTamperInstallDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeCacheTamperInstall'
