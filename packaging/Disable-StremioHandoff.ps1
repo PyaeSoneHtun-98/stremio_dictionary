@@ -1,5 +1,6 @@
 param(
-  [string]$ServerJsPath
+  [string]$ServerJsPath,
+  [switch]$AllowMissing
 )
 
 $ErrorActionPreference = 'Stop'
@@ -151,10 +152,19 @@ function Resolve-StremioServerJs([string]$ExplicitPath) {
     }
   }
 
+  if ($AllowMissing) {
+    return $null
+  }
+
   throw 'Could not locate a compatible Stremio server.js automatically. Pass -ServerJsPath with the full path to Stremio\server.js.'
 }
 
 $ServerJsPath = Resolve-StremioServerJs $ServerJsPath
+if ([string]::IsNullOrWhiteSpace($ServerJsPath)) {
+  Write-Host 'No compatible Stremio installation was found. Nothing was changed.'
+  exit 0
+}
+
 $content = [System.IO.File]::ReadAllText($ServerJsPath)
 $hasPatch = Get-PatchState $content
 
