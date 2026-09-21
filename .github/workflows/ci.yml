@@ -51,7 +51,49 @@ jobs:
           $installDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeInstall'
           $installer = Join-Path $packageDir 'Install-SubtitleBridge.ps1'
 
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch
+          # Use tiny local ZIP fixtures so CI exercises the full managed-runtime provisioning
+          # path without downloading large third-party binaries on every run.
+          $runtimeFixtureDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeRuntimeFixture'
+          $runtimeCacheDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeRuntimeCache'
+          Remove-Item -LiteralPath $runtimeFixtureDir -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $runtimeCacheDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $runtimeFixtureDir -Force | Out-Null
+
+          $mpvPayload = Join-Path $runtimeFixtureDir 'mpv-payload'
+          $ffmpegPayload = Join-Path $runtimeFixtureDir 'ffmpeg-payload'
+          New-Item -ItemType Directory -Path $mpvPayload -Force | Out-Null
+          New-Item -ItemType Directory -Path $ffmpegPayload -Force | Out-Null
+          Set-Content -LiteralPath (Join-Path $mpvPayload 'mpv.exe') -Value 'fixture-mpv'
+          Set-Content -LiteralPath (Join-Path $ffmpegPayload 'ffmpeg.exe') -Value 'fixture-ffmpeg'
+          Set-Content -LiteralPath (Join-Path $ffmpegPayload 'avcodec-fixture.dll') -Value 'fixture-dll'
+
+          $mpvZip = Join-Path $runtimeFixtureDir 'mpv.zip'
+          $ffmpegZip = Join-Path $runtimeFixtureDir 'ffmpeg.zip'
+          Compress-Archive -Path (Join-Path $mpvPayload '*') -DestinationPath $mpvZip -Force
+          Compress-Archive -Path (Join-Path $ffmpegPayload '*') -DestinationPath $ffmpegZip -Force
+
+          $runtimeManifest = Join-Path $runtimeFixtureDir 'runtime-manifest.json'
+          @{
+            version = 1
+            mpv = @{
+              displayName = 'mpv'
+              archiveUrl = $mpvZip
+              archiveSha256 = (Get-FileHash -LiteralPath $mpvZip -Algorithm SHA256).Hash.ToLowerInvariant()
+              executableName = 'mpv.exe'
+              provenance = 'CI fixture'
+              sourceUrl = 'https://example.invalid/mpv'
+            }
+            ffmpeg = @{
+              displayName = 'FFmpeg'
+              archiveUrl = $ffmpegZip
+              archiveSha256 = (Get-FileHash -LiteralPath $ffmpegZip -Algorithm SHA256).Hash.ToLowerInvariant()
+              executableName = 'ffmpeg.exe'
+              provenance = 'CI fixture'
+              sourceUrl = 'https://example.invalid/ffmpeg'
+            }
+          } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $runtimeManifest -Encoding UTF8
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
           if ($LASTEXITCODE -ne 0) {
             throw 'Initial installer run failed.'
           }
@@ -64,6 +106,11 @@ jobs:
             (Join-Path $installDir 'resources\app\out\main\index.js'),
             (Join-Path $installDir 'resources\app\out\preload\index.js'),
             (Join-Path $installDir 'resources\app\out\renderer\index.html'),
+            (Join-Path $installDir 'resources\tools\mpv\mpv.exe'),
+            (Join-Path $installDir 'resources\tools\ffmpeg\ffmpeg.exe'),
+            (Join-Path $installDir 'resources\tools\ffmpeg\avcodec-fixture.dll'),
+            (Join-Path $packageDir 'Install-RuntimeTools.ps1'),
+            (Join-Path $packageDir 'RUNTIME_MANIFEST.json'),
             (Join-Path $packageDir 'RUNTIME_DEPENDENCIES.txt'),
             (Join-Path $PWD 'release\SubtitleBridge-win-x64.zip'),
             (Join-Path $PWD 'release\SubtitleBridge-win-x64.zip.sha256')
@@ -82,6 +129,9 @@ jobs:
           if ($buildInfo.runtimeDependencies.mpv.bundled -or $buildInfo.runtimeDependencies.ffmpeg.bundled) {
             throw 'Release artifacts must not redistribute mpv or FFmpeg binaries.'
           }
+          if (-not $buildInfo.runtimeDependencies.mpv.installerProvisioned -or -not $buildInfo.runtimeDependencies.ffmpeg.installerProvisioned) {
+            throw 'Package metadata must declare installer-provisioned managed runtimes.'
+          }
 
           $unexpectedBundledTools = @(
             (Join-Path $packageDir 'resources\tools\mpv\mpv.exe'),
@@ -95,7 +145,7 @@ jobs:
 
           $staleSentinel = Join-Path $installDir 'obsolete-from-previous-install.txt'
           Set-Content -LiteralPath $staleSentinel -Value 'stale'
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
           if ($LASTEXITCODE -ne 0) {
             throw 'Upgrade installer run failed.'
           }
@@ -108,7 +158,7 @@ jobs:
           $brokenPackageDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeBrokenPackage'
           Copy-Item -LiteralPath $packageDir -Destination $brokenPackageDir -Recurse
           Remove-Item -LiteralPath (Join-Path $brokenPackageDir 'resources\app\out\renderer\index.html') -Force
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $brokenPackageDir 'Install-SubtitleBridge.ps1') -InstallDir $installDir -NoShortcut -NoLaunch
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $brokenPackageDir 'Install-SubtitleBridge.ps1') -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
           $brokenExitCode = $LASTEXITCODE
           $global:LASTEXITCODE = 0
           if ($brokenExitCode -eq 0) {
@@ -119,7 +169,7 @@ jobs:
           }
 
           $nestedInstallDir = Join-Path $packageDir 'nested-install-should-fail'
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $nestedInstallDir -NoShortcut -NoLaunch
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $nestedInstallDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
           $nestedExitCode = $LASTEXITCODE
           $global:LASTEXITCODE = 0
           if ($nestedExitCode -eq 0) {
