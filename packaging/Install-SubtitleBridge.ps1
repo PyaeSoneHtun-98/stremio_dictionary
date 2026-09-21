@@ -110,20 +110,9 @@ function Save-ShellMetadata {
   if (Test-Path -LiteralPath $RegistryPath) {
     $snapshot.exists = $true
     $properties = Get-ItemProperty -LiteralPath $RegistryPath
-    foreach ($name in @(
-      'DisplayName',
-      'DisplayVersion',
-      'Publisher',
-      'InstallLocation',
-      'DisplayIcon',
-      'UninstallString',
-      'QuietUninstallString',
-      'RuntimeCacheDir',
-      'NoModify',
-      'NoRepair'
-    )) {
-      if ($properties.PSObject.Properties.Name -contains $name) {
-        $snapshot.values[$name] = $properties.$name
+    foreach ($property in $properties.PSObject.Properties) {
+      if ($property.Name -notlike 'PS*') {
+        $snapshot.values[$property.Name] = $property.Value
       }
     }
   }
