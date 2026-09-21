@@ -140,20 +140,20 @@ describe('LocalDictionaryProvider', () => {
 
   it('falls back to the existing word dictionary when no phrase matches', async () => {
     const provider = new LocalDictionaryProvider()
+    const result = await provider.translate({
+      word: 'choose',
+      contextTokens: ['please', 'choose', 'one'],
+      clickedTokenIndex: 1
+    })
 
-    await expect(
-      provider.translate({
-        word: 'choose',
-        contextTokens: ['please', 'choose', 'one'],
-        clickedTokenIndex: 1
-      })
-    ).resolves.toMatchObject({
+    expect(result).toMatchObject({
       dictionaryEntry: {
         word: 'choose'
       },
-      phraseEntry: undefined,
       provider: 'local-dictionary'
     })
+    expect(result.phraseEntry).toBeUndefined()
+    expect(result.phraseMatch).toBeUndefined()
   })
 
   it('rejects target languages not present in the offline dataset', async () => {
