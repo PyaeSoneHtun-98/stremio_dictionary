@@ -206,29 +206,45 @@ jobs:
           $env:SUBTITLE_BRIDGE_SETUP_HEADLESS = '1'
           & $setupExe
           $setupExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+
+          if ($setupExitCode -ne 0) {
+            throw "One-click setup executable failed to launch with exit code $setupExitCode."
+          }
+
+          # IExpress launches its embedded command asynchronously. Wait for the bootstrap to
+          # finish rather than treating wrapper-process exit as installation completion.
+          $setupExePath = Join-Path $setupInstallDir 'Subtitle Bridge.exe'
+          $setupDeadline = [DateTime]::UtcNow.AddSeconds(60)
+          while ([DateTime]::UtcNow -lt $setupDeadline) {
+            if ((Test-Path -LiteralPath $setupExePath -PathType Leaf) -and
+                (Test-Path -LiteralPath $uninstallKey)) {
+              break
+            }
+            Start-Sleep -Milliseconds 250
+          }
+
           Remove-Item Env:SUBTITLE_BRIDGE_INSTALL_DIR -ErrorAction SilentlyContinue
           Remove-Item Env:SUBTITLE_BRIDGE_RUNTIME_MANIFEST -ErrorAction SilentlyContinue
           Remove-Item Env:SUBTITLE_BRIDGE_RUNTIME_CACHE -ErrorAction SilentlyContinue
           Remove-Item Env:SUBTITLE_BRIDGE_SETUP_NO_SHORTCUT -ErrorAction SilentlyContinue
           Remove-Item Env:SUBTITLE_BRIDGE_SETUP_NO_LAUNCH -ErrorAction SilentlyContinue
           Remove-Item Env:SUBTITLE_BRIDGE_SETUP_HEADLESS -ErrorAction SilentlyContinue
-          $global:LASTEXITCODE = 0
-
-          if ($setupExitCode -ne 0) {
-            throw "One-click setup executable failed with exit code $setupExitCode."
-          }
 
           foreach ($path in @(
-            (Join-Path $setupInstallDir 'Subtitle Bridge.exe'),
+            $setupExePath,
             (Join-Path $setupInstallDir 'resources\tools\mpv\mpv.exe'),
             (Join-Path $setupInstallDir 'resources\tools\ffmpeg\ffmpeg.exe'),
             (Join-Path $setupInstallDir 'Uninstall-SubtitleBridge.ps1')
           )) {
             if (-not (Test-Path -LiteralPath $path)) {
-              throw "One-click setup did not install required file: $path"
+              throw "One-click setup did not install required file before timeout: $path"
             }
           }
 
+          if (-not (Test-Path -LiteralPath $uninstallKey)) {
+            throw 'One-click setup did not register Windows uninstall metadata before timeout.'
+          }
           $setupUninstallInfo = Get-ItemProperty -LiteralPath $uninstallKey
           if ($setupUninstallInfo.InstallLocation -ne $setupInstallDir) {
             throw 'One-click setup did not update Windows uninstall metadata.'
