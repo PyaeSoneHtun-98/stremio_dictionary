@@ -1,38 +1,42 @@
 $ErrorActionPreference = 'Stop'
+$Headless = $env:SUBTITLE_BRIDGE_SETUP_HEADLESS -eq '1'
+$form = $null
 
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+if (-not $Headless) {
+  Add-Type -AssemblyName System.Windows.Forms
+  Add-Type -AssemblyName System.Drawing
 
-$form = New-Object System.Windows.Forms.Form
-$form.Text = 'Subtitle Bridge Setup'
-$form.Width = 460
-$form.Height = 150
-$form.StartPosition = 'CenterScreen'
-$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
-$form.MaximizeBox = $false
-$form.MinimizeBox = $false
-$form.ControlBox = $false
-$form.TopMost = $true
+  $form = New-Object System.Windows.Forms.Form
+  $form.Text = 'Subtitle Bridge Setup'
+  $form.Width = 460
+  $form.Height = 150
+  $form.StartPosition = 'CenterScreen'
+  $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+  $form.MaximizeBox = $false
+  $form.MinimizeBox = $false
+  $form.ControlBox = $false
+  $form.TopMost = $true
 
-$label = New-Object System.Windows.Forms.Label
-$label.Left = 24
-$label.Top = 20
-$label.Width = 400
-$label.Height = 42
-$label.Text = 'Installing Subtitle Bridge. This may take a minute while the media runtimes are prepared.'
-$form.Controls.Add($label)
+  $label = New-Object System.Windows.Forms.Label
+  $label.Left = 24
+  $label.Top = 20
+  $label.Width = 400
+  $label.Height = 42
+  $label.Text = 'Installing Subtitle Bridge. This may take a minute while the media runtimes are prepared.'
+  $form.Controls.Add($label)
 
-$progress = New-Object System.Windows.Forms.ProgressBar
-$progress.Left = 24
-$progress.Top = 72
-$progress.Width = 400
-$progress.Height = 20
-$progress.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
-$progress.MarqueeAnimationSpeed = 25
-$form.Controls.Add($progress)
+  $progress = New-Object System.Windows.Forms.ProgressBar
+  $progress.Left = 24
+  $progress.Top = 72
+  $progress.Width = 400
+  $progress.Height = 20
+  $progress.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
+  $progress.MarqueeAnimationSpeed = 25
+  $form.Controls.Add($progress)
 
-$form.Show()
-[System.Windows.Forms.Application]::DoEvents()
+  $form.Show()
+  [System.Windows.Forms.Application]::DoEvents()
+}
 
 $extractRoot = Join-Path $env:TEMP ("SubtitleBridge-setup-" + [Guid]::NewGuid().ToString('N'))
 
@@ -69,21 +73,29 @@ try {
   }
 
   & $installer @installParameters
-  [System.Windows.Forms.Application]::DoEvents()
 
-  $form.Close()
+  if ($form) {
+    [System.Windows.Forms.Application]::DoEvents()
+    $form.Close()
+  }
+
   exit 0
 } catch {
-  $form.Close()
-  try {
-    [System.Windows.Forms.MessageBox]::Show(
-      $_.Exception.Message,
-      'Subtitle Bridge setup failed',
-      [System.Windows.Forms.MessageBoxButtons]::OK,
-      [System.Windows.Forms.MessageBoxIcon]::Error
-    ) | Out-Null
-  } catch {
-    # Preserve the non-zero exit even if graphical error reporting is unavailable.
+  if ($form) {
+    $form.Close()
+  }
+
+  if (-not $Headless) {
+    try {
+      [System.Windows.Forms.MessageBox]::Show(
+        $_.Exception.Message,
+        'Subtitle Bridge setup failed',
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Error
+      ) | Out-Null
+    } catch {
+      # Preserve the non-zero exit even if graphical error reporting is unavailable.
+    }
   }
 
   Write-Error $_
