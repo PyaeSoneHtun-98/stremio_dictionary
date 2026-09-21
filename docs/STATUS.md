@@ -4,7 +4,7 @@
 
 The standalone Windows MVP (Issues #1–#10), Stremio handoff (Issue #24, PR #25), subtitle-first player redesign (Issue #26, PR #27), structured offline dictionary pipeline (Issue #28, PR #29), external subtitle/control work (Issue #30, PR #31), and finalized 30,000-word Dictionary v1.0 integration (Issue #32, PR #33) are merged.
 
-Stable capabilities include local MKV playback, FFmpeg text-subtitle extraction, clickable SRT/ASS/SSA dialogue, drag-and-drop external SRT/ASS/SSA subtitles, subtitle delay/size/position controls, structured offline Burmese lookup, translation settings/cache, and the Windows portable package/current-user installer.
+Stable master capabilities include local MKV playback, FFmpeg text-subtitle extraction, clickable SRT/ASS/SSA dialogue, drag-and-drop external SRT/ASS/SSA subtitles, subtitle delay/size/position controls, structured offline Burmese lookup, translation settings/cache, and the pre-Issue-34 Windows portable package/current-user installer.
 
 The production dictionary is the frozen 30,000-headword Dictionary v1.0 plus a 16-entry structured core supplement and a collision-checked compatibility alias layer preserving historical starter-dictionary coverage. PR #33 passed final CI #249 and final Codex review with no remaining P1/P2/P3 findings, then squash merged at `5c0ea8abc32f8b90a1d3ffff6ee10e4e0cc65259`. Issue #32 is closed.
 
@@ -16,7 +16,7 @@ Stremio streams use mpv live subtitles. The opt-in Play in Subtitle Bridge helpe
 
 **Branch:** `feat/issue-34-windows-installer`
 
-**State:** Issue defined and branch created from current stable master. Installer/dependency architecture research and implementation are next.
+**State:** Implementation and manual acceptance testing are complete on the feature branch. Exact-head CI passed before final review; Codex final review found no P1s and four installer/uninstall P2 edge cases that are being fixed before merge.
 
 ### User-facing goal
 
