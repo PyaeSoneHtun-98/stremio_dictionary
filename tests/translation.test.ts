@@ -112,6 +112,50 @@ describe('LocalDictionaryProvider', () => {
     }
   })
 
+  it('prefers a detected phrase over the clicked individual word', async () => {
+    const provider = new LocalDictionaryProvider()
+
+    await expect(
+      provider.translate({
+        word: 'out',
+        contextTokens: ['we', 'ran', 'out', 'of', 'time'],
+        clickedTokenIndex: 2
+      })
+    ).resolves.toMatchObject({
+      originalWord: 'out',
+      translation: 'ကုန်သွားသည်၊ လက်ကျန်မရှိတော့သည်',
+      phraseEntry: {
+        phrase: 'run out of',
+        type: 'phrasal_verb'
+      },
+      phraseMatch: {
+        source: 'ran out of',
+        startTokenIndex: 1,
+        endTokenIndex: 4
+      },
+      provider: 'local-dictionary',
+      targetLanguage: 'my'
+    })
+  })
+
+  it('falls back to the existing word dictionary when no phrase matches', async () => {
+    const provider = new LocalDictionaryProvider()
+
+    await expect(
+      provider.translate({
+        word: 'choose',
+        contextTokens: ['please', 'choose', 'one'],
+        clickedTokenIndex: 1
+      })
+    ).resolves.toMatchObject({
+      dictionaryEntry: {
+        word: 'choose'
+      },
+      phraseEntry: undefined,
+      provider: 'local-dictionary'
+    })
+  })
+
   it('rejects target languages not present in the offline dataset', async () => {
     const provider = new LocalDictionaryProvider()
 
