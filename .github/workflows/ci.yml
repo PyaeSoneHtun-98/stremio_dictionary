@@ -113,6 +113,7 @@ jobs:
             (Join-Path $packageDir 'Install-RuntimeTools.ps1'),
             (Join-Path $packageDir 'Uninstall-SubtitleBridge.ps1'),
             (Join-Path $packageDir 'RUNTIME_MANIFEST.json'),
+            (Join-Path $packageDir 'THIRD_PARTY_NOTICES.txt'),
             (Join-Path $packageDir 'RUNTIME_DEPENDENCIES.txt'),
             (Join-Path $PWD 'release\SubtitleBridge-win-x64.zip'),
             (Join-Path $PWD 'release\SubtitleBridge-win-x64.zip.sha256'),
