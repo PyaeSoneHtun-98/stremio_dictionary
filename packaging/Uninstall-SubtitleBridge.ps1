@@ -1,14 +1,31 @@
 param(
-  [string]$InstallDir = "$env:LOCALAPPDATA\Programs\Subtitle Bridge",
+  [string]$InstallDir,
+  [string]$RuntimeCacheDir,
   [string]$StremioServerJsPath,
+  [switch]$KeepRuntimeCache,
   [switch]$Quiet
 )
 
 $ErrorActionPreference = 'Stop'
-$InstallDir = [System.IO.Path]::GetFullPath($InstallDir).TrimEnd('\').TrimEnd('/')
-$ExePath = Join-Path $InstallDir 'Subtitle Bridge.exe'
 $UninstallRegistryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SubtitleBridge'
 $ShortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Subtitle Bridge.lnk'
+
+if ([string]::IsNullOrWhiteSpace($InstallDir)) {
+  $InstallDir = $PSScriptRoot
+}
+$InstallDir = [System.IO.Path]::GetFullPath($InstallDir).TrimEnd('\').TrimEnd('/')
+$ExePath = Join-Path $InstallDir 'Subtitle Bridge.exe'
+
+if ([string]::IsNullOrWhiteSpace($RuntimeCacheDir) -and (Test-Path -LiteralPath $UninstallRegistryPath)) {
+  $registeredCache = (Get-ItemProperty -LiteralPath $UninstallRegistryPath -ErrorAction SilentlyContinue).RuntimeCacheDir
+  if (-not [string]::IsNullOrWhiteSpace([string]$registeredCache)) {
+    $RuntimeCacheDir = [string]$registeredCache
+  }
+}
+if ([string]::IsNullOrWhiteSpace($RuntimeCacheDir)) {
+  $RuntimeCacheDir = Join-Path $env:LOCALAPPDATA 'Subtitle Bridge\RuntimeCache'
+}
+$RuntimeCacheDir = [System.IO.Path]::GetFullPath($RuntimeCacheDir).TrimEnd('\').TrimEnd('/')
 
 function Get-RunningInstalledProcesses {
   param([Parameter(Mandatory = $true)][string]$ExecutablePath)
@@ -42,14 +59,15 @@ try {
   $disableHandoff = Join-Path $InstallDir 'Disable-StremioHandoff.ps1'
   if (Test-Path -LiteralPath $disableHandoff -PathType Leaf) {
     $handoffArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $disableHandoff)
+    $handoffArgs += '-AllowMissing'
     if (-not [string]::IsNullOrWhiteSpace($StremioServerJsPath)) {
       $handoffArgs += @('-ServerJsPath', $StremioServerJsPath)
     }
 
     & powershell.exe @handoffArgs
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning 'Could not remove the optional Stremio integration during uninstall. Subtitle Bridge will still be removed.'
       $global:LASTEXITCODE = 0
+      throw 'Could not remove the Stremio integration safely. Subtitle Bridge was not uninstalled so you can retry or repair the integration first.'
     }
   }
 
@@ -66,6 +84,10 @@ try {
 
   if (Test-Path -LiteralPath $InstallDir -PathType Container) {
     Remove-Item -LiteralPath $InstallDir -Recurse -Force
+  }
+
+  if (-not $KeepRuntimeCache -and (Test-Path -LiteralPath $RuntimeCacheDir -PathType Container)) {
+    Remove-Item -LiteralPath $RuntimeCacheDir -Recurse -Force
   }
 
   if (-not $Quiet) {
