@@ -154,7 +154,7 @@ export class SubtitleExtractor {
 function toExtractionError(error: Error): Error {
   if ('code' in error && error.code === 'ENOENT') {
     return new Error(
-      'FFmpeg was not found. Install ffmpeg and add it to PATH, or set FFMPEG_PATH to ffmpeg.exe.'
+      'FFmpeg was not found. Reinstall Subtitle Bridge to restore its managed subtitle runtime, or configure FFMPEG_PATH for development.'
     )
   }
 
