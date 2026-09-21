@@ -709,11 +709,21 @@ try {
   }
 
 } catch {
-  $recoveryPending = Test-Path -LiteralPath $TransactionMarkerPath -PathType Leaf
+  $recoveryPending = $false
+  if (Test-Path -LiteralPath $TransactionMarkerPath -PathType Leaf) {
+    try {
+      $failedTransaction = Get-Content -LiteralPath $TransactionMarkerPath -Raw | ConvertFrom-Json
+      $recoveryPending = ([string]$failedTransaction.phase -ne 'prepared')
+    } catch {
+      # An unreadable transaction marker is evidence we must preserve for fail-closed recovery.
+      $recoveryPending = $true
+    }
+  }
 
   if (-not $recoveryPending) {
     Remove-OwnedTransactionDirectory -Directory $StageDir -TransactionId $transactionId -Role 'stage' -LogicalInstallDir $InstallDir
     Remove-OwnedTransactionDirectory -Directory $MetadataDir -TransactionId $transactionId -Role 'metadata' -LogicalInstallDir $InstallDir
+    Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction SilentlyContinue
   }
 
   throw
