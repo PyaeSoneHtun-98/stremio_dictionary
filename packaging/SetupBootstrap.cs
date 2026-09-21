@@ -111,8 +111,7 @@ internal static class SubtitleBridgeSetup
             var startInfo = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments =
-                    "-NoProfile -ExecutionPolicy Bypass -File " + QuoteArgument(installer),
+                Arguments = BuildInstallerArguments(installer),
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden
@@ -147,6 +146,54 @@ internal static class SubtitleBridgeSetup
                 // Temporary cleanup must not hide the setup result.
             }
         }
+    }
+
+    private static string BuildInstallerArguments(string installer)
+    {
+        var arguments = new StringBuilder();
+        arguments.Append("-NoProfile -ExecutionPolicy Bypass -File ");
+        arguments.Append(QuoteArgument(installer));
+
+        AppendPathArgument(
+            arguments,
+            "-InstallDir",
+            Environment.GetEnvironmentVariable("SUBTITLE_BRIDGE_INSTALL_DIR")
+        );
+        AppendPathArgument(
+            arguments,
+            "-RuntimeManifestPath",
+            Environment.GetEnvironmentVariable("SUBTITLE_BRIDGE_RUNTIME_MANIFEST")
+        );
+        AppendPathArgument(
+            arguments,
+            "-RuntimeCacheDir",
+            Environment.GetEnvironmentVariable("SUBTITLE_BRIDGE_RUNTIME_CACHE")
+        );
+
+        if (Environment.GetEnvironmentVariable("SUBTITLE_BRIDGE_SETUP_NO_SHORTCUT") == "1")
+        {
+            arguments.Append(" -NoShortcut");
+        }
+
+        if (Environment.GetEnvironmentVariable("SUBTITLE_BRIDGE_SETUP_NO_LAUNCH") == "1")
+        {
+            arguments.Append(" -NoLaunch");
+        }
+
+        return arguments.ToString();
+    }
+
+    private static void AppendPathArgument(StringBuilder arguments, string name, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        arguments.Append(" ");
+        arguments.Append(name);
+        arguments.Append(" ");
+        arguments.Append(QuoteArgument(value));
     }
 
     private static void ExtractAppendedPayload(string destinationPath)
