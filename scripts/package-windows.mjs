@@ -82,6 +82,10 @@ copyFileSync(
   join(root, 'packaging', 'runtime-manifest.json'),
   join(packageDir, 'RUNTIME_MANIFEST.json')
 )
+copyFileSync(
+  join(root, 'packaging', 'THIRD_PARTY_NOTICES.txt'),
+  join(packageDir, 'THIRD_PARTY_NOTICES.txt')
+)
 
 writeFileSync(
   join(packageDir, 'RUNTIME_DEPENDENCIES.txt'),
