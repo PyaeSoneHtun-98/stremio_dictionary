@@ -1,7 +1,10 @@
 param(
   [string]$InstallDir = "$env:LOCALAPPDATA\Programs\Subtitle Bridge",
   [switch]$NoShortcut,
-  [switch]$NoLaunch
+  [switch]$NoLaunch,
+  [string]$RuntimeManifestPath,
+  [string]$RuntimeCacheDir,
+  [switch]$SkipRuntimeProvisioning
 )
 
 $ErrorActionPreference = 'Stop'
@@ -77,6 +80,16 @@ $SourceDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SourceDir = Get-NormalizedPath (Resolve-Path $SourceDir).Path
 $InstallDir = Get-NormalizedPath $InstallDir
 
+if ([string]::IsNullOrWhiteSpace($RuntimeManifestPath)) {
+  $RuntimeManifestPath = Join-Path $SourceDir 'RUNTIME_MANIFEST.json'
+} else {
+  $RuntimeManifestPath = Get-NormalizedPath $RuntimeManifestPath
+}
+
+if (-not [string]::IsNullOrWhiteSpace($RuntimeCacheDir)) {
+  $RuntimeCacheDir = Get-NormalizedPath $RuntimeCacheDir
+}
+
 if (Test-IsSameOrChildPath -Candidate $InstallDir -Parent $SourceDir) {
   throw 'Choose an install directory outside the extracted package directory.'
 }
@@ -110,6 +123,23 @@ try {
     Copy-Item -LiteralPath $_.FullName -Destination $StageDir -Recurse -Force
   }
 
+  if (-not $SkipRuntimeProvisioning) {
+    $runtimeInstaller = Join-Path $SourceDir 'Install-RuntimeTools.ps1'
+    if (-not (Test-Path -LiteralPath $runtimeInstaller -PathType Leaf)) {
+      throw 'The runtime provisioning helper is missing from this package.'
+    }
+
+    $runtimeParameters = @{
+      DestinationRoot = (Join-Path $StageDir 'resources\tools')
+      ManifestPath = $RuntimeManifestPath
+    }
+    if (-not [string]::IsNullOrWhiteSpace($RuntimeCacheDir)) {
+      $runtimeParameters['CacheDir'] = $RuntimeCacheDir
+    }
+
+    & $runtimeInstaller @runtimeParameters
+  }
+
   $requiredRelativePaths = @(
     'Subtitle Bridge.exe',
     'resources\app\package.json',
@@ -117,6 +147,13 @@ try {
     'resources\app\out\preload\index.js',
     'resources\app\out\renderer\index.html'
   )
+
+  if (-not $SkipRuntimeProvisioning) {
+    $requiredRelativePaths += @(
+      'resources\tools\mpv\mpv.exe',
+      'resources\tools\ffmpeg\ffmpeg.exe'
+    )
+  }
 
   foreach ($relativePath in $requiredRelativePaths) {
     $stagedPath = Join-Path $StageDir $relativePath
