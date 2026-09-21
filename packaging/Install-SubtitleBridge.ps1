@@ -187,9 +187,6 @@ try {
     throw $swapError
   }
 
-  if (Test-Path -LiteralPath $BackupDir) {
-    Remove-Item -LiteralPath $BackupDir -Recurse -Force -ErrorAction SilentlyContinue
-  }
 } catch {
   if (Test-Path -LiteralPath $StageDir) {
     Remove-Item -LiteralPath $StageDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -199,43 +196,65 @@ try {
 }
 
 $ExePath = Join-Path $InstallDir 'Subtitle Bridge.exe'
-if (-not (Test-Path -LiteralPath $ExePath)) {
-  throw 'Subtitle Bridge.exe was not found after installation.'
+
+try {
+  if (-not (Test-Path -LiteralPath $ExePath)) {
+    throw 'Subtitle Bridge.exe was not found after installation.'
+  }
+
+  if (-not $NoShortcut) {
+    $StartMenuDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+    New-Item -ItemType Directory -Path $StartMenuDir -Force | Out-Null
+    $ShortcutPath = Join-Path $StartMenuDir 'Subtitle Bridge.lnk'
+    $Shell = New-Object -ComObject WScript.Shell
+    $Shortcut = $Shell.CreateShortcut($ShortcutPath)
+    $Shortcut.TargetPath = $ExePath
+    $Shortcut.WorkingDirectory = $InstallDir
+    $Shortcut.Description = 'Subtitle Bridge Player'
+    $Shortcut.Save()
+    Write-Host "Created Start Menu shortcut: $ShortcutPath"
+  }
+
+  $AppPackageJsonPath = Join-Path $InstallDir 'resources\app\package.json'
+  $AppPackageJson = Get-Content -LiteralPath $AppPackageJsonPath -Raw | ConvertFrom-Json
+  $UninstallerPath = Join-Path $InstallDir 'Uninstall-SubtitleBridge.ps1'
+  if (-not (Test-Path -LiteralPath $UninstallerPath -PathType Leaf)) {
+    throw 'The installed package is missing Uninstall-SubtitleBridge.ps1.'
+  }
+
+  $UninstallRegistryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SubtitleBridge'
+  New-Item -Path $UninstallRegistryPath -Force | Out-Null
+  New-ItemProperty -Path $UninstallRegistryPath -Name 'DisplayName' -Value 'Subtitle Bridge' -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $UninstallRegistryPath -Name 'DisplayVersion' -Value ([string]$AppPackageJson.version) -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $UninstallRegistryPath -Name 'Publisher' -Value 'Subtitle Bridge' -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $UninstallRegistryPath -Name 'InstallLocation' -Value $InstallDir -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $UninstallRegistryPath -Name 'DisplayIcon' -Value "$ExePath,0" -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $UninstallRegistryPath -Name 'UninstallString' -Value "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$UninstallerPath`"" -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $UninstallRegistryPath -Name 'QuietUninstallString' -Value "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$UninstallerPath`" -Quiet" -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $UninstallRegistryPath -Name 'NoModify' -Value 1 -PropertyType DWord -Force | Out-Null
+  New-ItemProperty -Path $UninstallRegistryPath -Name 'NoRepair' -Value 1 -PropertyType DWord -Force | Out-Null
+
+  Write-Host 'Subtitle Bridge installation completed.'
+} catch {
+  $postInstallError = $_
+
+  Remove-Item -LiteralPath (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Subtitle Bridge.lnk') -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SubtitleBridge' -Recurse -Force -ErrorAction SilentlyContinue
+
+  if ($newInstallMoved -and (Test-Path -LiteralPath $InstallDir)) {
+    Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+
+  if ($oldInstallMoved -and (Test-Path -LiteralPath $BackupDir) -and -not (Test-Path -LiteralPath $InstallDir)) {
+    Move-Item -LiteralPath $BackupDir -Destination $InstallDir -ErrorAction SilentlyContinue
+  }
+
+  throw $postInstallError
 }
 
-if (-not $NoShortcut) {
-  $StartMenuDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
-  New-Item -ItemType Directory -Path $StartMenuDir -Force | Out-Null
-  $ShortcutPath = Join-Path $StartMenuDir 'Subtitle Bridge.lnk'
-  $Shell = New-Object -ComObject WScript.Shell
-  $Shortcut = $Shell.CreateShortcut($ShortcutPath)
-  $Shortcut.TargetPath = $ExePath
-  $Shortcut.WorkingDirectory = $InstallDir
-  $Shortcut.Description = 'Subtitle Bridge Player'
-  $Shortcut.Save()
-  Write-Host "Created Start Menu shortcut: $ShortcutPath"
+if (Test-Path -LiteralPath $BackupDir) {
+  Remove-Item -LiteralPath $BackupDir -Recurse -Force -ErrorAction SilentlyContinue
 }
-
-$AppPackageJsonPath = Join-Path $InstallDir 'resources\app\package.json'
-$AppPackageJson = Get-Content -LiteralPath $AppPackageJsonPath -Raw | ConvertFrom-Json
-$UninstallerPath = Join-Path $InstallDir 'Uninstall-SubtitleBridge.ps1'
-if (-not (Test-Path -LiteralPath $UninstallerPath -PathType Leaf)) {
-  throw 'The installed package is missing Uninstall-SubtitleBridge.ps1.'
-}
-
-$UninstallRegistryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SubtitleBridge'
-New-Item -Path $UninstallRegistryPath -Force | Out-Null
-New-ItemProperty -Path $UninstallRegistryPath -Name 'DisplayName' -Value 'Subtitle Bridge' -PropertyType String -Force | Out-Null
-New-ItemProperty -Path $UninstallRegistryPath -Name 'DisplayVersion' -Value ([string]$AppPackageJson.version) -PropertyType String -Force | Out-Null
-New-ItemProperty -Path $UninstallRegistryPath -Name 'Publisher' -Value 'Subtitle Bridge' -PropertyType String -Force | Out-Null
-New-ItemProperty -Path $UninstallRegistryPath -Name 'InstallLocation' -Value $InstallDir -PropertyType String -Force | Out-Null
-New-ItemProperty -Path $UninstallRegistryPath -Name 'DisplayIcon' -Value "$ExePath,0" -PropertyType String -Force | Out-Null
-New-ItemProperty -Path $UninstallRegistryPath -Name 'UninstallString' -Value "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$UninstallerPath`"" -PropertyType String -Force | Out-Null
-New-ItemProperty -Path $UninstallRegistryPath -Name 'QuietUninstallString' -Value "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$UninstallerPath`" -Quiet" -PropertyType String -Force | Out-Null
-New-ItemProperty -Path $UninstallRegistryPath -Name 'NoModify' -Value 1 -PropertyType DWord -Force | Out-Null
-New-ItemProperty -Path $UninstallRegistryPath -Name 'NoRepair' -Value 1 -PropertyType DWord -Force | Out-Null
-
-Write-Host 'Subtitle Bridge installation completed.'
 
 if (-not $NoLaunch) {
   Start-Process -FilePath $ExePath
