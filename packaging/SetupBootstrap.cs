@@ -87,6 +87,9 @@ internal static class SubtitleBridgeSetup
 
     private static int RunSetup()
     {
+        var statusFile = Environment.GetEnvironmentVariable("SUBTITLE_BRIDGE_SETUP_STATUS_FILE");
+        WriteStatus(statusFile, "starting");
+
         var extractRoot = Path.Combine(
             Path.GetTempPath(),
             "SubtitleBridge-setup-" + Guid.NewGuid().ToString("N")
@@ -95,18 +98,25 @@ internal static class SubtitleBridgeSetup
         try
         {
             Directory.CreateDirectory(extractRoot);
+            WriteStatus(statusFile, "extract-root-created");
+
             var payloadZip = Path.Combine(extractRoot, "payload.zip");
             ExtractAppendedPayload(payloadZip);
+            WriteStatus(statusFile, "payload-extracted");
 
             ZipFile.ExtractToDirectory(payloadZip, extractRoot);
+            WriteStatus(statusFile, "zip-extracted");
             File.Delete(payloadZip);
 
             var packageDir = Path.Combine(extractRoot, "SubtitleBridge-win-x64");
             var installer = Path.Combine(packageDir, "Install-SubtitleBridge.ps1");
             if (!File.Exists(installer))
             {
+                WriteStatus(statusFile, "installer-missing");
                 return 2;
             }
+
+            WriteStatus(statusFile, "installer-found");
 
             var startInfo = new ProcessStartInfo
             {
@@ -121,15 +131,19 @@ internal static class SubtitleBridgeSetup
             {
                 if (process == null)
                 {
+                    WriteStatus(statusFile, "installer-process-missing");
                     return 3;
                 }
 
+                WriteStatus(statusFile, "installer-started");
                 process.WaitForExit();
+                WriteStatus(statusFile, "installer-exit:" + process.ExitCode);
                 return process.ExitCode;
             }
         }
-        catch
+        catch (Exception exception)
         {
+            WriteStatus(statusFile, "exception:" + exception.GetType().Name + ":" + exception.Message);
             return 4;
         }
         finally
@@ -145,6 +159,23 @@ internal static class SubtitleBridgeSetup
             {
                 // Temporary cleanup must not hide the setup result.
             }
+        }
+    }
+
+    private static void WriteStatus(string path, string message)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        try
+        {
+            File.AppendAllText(path, DateTime.UtcNow.ToString("O") + " " + message + Environment.NewLine);
+        }
+        catch
+        {
+            // Status reporting is diagnostic-only and must not affect setup.
         }
     }
 
