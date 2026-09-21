@@ -16,7 +16,7 @@ Stremio streams use mpv live subtitles. The opt-in Play in Subtitle Bridge helpe
 
 **Branch:** `feat/issue-34-windows-installer`
 
-**State:** Implementation and manual acceptance testing are complete on the feature branch. Codex final review found no P1s and four installer/uninstall P2 edge cases; all four P2s and both P3 follow-ups are fixed, with final exact-head CI and Codex re-review required before merge.
+**State:** Implementation and manual acceptance testing are complete on the feature branch. Successive Codex reviews found installer/uninstall safety edge cases; the reported P1/P2/P3 findings have been addressed, including strict transaction-path ownership, phase-based rollback recovery, verified shell-metadata restoration, and persisted/exhaustive Stremio cleanup. Final exact-head CI and Codex re-review are required before merge.
 
 ### User-facing goal
 
