@@ -70,23 +70,39 @@ writeFileSync(
 
 for (const helper of [
   'Install-SubtitleBridge.ps1',
+  'Install-RuntimeTools.ps1',
+  'Uninstall-SubtitleBridge.ps1',
   'Enable-StremioHandoff.ps1',
   'Disable-StremioHandoff.ps1'
 ]) {
   copyFileSync(join(root, 'packaging', helper), join(packageDir, helper))
 }
 
+copyFileSync(
+  join(root, 'packaging', 'runtime-manifest.json'),
+  join(packageDir, 'RUNTIME_MANIFEST.json')
+)
+copyFileSync(
+  join(root, 'packaging', 'THIRD_PARTY_NOTICES.txt'),
+  join(packageDir, 'THIRD_PARTY_NOTICES.txt')
+)
+
 writeFileSync(
   join(packageDir, 'RUNTIME_DEPENDENCIES.txt'),
   [
     'Subtitle Bridge runtime dependencies',
     '',
-    'This release artifact does NOT redistribute mpv or FFmpeg binaries.',
-    'Install compatible Windows x64 builds separately and make them available through PATH,',
-    'or set MPV_PATH and FFMPEG_PATH to the corresponding executable paths before launching.',
+    'The portable package does not redistribute mpv or FFmpeg binaries.',
+    'The normal Windows installer provisions pinned, SHA-256-verified app-local runtime builds',
+    'from the sources recorded in RUNTIME_MANIFEST.json.',
     '',
-    'Keeping these third-party runtimes external avoids silently redistributing binaries whose',
-    'license obligations depend on the exact build configuration and source provenance.',
+    'Runtime lookup order:',
+    '1. MPV_PATH / FFMPEG_PATH developer override',
+    '2. installer-managed app-local runtime',
+    '3. system PATH fallback',
+    '',
+    'A raw portable ZIP therefore still requires either managed tools to be added manually',
+    'under resources\\tools or compatible tools available through the developer overrides/PATH.',
     ''
   ].join('\r\n'),
   'utf8'
@@ -102,8 +118,16 @@ writeFileSync(
       arch: process.arch,
       createdAt: new Date().toISOString(),
       runtimeDependencies: {
-        mpv: { bundled: false, resolution: ['MPV_PATH', 'PATH'] },
-        ffmpeg: { bundled: false, resolution: ['FFMPEG_PATH', 'PATH'] }
+        mpv: {
+          bundled: false,
+          installerProvisioned: true,
+          resolution: ['MPV_PATH', 'managed-app-local', 'PATH']
+        },
+        ffmpeg: {
+          bundled: false,
+          installerProvisioned: true,
+          resolution: ['FFMPEG_PATH', 'managed-app-local', 'PATH']
+        }
       }
     },
     null,
@@ -129,8 +153,8 @@ writeFileSync(checksumPath, `${digest}  ${zipPath.split(/[\\/]/).pop()}\r\n`, 'u
 console.log(`Packaged: ${packageDir}`)
 console.log(`Archive:  ${zipPath}`)
 console.log(`SHA-256:  ${digest}`)
-console.log('Bundled mpv: no (external runtime required)')
-console.log('Bundled FFmpeg: no (external runtime required)')
+console.log('Bundled mpv: no (normal installer provisions a pinned managed runtime)')
+console.log('Bundled FFmpeg: no (normal installer provisions a pinned managed runtime)')
 
 function escapePowerShell(value) {
   return value.replaceAll("'", "''")

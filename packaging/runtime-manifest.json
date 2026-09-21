@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "mpv": {
+    "displayName": "mpv",
+    "archiveUrl": "https://github.com/mpv-player/mpv/releases/download/git-release/mpv-v0.41.0-dev-g0b7ed670f-34806151888-x86_64-w64-mingw32.zip",
+    "archiveSha256": "456318b7cbd4f8186ba8a68e9469048bd72ad9f8d474a0a1602b293fff430982",
+    "executableName": "mpv.exe",
+    "provenance": "mpv-player/mpv first-party GitHub CI build, git 0b7ed670f",
+    "sourceUrl": "https://github.com/mpv-player/mpv"
+  },
+  "ffmpeg": {
+    "displayName": "FFmpeg",
+    "archiveUrl": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-20-13-11/ffmpeg-n8.1.2-267-gb2f422d306-win64-lgpl-shared-8.1.zip",
+    "archiveSha256": "170e3f1dd7a2099c3e9bccc47958610fe6ea3a75e84e5c46e576af4163ab10bf",
+    "executableName": "ffmpeg.exe",
+    "provenance": "BtbN/FFmpeg-Builds LGPL shared autobuild-2026-09-20-13-11, FFmpeg n8.1.2-267-gb2f422d306",
+    "sourceUrl": "https://github.com/FFmpeg/FFmpeg"
+  }
+}

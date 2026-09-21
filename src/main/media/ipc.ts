@@ -174,6 +174,10 @@ async function openMediaTargetNow(rawTarget: string): Promise<OpenVideoResult> {
     externalSubtitleExtractor.cancel()
     subtitleSession.clear(controller.getState())
     await controller.load(mediaTarget.target, windowId, mediaTarget.displayName)
+    // Loading mpv can take long enough for the regular app window to finish showing
+    // and steal foreground activation. Re-activate the player after mpv is ready so
+    // Stremio and command-line handoffs land directly on the video.
+    playbackSurface.focus()
     return { cancelled: false }
   } catch (error) {
     return {

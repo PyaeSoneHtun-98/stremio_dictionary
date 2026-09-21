@@ -28,6 +28,10 @@ const desktopBridge: DesktopBridge = {
       return () => ipcRenderer.removeListener('media:state', subscription)
     }
   },
+  stremio: {
+    enableHandoff: () => ipcRenderer.invoke('stremio:enable-handoff'),
+    disableHandoff: () => ipcRenderer.invoke('stremio:disable-handoff')
+  },
   translation: {
     translateWord: (request) => ipcRenderer.invoke('translation:translate-word', request),
     getSettings: () => ipcRenderer.invoke('translation:get-settings'),

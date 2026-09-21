@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { diagnosticLog, disposeDiagnostics, initializeDiagnostics } from './diagnostics'
 import { disposeMediaIpc, openMediaTarget, registerMediaIpc } from './media/ipc'
 import { findLaunchTargetArgument } from './media/launchTarget'
+import { disposeStremioIpc, registerStremioIpc } from './stremio/ipc'
 import { disposeTranslationIpc, registerTranslationIpc } from './translation/ipc'
 
 // On some Windows x64 systems, Chromium's accelerated transparent windows render their
@@ -17,8 +18,13 @@ if (!hasSingleInstanceLock) {
   app.quit()
 } else {
   app.on('second-instance', (_event, commandLine) => {
+    const target = findLaunchTargetArgument(commandLine)
+    if (target) {
+      void handleLaunchTarget(target)
+      return
+    }
+
     focusMainWindow()
-    void handleLaunchArguments(commandLine)
   })
 
   app.whenReady().then(() => {
@@ -38,9 +44,14 @@ if (!hasSingleInstanceLock) {
     })
 
     registerMediaIpc()
+    registerStremioIpc()
     registerTranslationIpc()
-    createWindow()
-    void handleLaunchArguments(process.argv)
+
+    const initialLaunchTarget = findLaunchTargetArgument(process.argv)
+    createWindow({ activateOnReady: !initialLaunchTarget })
+    if (initialLaunchTarget) {
+      void handleLaunchTarget(initialLaunchTarget)
+    }
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -53,6 +64,7 @@ if (!hasSingleInstanceLock) {
 
   app.on('before-quit', () => {
     disposeTranslationIpc()
+    disposeStremioIpc()
     disposeMediaIpc()
     disposeDiagnostics()
   })
@@ -64,7 +76,7 @@ if (!hasSingleInstanceLock) {
   })
 }
 
-function createWindow(): void {
+function createWindow({ activateOnReady = true }: { activateOnReady?: boolean } = {}): void {
   const window = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -86,7 +98,17 @@ function createWindow(): void {
       mainWindow = null
     }
   })
-  window.once('ready-to-show', () => window.show())
+  window.once('ready-to-show', () => {
+    if (activateOnReady) {
+      window.show()
+      return
+    }
+
+    // When Subtitle Bridge was launched with media (for example from Stremio),
+    // keep the library window visible without letting it cover the player that
+    // is being created at the same time.
+    window.showInactive()
+  })
 
   if (process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -96,18 +118,14 @@ function createWindow(): void {
   void window.loadFile(join(__dirname, '../renderer/index.html'))
 }
 
-async function handleLaunchArguments(argv: readonly string[]): Promise<void> {
-  const target = findLaunchTargetArgument(argv)
-  if (!target) {
-    return
-  }
-
+async function handleLaunchTarget(target: string): Promise<void> {
   diagnosticLog('media.externalLaunchRequested', {
     source: target.toLowerCase().startsWith('vlc://') ? 'stremio-vlc' : 'direct'
   })
   const result = await openMediaTarget(target)
   if (result.error) {
     diagnosticLog('media.externalLaunchRejected', { reason: 'open-failed' })
+    focusMainWindow()
     dialog.showErrorBox('Could not open media', result.error)
   }
 }

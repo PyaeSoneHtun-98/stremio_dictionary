@@ -16,7 +16,7 @@ The product should feel like a normal media player first. Translation and subtit
 - FFmpeg handles full embedded text-subtitle extraction for local files.
 - The offline English → Burmese Dictionary v1.0 is the default translation provider.
 
-Release packages intentionally do not bundle mpv or FFmpeg. They are external runtime dependencies supplied by the target machine through `PATH`, `MPV_PATH`, and `FFMPEG_PATH`.
+Release packages do not redistribute mpv or FFmpeg binaries inside the setup executable. The Windows setup provisions pinned, SHA-256-verified app-local runtime archives on first install, caches the verified archives under the user's local application data for upgrades, and the app prefers those managed runtimes. Developer overrides through `MPV_PATH` / `FFMPEG_PATH` and system `PATH` remain fallback paths.
 
 ## Main playback architecture
 
@@ -152,7 +152,7 @@ The Windows package is produced with:
 npm run package:win
 ```
 
-The current package is an Electron portable directory/ZIP plus a current-user PowerShell installer. The installer stages and validates upgrades before replacing an existing installation and removes stale files from older installs.
+The release build produces an Electron portable directory/ZIP plus a single `SubtitleBridge-Setup-x64.exe` for normal users. The setup executable extracts the packaged app, provisions pinned/hash-verified app-local mpv and FFmpeg runtimes, registers a per-user Start Menu entry and Windows Installed Apps uninstall metadata, and uses a staged directory swap with rollback and interrupted-upgrade recovery. The packaged PowerShell installer remains the internal transaction engine and developer/test path. Normal users do not need to run PowerShell commands. Uninstall removes the managed runtime archive cache by default while preserving normal Electron user settings/data.
 
 Diagnostics are intentionally small and privacy-conscious. They may record lifecycle, controlled media/subtitle failure metadata, and memory samples. They must not record:
 
@@ -166,7 +166,7 @@ Diagnostics are intentionally small and privacy-conscious. They may record lifec
 ## Current product limitations
 
 - Windows x64 only.
-- mpv and FFmpeg must currently be installed/configured separately.
+- The first normal Windows install requires Internet access to download the pinned mpv and FFmpeg runtime archives; verified archives are cached for later upgrades.
 - The Dictionary v1.0 corpus is broad but not exhaustive; unknown words still fail cleanly offline.
 - Multi-word expressions and phrasal-verb lookup are not yet supported.
 - Rich ASS/SSA styling is not recreated in the interactive overlay.

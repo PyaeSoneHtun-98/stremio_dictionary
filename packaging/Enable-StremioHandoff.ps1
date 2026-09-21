@@ -12,6 +12,88 @@ $PlayersDeclarationPattern = '\b(?:var|let|const)\s+players\s*=\s*\{'
 $PlatformPathPattern = 'player\[process\.platform\]\s*&&\s*player\[process\.platform\]\.path\.forEach'
 $ExternalPushPattern = 'devices\.groups\.external\.push'
 
+function Get-StremioTargetStatePath {
+  if (-not [string]::IsNullOrWhiteSpace($env:SUBTITLE_BRIDGE_STREMIO_TARGETS_PATH)) {
+    return [System.IO.Path]::GetFullPath($env:SUBTITLE_BRIDGE_STREMIO_TARGETS_PATH)
+  }
+
+  return [System.IO.Path]::GetFullPath(
+    (Join-Path $env:LOCALAPPDATA 'Subtitle Bridge\stremio-handoff-targets.json')
+  )
+}
+
+function Read-StremioTargetPaths {
+  $statePath = Get-StremioTargetStatePath
+  if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) {
+    return @()
+  }
+
+  try {
+    $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+  } catch {
+    throw "The saved Stremio handoff target record is unreadable: $statePath"
+  }
+
+  if ($state.version -ne 1 -or [string]$state.application -ne 'Subtitle Bridge') {
+    throw "The saved Stremio handoff target record has an unsupported format: $statePath"
+  }
+
+  $paths = New-Object System.Collections.Generic.List[string]
+  foreach ($path in @($state.paths)) {
+    if ([string]::IsNullOrWhiteSpace([string]$path)) {
+      throw "The saved Stremio handoff target record contains an invalid path: $statePath"
+    }
+    $paths.Add([System.IO.Path]::GetFullPath([string]$path))
+  }
+
+  return @($paths | Select-Object -Unique)
+}
+
+function Write-StremioTargetPaths {
+  param([Parameter(Mandatory = $true)][string[]]$Paths)
+
+  $statePath = Get-StremioTargetStatePath
+  $stateDir = Split-Path -Parent $statePath
+
+  if ($Paths.Count -eq 0) {
+    if (Test-Path -LiteralPath $statePath) {
+      Remove-Item -LiteralPath $statePath -Force -ErrorAction Stop
+    }
+    return
+  }
+
+  New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+  $normalized = @($Paths | ForEach-Object {
+    [System.IO.Path]::GetFullPath($_)
+  } | Select-Object -Unique)
+
+  $tempPath = "$statePath.tmp"
+  try {
+    [ordered]@{
+      version = 1
+      application = 'Subtitle Bridge'
+      paths = $normalized
+    } |
+      ConvertTo-Json -Depth 4 |
+      Set-Content -LiteralPath $tempPath -Encoding UTF8
+
+    Move-Item -LiteralPath $tempPath -Destination $statePath -Force -ErrorAction Stop
+  } finally {
+    Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Record-StremioTarget {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  $resolved = [System.IO.Path]::GetFullPath($Path)
+  $paths = @(Read-StremioTargetPaths)
+  if ($paths -notcontains $resolved) {
+    $paths += $resolved
+  }
+  Write-StremioTargetPaths -Paths $paths
+}
+
 function Get-PatchState([string]$Text) {
   $beginCount = ([regex]::Matches($Text, [regex]::Escape($MarkerBegin))).Count
   $endCount = ([regex]::Matches($Text, [regex]::Escape($MarkerEnd))).Count
@@ -81,8 +163,6 @@ function Write-AtomicUtf8([string]$Path, [string]$Text) {
       throw 'Could not verify the temporary Stremio patch file.'
     }
 
-    # CI uses this fail-before-replace hook to prove that an interrupted/failed mutation
-    # leaves the original server.js untouched. It is intentionally fail-safe if set by a user.
     if ($env:SUBTITLE_BRIDGE_TEST_FORCE_STREMIO_REPLACE_FAILURE -eq '1') {
       throw 'Simulated Stremio atomic replacement failure.'
     }
@@ -120,7 +200,7 @@ function Resolve-StremioServerJs([string]$ExplicitPath) {
           }
         }
       } catch {
-        # Process path access can fail for unrelated elevated processes; continue with filesystem discovery.
+        # Process-path access can fail; filesystem discovery below remains authoritative.
       }
     }
 
@@ -134,20 +214,22 @@ function Resolve-StremioServerJs([string]$ExplicitPath) {
       continue
     }
 
-    Get-ChildItem -LiteralPath $root -Filter 'server.js' -File -Recurse -ErrorAction SilentlyContinue |
-      Where-Object { $_.FullName -match '(?i)stremio' } |
-      ForEach-Object { $candidates.Add([System.IO.Path]::GetFullPath($_.FullName)) }
+    try {
+      Get-ChildItem -LiteralPath $root -Filter 'server.js' -File -Recurse -ErrorAction Stop |
+        Where-Object { $_.FullName -match '(?i)stremio' } |
+        ForEach-Object { $candidates.Add([System.IO.Path]::GetFullPath($_.FullName)) }
+    } catch {
+      throw "Could not safely inspect Stremio installations under: $root"
+    }
   }
 
   foreach ($candidate in ($candidates | Select-Object -Unique)) {
     try {
       $candidateContent = [System.IO.File]::ReadAllText($candidate)
     } catch {
-      continue
+      throw "Could not read a discovered Stremio server.js safely: $candidate"
     }
 
-    # If our markers are present, do not hide a malformed patch by silently moving on to
-    # another Stremio installation. Marker corruption must fail closed and be handled explicitly.
     if ($candidateContent.Contains($MarkerBegin) -or $candidateContent.Contains($MarkerEnd)) {
       $candidateBase = Remove-PatchBlock $candidateContent
       Assert-CompatibleStremioLayout $candidateBase
@@ -158,7 +240,7 @@ function Resolve-StremioServerJs([string]$ExplicitPath) {
       Assert-CompatibleStremioLayout $candidateContent
       return $candidate
     } catch {
-      # Ignore incompatible unrelated candidates and keep looking.
+      # Readable but incompatible unrelated candidate; keep looking.
     }
   }
 
@@ -175,9 +257,10 @@ $content = [System.IO.File]::ReadAllText($ServerJsPath)
 $hasExistingPatch = Get-PatchState $content
 $baseContent = Remove-PatchBlock $content
 
-# Validate the unpatched Stremio structure before creating/replacing backups or writing anything.
 Assert-CompatibleStremioLayout $baseContent
 $externalMatch = [regex]::Match($baseContent, $ExternalDevicesPattern)
+
+Record-StremioTarget -Path $ServerJsPath
 
 $quotedExecutable = '"' + $ExecutablePath + '"'
 $jsExecutable = ConvertTo-Json $quotedExecutable -Compress
@@ -199,7 +282,7 @@ $MarkerEnd
 $patched = $baseContent.Insert($externalMatch.Index, "$block`r`n")
 
 if ($patched -eq $content) {
-  Write-Host 'Subtitle Bridge is already enabled for this Stremio server.js. Nothing was changed.'
+  Write-Host 'Subtitle Bridge is already enabled for this Stremio server.js. Target record verified.'
   exit 0
 }
 

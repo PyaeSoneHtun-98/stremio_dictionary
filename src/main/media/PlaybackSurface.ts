@@ -12,10 +12,7 @@ export class PlaybackSurface {
       this.overlayWindow &&
       !this.overlayWindow.isDestroyed()
     ) {
-      this.hostWindow.show()
-      this.overlayWindow.show()
-      this.syncOverlayBounds()
-      this.overlayWindow.focus()
+      this.focus()
       return getWin32WindowId(this.hostWindow)
     }
 
@@ -94,13 +91,33 @@ export class PlaybackSurface {
 
     await loadOverlayRenderer(overlayWindow)
 
+    this.focus()
+
+    return getWin32WindowId(hostWindow)
+  }
+
+  focus(): void {
+    const hostWindow = this.hostWindow
+    const overlayWindow = this.overlayWindow
+
+    if (
+      !hostWindow ||
+      hostWindow.isDestroyed() ||
+      !overlayWindow ||
+      overlayWindow.isDestroyed()
+    ) {
+      return
+    }
+
+    // A Stremio handoff can arrive while the regular Subtitle Bridge window is the
+    // foreground window. Explicitly activate the playback host first so Windows
+    // raises the whole player surface, then return keyboard focus to the overlay.
     hostWindow.show()
+    hostWindow.focus()
     this.syncOverlayBounds()
     overlayWindow.show()
     overlayWindow.moveTop()
     overlayWindow.focus()
-
-    return getWin32WindowId(hostWindow)
   }
 
   toggleFullscreen(): void {

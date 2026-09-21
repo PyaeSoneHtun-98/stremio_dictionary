@@ -8,7 +8,7 @@
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
     "build:app": "electron-vite build",
-    "package:win": "npm run build && node scripts/package-windows.mjs",
+    "package:win": "npm run build && node scripts/package-windows.mjs && node scripts/build-windows-setup.mjs",
     "preview": "electron-vite preview",
     "lint": "biome lint .",
     "format": "biome format --write .",

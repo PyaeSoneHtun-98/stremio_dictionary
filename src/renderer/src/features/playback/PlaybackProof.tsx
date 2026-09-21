@@ -21,6 +21,8 @@ export function PlaybackProof(): React.JSX.Element {
   const [opening, setOpening] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
+  const [stremioBusy, setStremioBusy] = useState(false)
+  const [stremioMessage, setStremioMessage] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -97,6 +99,22 @@ export function PlaybackProof(): React.JSX.Element {
     }
   }
 
+  const updateStremioHandoff = async (enabled: boolean): Promise<void> => {
+    setStremioBusy(true)
+    setStremioMessage(null)
+
+    try {
+      const result = enabled
+        ? await window.desktop.stremio.enableHandoff()
+        : await window.desktop.stremio.disableHandoff()
+      setStremioMessage(result.message)
+    } catch {
+      setStremioMessage('Could not update the Stremio integration. Try again.')
+    } finally {
+      setStremioBusy(false)
+    }
+  }
+
   return (
     <section
       className={`playback-proof${dragActive ? ' is-dragging' : ''}`}
@@ -141,10 +159,39 @@ export function PlaybackProof(): React.JSX.Element {
         </button>
       </div>
 
-      <p className="playback-help">
-        Watching with Stremio? Choose <strong>Play in Subtitle Bridge</strong> from its player menu
-        after enabling the handoff helper.
-      </p>
+      <div className="stremio-integration">
+        <div>
+          <strong>Watching with Stremio?</strong>
+          <span>
+            Enable the optional handoff, restart Stremio, then choose{' '}
+            <strong>Play in Subtitle Bridge</strong> from its player menu.
+          </span>
+        </div>
+        <div className="stremio-actions">
+          <button
+            className="secondary-action"
+            type="button"
+            disabled={stremioBusy}
+            onClick={() => void updateStremioHandoff(true)}
+          >
+            {stremioBusy ? 'Working…' : 'Enable Stremio'}
+          </button>
+          <button
+            className="secondary-action"
+            type="button"
+            disabled={stremioBusy}
+            onClick={() => void updateStremioHandoff(false)}
+          >
+            Disable
+          </button>
+        </div>
+      </div>
+
+      {stremioMessage ? (
+        <p className="playback-help" aria-live="polite">
+          {stremioMessage}
+        </p>
+      ) : null}
 
       {state.error || localError ? (
         <div className="media-error">{localError ?? state.error}</div>

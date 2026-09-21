@@ -94,6 +94,11 @@ export interface LoadExternalSubtitleResult {
   error?: string
 }
 
+export interface StremioHandoffResult {
+  ok: boolean
+  message: string
+}
+
 export interface DesktopBridge {
   platform: string
   media: {
@@ -114,6 +119,10 @@ export interface DesktopBridge {
     ) => Promise<SubtitlePreferencesSnapshot>
     toggleFullscreen: () => Promise<void>
     onState: (listener: (state: PlaybackSnapshot) => void) => () => void
+  }
+  stremio: {
+    enableHandoff: () => Promise<StremioHandoffResult>
+    disableHandoff: () => Promise<StremioHandoffResult>
   }
   translation: {
     translateWord: (request: TranslationRequest) => Promise<TranslationResult>
