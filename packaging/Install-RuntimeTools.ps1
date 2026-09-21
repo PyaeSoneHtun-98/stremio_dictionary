@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.Reflection.Assembly]::LoadWithPartialName('System.IO.Compression.FileSystem') | Out-Null
 
 function Get-NormalizedSha256 {
   param([Parameter(Mandatory = $true)][string]$Value)
@@ -219,7 +219,12 @@ function Copy-OrDownloadArchive {
   }
 
   Write-Host "Downloading runtime archive from $($uri.Host)..."
-  Invoke-WebRequest -Uri $uri.AbsoluteUri -OutFile $Destination -UseBasicParsing -TimeoutSec 300
+  $client = [System.Net.WebClient]::new()
+  try {
+    $client.DownloadFile($uri.AbsoluteUri, $Destination)
+  } finally {
+    $client.Dispose()
+  }
 }
 
 function Install-Runtime {
@@ -282,8 +287,7 @@ function Install-Runtime {
       throw "$displayName cached runtime archive failed SHA-256 verification."
     }
 
-    New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
-    Expand-Archive -LiteralPath $archivePath -DestinationPath $extractDir -Force
+    Expand-ZipArchive -ArchivePath $archivePath -DestinationPath $extractDir
 
     $executable = Get-ChildItem -LiteralPath $extractDir -Filter $executableName -File -Recurse |
       Select-Object -First 1
