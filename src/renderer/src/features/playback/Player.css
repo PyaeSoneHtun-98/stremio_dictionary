@@ -439,6 +439,27 @@ html.overlay-mode #root {
 .translation-popup-close svg {
   width: 17px;
 }
+.translation-phrase-detected {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-top: 1px solid #ffffff12;
+  margin-top: 10px;
+  padding-top: 10px;
+  font-size: 11px;
+  color: #a1b6ac;
+}
+
+.translation-phrase-detected strong {
+  font-size: 13px;
+  color: #d2f4e4;
+}
+
+.translation-phrase-detected small {
+  font-size: 10px;
+  color: #82968d;
+}
+
 .translation-burmese {
   border-top: 1px solid #ffffff12;
   margin-top: 10px;
