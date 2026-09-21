@@ -185,6 +185,18 @@ jobs:
             throw 'Failed upgrade modified the existing installation.'
           }
 
+          $env:SUBTITLE_BRIDGE_TEST_FORCE_POST_INSTALL_FAILURE = '1'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+          $postInstallFailureExitCode = $LASTEXITCODE
+          Remove-Item Env:SUBTITLE_BRIDGE_TEST_FORCE_POST_INSTALL_FAILURE -ErrorAction SilentlyContinue
+          $global:LASTEXITCODE = 0
+          if ($postInstallFailureExitCode -eq 0) {
+            throw 'Forced post-install metadata failure unexpectedly succeeded.'
+          }
+          if (-not (Test-Path -LiteralPath $rollbackMarker)) {
+            throw 'Post-swap failure did not restore the previous installation.'
+          }
+
           $nestedInstallDir = Join-Path $packageDir 'nested-install-should-fail'
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $nestedInstallDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
           $nestedExitCode = $LASTEXITCODE
