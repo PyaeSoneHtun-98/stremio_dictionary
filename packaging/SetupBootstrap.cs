@@ -124,7 +124,9 @@ internal static class SubtitleBridgeSetup
                 Arguments = BuildInstallerArguments(installer),
                 UseShellExecute = false,
                 CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden
+                WindowStyle = ProcessWindowStyle.Hidden,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
             };
 
             using (var process = Process.Start(startInfo))
@@ -136,7 +138,20 @@ internal static class SubtitleBridgeSetup
                 }
 
                 WriteStatus(statusFile, "installer-started");
+
+                var standardOutput = process.StandardOutput.ReadToEnd();
+                var standardError = process.StandardError.ReadToEnd();
                 process.WaitForExit();
+
+                if (!string.IsNullOrWhiteSpace(standardOutput))
+                {
+                    WriteStatus(statusFile, "installer-stdout:" + FlattenForStatus(standardOutput));
+                }
+                if (!string.IsNullOrWhiteSpace(standardError))
+                {
+                    WriteStatus(statusFile, "installer-stderr:" + FlattenForStatus(standardError));
+                }
+
                 WriteStatus(statusFile, "installer-exit:" + process.ExitCode);
                 return process.ExitCode;
             }
@@ -160,6 +175,14 @@ internal static class SubtitleBridgeSetup
                 // Temporary cleanup must not hide the setup result.
             }
         }
+    }
+
+    private static string FlattenForStatus(string value)
+    {
+        return value
+            .Replace("\r", " ")
+            .Replace("\n", " ")
+            .Trim();
     }
 
     private static void WriteStatus(string path, string message)
