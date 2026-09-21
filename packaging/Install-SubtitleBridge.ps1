@@ -180,6 +180,33 @@ function Get-PathToken {
   }
 }
 
+function Acquire-InstallMutex {
+  param([Parameter(Mandatory = $true)][string]$InstallPathToken)
+
+  $mutexName = "Local\SubtitleBridge-Setup-$InstallPathToken"
+  $mutex = New-Object System.Threading.Mutex($false, $mutexName)
+  $acquired = $false
+
+  try {
+    try {
+      $acquired = $mutex.WaitOne(0)
+    } catch [System.Threading.AbandonedMutexException] {
+      # The previous setup process terminated while holding the mutex. Windows transfers
+      # ownership to this process, and transaction recovery below will repair its state.
+      $acquired = $true
+    }
+
+    if (-not $acquired) {
+      throw 'Another Subtitle Bridge setup is already running for this install directory. Finish or close it before starting setup again.'
+    }
+
+    return $mutex
+  } catch {
+    $mutex.Dispose()
+    throw
+  }
+}
+
 function Save-ShellMetadata {
   param(
     [Parameter(Mandatory = $true)][string]$MetadataDir,
@@ -445,14 +472,9 @@ function Recover-InterruptedTransaction {
     throw 'A previous Subtitle Bridge installation transaction reuses a temporary path.'
   }
 
-  if (-not (Test-Path -LiteralPath $metadataDir -PathType Container)) {
-    throw 'A previous Subtitle Bridge installation transaction is missing its shell-metadata snapshot.'
-  }
-  Assert-TransactionDirectoryMarker -Directory $metadataDir -TransactionId $transactionId -Role 'metadata' -LogicalInstallDir $ExpectedInstallDir
-
   $hadPreviousInstall = [bool]$transaction.hadPreviousInstall
   $phase = [string]$transaction.phase
-  $validPhases = @('prepared', 'backup-moved', 'new-installed', 'restoring-app', 'app-restored', 'app-removed', 'metadata-restored')
+  $validPhases = @('prepared', 'backup-moved', 'new-installed', 'restoring-app', 'app-restored', 'app-removed', 'metadata-restored', 'committed')
   if ($phase -notin $validPhases) {
     throw 'A previous Subtitle Bridge installation transaction has an invalid recovery phase.'
   }
@@ -461,6 +483,31 @@ function Recover-InterruptedTransaction {
   if ($backupExists) {
     Assert-OwnedInstallDirectory -Directory $backupDir -LogicalInstallDir $ExpectedInstallDir
   }
+
+  if ($phase -eq 'committed') {
+    # The new application and shell metadata are already authoritative. A crash during
+    # successful cleanup must never turn the next setup run into a rollback.
+    if ($backupExists) {
+      Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction Stop
+    }
+
+    if (Test-Path -LiteralPath $metadataDir -PathType Container) {
+      Remove-OwnedTransactionDirectory -Directory $metadataDir -TransactionId $transactionId -Role 'metadata' -LogicalInstallDir $ExpectedInstallDir
+    }
+
+    if (Test-Path -LiteralPath $stageDir -PathType Container) {
+      Remove-OwnedTransactionDirectory -Directory $stageDir -TransactionId $transactionId -Role 'stage' -LogicalInstallDir $ExpectedInstallDir
+    }
+
+    Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction Stop
+    Write-Host 'Finished cleanup from a previously committed Subtitle Bridge installation.'
+    return
+  }
+
+  if (-not (Test-Path -LiteralPath $metadataDir -PathType Container)) {
+    throw 'A previous Subtitle Bridge installation transaction is missing its shell-metadata snapshot.'
+  }
+  Assert-TransactionDirectoryMarker -Directory $metadataDir -TransactionId $transactionId -Role 'metadata' -LogicalInstallDir $ExpectedInstallDir
 
   if ($phase -in @('backup-moved', 'new-installed', 'restoring-app') -or $backupExists) {
     Set-TransactionPhase -MarkerPath $MarkerPath -Phase 'restoring-app'
@@ -599,7 +646,20 @@ if (Test-InstalledAppRunning -ExecutablePath $ExistingExePath) {
 $StartMenuDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
 $ShortcutPath = Join-Path $StartMenuDir 'Subtitle Bridge.lnk'
 $UninstallRegistryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SubtitleBridge'
-$TransactionMarkerPath = Join-Path $InstallParent ('.SubtitleBridge-transaction-' + (Get-PathToken $InstallDir) + '.json')
+$InstallPathToken = Get-PathToken $InstallDir
+$TransactionMarkerPath = Join-Path $InstallParent ('.SubtitleBridge-transaction-' + $InstallPathToken + '.json')
+$InstallMutex = Acquire-InstallMutex -InstallPathToken $InstallPathToken
+$InstallMutexHeld = $true
+
+try {
+  if (-not [string]::IsNullOrWhiteSpace($env:SUBTITLE_BRIDGE_TEST_HOLD_INSTALL_LOCK_MS)) {
+    $holdMilliseconds = 0
+    if (-not [int]::TryParse($env:SUBTITLE_BRIDGE_TEST_HOLD_INSTALL_LOCK_MS, [ref]$holdMilliseconds) -or
+        $holdMilliseconds -lt 0 -or $holdMilliseconds -gt 30000) {
+      throw 'SUBTITLE_BRIDGE_TEST_HOLD_INSTALL_LOCK_MS must be an integer from 0 to 30000.'
+    }
+    Start-Sleep -Milliseconds $holdMilliseconds
+  }
 
 Assert-OwnedInstallDirectory -Directory $InstallDir -LogicalInstallDir $InstallDir -AllowLegacyDefault
 Recover-InterruptedTransaction -MarkerPath $TransactionMarkerPath -ExpectedInstallDir $InstallDir -InstallParent $InstallParent -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
@@ -789,13 +849,39 @@ try {
   throw $postInstallError
 }
 
+Set-TransactionPhase -MarkerPath $TransactionMarkerPath -Phase 'committed'
+
+if ($env:SUBTITLE_BRIDGE_TEST_COMMITTED_CLEANUP_STOP -eq 'before-artifacts') {
+  [System.Environment]::Exit(86)
+}
+
 if (Test-Path -LiteralPath $BackupDir -PathType Container) {
   Assert-OwnedInstallDirectory -Directory $BackupDir -LogicalInstallDir $InstallDir
   Remove-Item -LiteralPath $BackupDir -Recurse -Force -ErrorAction Stop
 }
+
+if ($env:SUBTITLE_BRIDGE_TEST_COMMITTED_CLEANUP_STOP -eq 'after-backup') {
+  [System.Environment]::Exit(87)
+}
+
 Remove-OwnedTransactionDirectory -Directory $MetadataDir -TransactionId $transactionId -Role 'metadata' -LogicalInstallDir $InstallDir
+
+if ($env:SUBTITLE_BRIDGE_TEST_COMMITTED_CLEANUP_STOP -eq 'after-metadata') {
+  [System.Environment]::Exit(88)
+}
+
 Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction Stop
 
 if (-not $NoLaunch) {
   Start-Process -FilePath $ExePath
+}
+} finally {
+  if ($InstallMutexHeld -and $null -ne $InstallMutex) {
+    try {
+      $InstallMutex.ReleaseMutex()
+    } catch {
+      # The process may be terminating through a test-only hard-exit hook.
+    }
+    $InstallMutex.Dispose()
+  }
 }
