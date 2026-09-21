@@ -84,10 +84,15 @@ function Install-Runtime {
       $downloadPath = "$archivePath.download"
       Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
       try {
-        Copy-OrDownloadArchive -Source $archiveUrl -Destination $downloadPath
+        try {
+          Copy-OrDownloadArchive -Source $archiveUrl -Destination $downloadPath
+        } catch {
+          throw "Could not download the required $displayName runtime. Check your internet connection and try again."
+        }
+
         $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($actualHash -ne $expectedHash) {
-          throw "$displayName runtime archive failed SHA-256 verification."
+          throw "$displayName runtime archive failed SHA-256 verification. The downloaded file was not installed."
         }
         Move-Item -LiteralPath $downloadPath -Destination $archivePath -Force
       } finally {
