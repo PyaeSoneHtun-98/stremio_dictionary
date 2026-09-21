@@ -18,7 +18,7 @@ PR #31 added external subtitle drag/drop and subtitle timing/appearance controls
 
 **Branch:** `feat/issue-32-production-dictionary`
 
-**State:** Codex found one P2 legacy-alias regression. The code fix and automated regression test are complete; one short Windows alias retest and final Codex re-review remain.
+**State:** Codex found one P2 legacy-alias regression. The fix, automated regression coverage, and Windows manual alias retest are complete; final exact-head CI and Codex re-review remain.
 
 ### Source dataset
 
@@ -93,10 +93,18 @@ CI #247 passed on code head `15fed17c9816578bdc9cd936685129542ad74821`:
 - production build passed;
 - Windows packaging/install/upgrade/Stremio-handoff regression passed.
 
+### P2 manual retest
+
+Windows manual retest passed on another PC using the current Issue #32 branch/build:
+- `children → child`;
+- `signed → sign`;
+- `women → woman`.
+
+Each restored alias resolved through the normal structured popup path.
+
 ### Remaining gate
 
-- Short Windows manual retest of at least one restored compatibility alias.
-- Final exact-head CI after documentation/manual-result recording.
+- Final exact-head CI after this manual-result documentation commit.
 - Codex re-review of the P2 fix.
 - Merge only if no P1/P2 blockers remain.
 
