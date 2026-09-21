@@ -34,6 +34,97 @@ function Test-IsSameOrChildPath {
   )
 }
 
+function Test-ExpectedInstallLayout {
+  param([Parameter(Mandatory = $true)][string]$Directory)
+
+  $requiredPaths = @(
+    'Subtitle Bridge.exe',
+    'resources\app\package.json',
+    'resources\app\out\main\index.js',
+    'resources\app\out\preload\index.js',
+    'resources\app\out\renderer\index.html'
+  )
+
+  foreach ($relativePath in $requiredPaths) {
+    if (-not (Test-Path -LiteralPath (Join-Path $Directory $relativePath))) {
+      return $false
+    }
+  }
+
+  try {
+    $packageJson = Get-Content -LiteralPath (Join-Path $Directory 'resources\app\package.json') -Raw | ConvertFrom-Json
+    return ([string]$packageJson.name -eq 'subtitle-bridge')
+  } catch {
+    return $false
+  }
+}
+
+function Write-InstallOwnershipMarker {
+  param(
+    [Parameter(Mandatory = $true)][string]$Directory,
+    [Parameter(Mandatory = $true)][string]$LogicalInstallDir
+  )
+
+  $markerPath = Join-Path $Directory '.subtitle-bridge-install.json'
+  [ordered]@{
+    version = 1
+    application = 'Subtitle Bridge'
+    installDir = (Get-NormalizedPath $LogicalInstallDir)
+  } |
+    ConvertTo-Json -Depth 3 |
+    Set-Content -LiteralPath $markerPath -Encoding UTF8
+}
+
+function Assert-OwnedInstallDirectory {
+  param(
+    [Parameter(Mandatory = $true)][string]$Directory,
+    [Parameter(Mandatory = $true)][string]$LogicalInstallDir,
+    [switch]$AllowLegacyDefault
+  )
+
+  if (-not (Test-Path -LiteralPath $Directory -PathType Container)) {
+    return
+  }
+
+  $entries = @(Get-ChildItem -LiteralPath $Directory -Force -ErrorAction Stop)
+  if ($entries.Count -eq 0) {
+    return
+  }
+
+  if (-not (Test-ExpectedInstallLayout -Directory $Directory)) {
+    throw "The existing install directory is not a recognized Subtitle Bridge installation: $Directory"
+  }
+
+  $markerPath = Join-Path $Directory '.subtitle-bridge-install.json'
+  if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+    try {
+      $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
+    } catch {
+      throw "The Subtitle Bridge ownership marker is unreadable: $markerPath"
+    }
+
+    $expected = Get-NormalizedPath $LogicalInstallDir
+    $recorded = Get-NormalizedPath ([string]$marker.installDir)
+    if ($marker.version -ne 1 -or
+        [string]$marker.application -ne 'Subtitle Bridge' -or
+        -not $recorded.Equals($expected, [System.StringComparison]::OrdinalIgnoreCase)) {
+      throw "The existing install directory has an invalid Subtitle Bridge ownership marker: $Directory"
+    }
+    return
+  }
+
+  $defaultInstallDir = Get-NormalizedPath (Join-Path $env:LOCALAPPDATA 'Programs\Subtitle Bridge')
+  $logical = Get-NormalizedPath $LogicalInstallDir
+  if ($AllowLegacyDefault -and
+      $logical.Equals($defaultInstallDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Write-InstallOwnershipMarker -Directory $Directory -LogicalInstallDir $LogicalInstallDir
+    Write-Host 'Migrated the previous default Subtitle Bridge installation to the ownership-marker format.'
+    return
+  }
+
+  throw "Refusing to replace a non-empty directory without a Subtitle Bridge ownership marker: $Directory"
+}
+
 function Test-InstalledAppRunning {
   param([Parameter(Mandatory = $true)][string]$ExecutablePath)
 
@@ -238,14 +329,23 @@ function Restore-PreviousInstallation {
     [Parameter(Mandatory = $true)][string]$RegistryPath
   )
 
+  if (-not (Test-Path -LiteralPath $BackupDir -PathType Container)) {
+    throw 'The previous Subtitle Bridge installation backup is missing; automatic rollback cannot continue.'
+  }
+
+  Assert-OwnedInstallDirectory -Directory $BackupDir -LogicalInstallDir $InstallDir
+
+  if ($env:SUBTITLE_BRIDGE_TEST_FORCE_ROLLBACK_FAILURE -eq '1') {
+    throw 'Simulated rollback restoration failure.'
+  }
+
   if (Test-Path -LiteralPath $InstallDir) {
-    Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
+    Assert-OwnedInstallDirectory -Directory $InstallDir -LogicalInstallDir $InstallDir
+    Remove-Item -LiteralPath $InstallDir -Recurse -Force
   }
 
-  if (Test-Path -LiteralPath $BackupDir -PathType Container) {
-    Move-Item -LiteralPath $BackupDir -Destination $InstallDir -ErrorAction SilentlyContinue
-  }
-
+  Move-Item -LiteralPath $BackupDir -Destination $InstallDir
+  Assert-OwnedInstallDirectory -Directory $InstallDir -LogicalInstallDir $InstallDir
   Restore-ShellMetadata -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $RegistryPath
 }
 
@@ -290,6 +390,7 @@ $ShortcutPath = Join-Path $StartMenuDir 'Subtitle Bridge.lnk'
 $UninstallRegistryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SubtitleBridge'
 $TransactionMarkerPath = Join-Path $InstallParent ('.SubtitleBridge-transaction-' + (Get-PathToken $InstallDir) + '.json')
 
+Assert-OwnedInstallDirectory -Directory $InstallDir -LogicalInstallDir $InstallDir -AllowLegacyDefault
 Recover-InterruptedTransaction -MarkerPath $TransactionMarkerPath -ExpectedInstallDir $InstallDir -InstallParent $InstallParent -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
 
 $transactionId = [System.Guid]::NewGuid().ToString('N')
@@ -355,6 +456,9 @@ try {
     }
   }
 
+  Write-InstallOwnershipMarker -Directory $StageDir -LogicalInstallDir $InstallDir
+  Assert-OwnedInstallDirectory -Directory $StageDir -LogicalInstallDir $InstallDir
+
   try {
     if (Test-Path -LiteralPath $InstallDir) {
       Move-Item -LiteralPath $InstallDir -Destination $BackupDir
@@ -371,17 +475,27 @@ try {
   } catch {
     $swapError = $_
 
-    Restore-PreviousInstallation -InstallDir $InstallDir -BackupDir $BackupDir -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
-    Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction SilentlyContinue
+    try {
+      Restore-PreviousInstallation -InstallDir $InstallDir -BackupDir $BackupDir -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
+      Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction Stop
+    } catch {
+      throw "The upgrade failed and automatic rollback also failed. Recovery data was preserved for the next setup run. Upgrade error: $($swapError.Exception.Message) Rollback error: $($_.Exception.Message)"
+    }
+
     throw $swapError
   }
 
 } catch {
-  if (Test-Path -LiteralPath $StageDir) {
-    Remove-Item -LiteralPath $StageDir -Recurse -Force -ErrorAction SilentlyContinue
+  $recoveryPending = (Test-Path -LiteralPath $TransactionMarkerPath -PathType Leaf) -and
+    (Test-Path -LiteralPath $BackupDir -PathType Container)
+
+  if (-not $recoveryPending) {
+    if (Test-Path -LiteralPath $StageDir) {
+      Remove-Item -LiteralPath $StageDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Remove-Item -LiteralPath $MetadataDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction SilentlyContinue
   }
-  Remove-Item -LiteralPath $MetadataDir -Recurse -Force -ErrorAction SilentlyContinue
-  Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction SilentlyContinue
 
   throw
 }
@@ -435,9 +549,13 @@ try {
 } catch {
   $postInstallError = $_
 
-  Restore-PreviousInstallation -InstallDir $InstallDir -BackupDir $BackupDir -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
-  Remove-Item -LiteralPath $MetadataDir -Recurse -Force -ErrorAction SilentlyContinue
-  Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction SilentlyContinue
+  try {
+    Restore-PreviousInstallation -InstallDir $InstallDir -BackupDir $BackupDir -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
+    Remove-Item -LiteralPath $MetadataDir -Recurse -Force -ErrorAction Stop
+    Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction Stop
+  } catch {
+    throw "Post-install setup failed and automatic rollback also failed. Recovery data was preserved for the next setup run. Setup error: $($postInstallError.Exception.Message) Rollback error: $($_.Exception.Message)"
+  }
 
   throw $postInstallError
 }
