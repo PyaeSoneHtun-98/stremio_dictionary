@@ -216,6 +216,25 @@ if (-not $NoShortcut) {
   Write-Host "Created Start Menu shortcut: $ShortcutPath"
 }
 
+$AppPackageJsonPath = Join-Path $InstallDir 'resources\app\package.json'
+$AppPackageJson = Get-Content -LiteralPath $AppPackageJsonPath -Raw | ConvertFrom-Json
+$UninstallerPath = Join-Path $InstallDir 'Uninstall-SubtitleBridge.ps1'
+if (-not (Test-Path -LiteralPath $UninstallerPath -PathType Leaf)) {
+  throw 'The installed package is missing Uninstall-SubtitleBridge.ps1.'
+}
+
+$UninstallRegistryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SubtitleBridge'
+New-Item -Path $UninstallRegistryPath -Force | Out-Null
+New-ItemProperty -Path $UninstallRegistryPath -Name 'DisplayName' -Value 'Subtitle Bridge' -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $UninstallRegistryPath -Name 'DisplayVersion' -Value ([string]$AppPackageJson.version) -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $UninstallRegistryPath -Name 'Publisher' -Value 'Subtitle Bridge' -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $UninstallRegistryPath -Name 'InstallLocation' -Value $InstallDir -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $UninstallRegistryPath -Name 'DisplayIcon' -Value "$ExePath,0" -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $UninstallRegistryPath -Name 'UninstallString' -Value "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$UninstallerPath`"" -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $UninstallRegistryPath -Name 'QuietUninstallString' -Value "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$UninstallerPath`" -Quiet" -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $UninstallRegistryPath -Name 'NoModify' -Value 1 -PropertyType DWord -Force | Out-Null
+New-ItemProperty -Path $UninstallRegistryPath -Name 'NoRepair' -Value 1 -PropertyType DWord -Force | Out-Null
+
 Write-Host 'Subtitle Bridge installation completed.'
 
 if (-not $NoLaunch) {
