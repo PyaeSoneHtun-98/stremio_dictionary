@@ -184,10 +184,13 @@ function Save-ShellMetadata {
   param(
     [Parameter(Mandatory = $true)][string]$MetadataDir,
     [Parameter(Mandatory = $true)][string]$ShortcutPath,
-    [Parameter(Mandatory = $true)][string]$RegistryPath
+    [Parameter(Mandatory = $true)][string]$RegistryPath,
+    [Parameter(Mandatory = $true)][string]$TransactionId,
+    [Parameter(Mandatory = $true)][string]$LogicalInstallDir
   )
 
   New-Item -ItemType Directory -Path $MetadataDir -Force | Out-Null
+  Write-TransactionDirectoryMarker -Directory $MetadataDir -TransactionId $TransactionId -Role 'metadata' -LogicalInstallDir $LogicalInstallDir
 
   if (Test-Path -LiteralPath $ShortcutPath -PathType Leaf) {
     Copy-Item -LiteralPath $ShortcutPath -Destination (Join-Path $MetadataDir 'Subtitle Bridge.lnk') -Force
@@ -220,42 +223,147 @@ function Restore-ShellMetadata {
     [Parameter(Mandatory = $true)][string]$RegistryPath
   )
 
-  Remove-Item -LiteralPath $ShortcutPath -Force -ErrorAction SilentlyContinue
-  Remove-Item -LiteralPath $RegistryPath -Recurse -Force -ErrorAction SilentlyContinue
+  if ($env:SUBTITLE_BRIDGE_TEST_FORCE_SHELL_METADATA_FAILURE -eq '1') {
+    throw 'Simulated shell metadata restoration failure.'
+  }
 
   $shortcutBackup = Join-Path $MetadataDir 'Subtitle Bridge.lnk'
+  $registrySnapshotPath = Join-Path $MetadataDir 'uninstall-registry.json'
+  if (-not (Test-Path -LiteralPath $registrySnapshotPath -PathType Leaf)) {
+    throw 'The saved uninstall-registry snapshot is missing; rollback cannot be verified.'
+  }
+
+  $snapshot = Get-Content -LiteralPath $registrySnapshotPath -Raw | ConvertFrom-Json
+
+  if (Test-Path -LiteralPath $ShortcutPath) {
+    Remove-Item -LiteralPath $ShortcutPath -Force -ErrorAction Stop
+  }
+  if (Test-Path -LiteralPath $ShortcutPath) {
+    throw 'Could not remove the current Subtitle Bridge Start Menu shortcut during rollback.'
+  }
+
+  if (Test-Path -LiteralPath $RegistryPath) {
+    Remove-Item -LiteralPath $RegistryPath -Recurse -Force -ErrorAction Stop
+  }
+  if (Test-Path -LiteralPath $RegistryPath) {
+    throw 'Could not remove the current Subtitle Bridge uninstall registry metadata during rollback.'
+  }
+
   if (Test-Path -LiteralPath $shortcutBackup -PathType Leaf) {
     $shortcutParent = Split-Path -Parent $ShortcutPath
     New-Item -ItemType Directory -Path $shortcutParent -Force | Out-Null
     Copy-Item -LiteralPath $shortcutBackup -Destination $ShortcutPath -Force
+    if (-not (Test-Path -LiteralPath $ShortcutPath -PathType Leaf)) {
+      throw 'Could not restore the previous Subtitle Bridge Start Menu shortcut.'
+    }
   }
 
-  $registrySnapshotPath = Join-Path $MetadataDir 'uninstall-registry.json'
-  if (-not (Test-Path -LiteralPath $registrySnapshotPath -PathType Leaf)) {
-    return
+  if ($snapshot.exists) {
+    New-Item -Path $RegistryPath -Force | Out-Null
+    foreach ($property in $snapshot.values.PSObject.Properties) {
+      $propertyType = if ($property.Name -in @('NoModify', 'NoRepair')) { 'DWord' } else { 'String' }
+      New-ItemProperty -Path $RegistryPath -Name $property.Name -Value $property.Value -PropertyType $propertyType -Force | Out-Null
+    }
+
+    if (-not (Test-Path -LiteralPath $RegistryPath)) {
+      throw 'Could not restore the previous Subtitle Bridge uninstall registry key.'
+    }
+
+    $restored = Get-ItemProperty -LiteralPath $RegistryPath
+    foreach ($property in $snapshot.values.PSObject.Properties) {
+      $actual = $restored.PSObject.Properties[$property.Name]
+      if ($null -eq $actual -or [string]$actual.Value -ne [string]$property.Value) {
+        throw "Could not verify restored uninstall registry value: $($property.Name)"
+      }
+    }
+  } elseif (Test-Path -LiteralPath $RegistryPath) {
+    throw 'Rollback expected no uninstall registry metadata, but the key still exists.'
+  }
+}
+
+function Write-TransactionDirectoryMarker {
+  param(
+    [Parameter(Mandatory = $true)][string]$Directory,
+    [Parameter(Mandatory = $true)][string]$TransactionId,
+    [Parameter(Mandatory = $true)][ValidateSet('stage', 'metadata')][string]$Role,
+    [Parameter(Mandatory = $true)][string]$LogicalInstallDir
+  )
+
+  $markerPath = Join-Path $Directory ".subtitle-bridge-transaction-$Role.json"
+  [ordered]@{
+    version = 1
+    application = 'Subtitle Bridge'
+    transactionId = $TransactionId
+    role = $Role
+    installDir = (Get-NormalizedPath $LogicalInstallDir)
+  } |
+    ConvertTo-Json -Depth 3 |
+    Set-Content -LiteralPath $markerPath -Encoding UTF8
+}
+
+function Assert-TransactionDirectoryMarker {
+  param(
+    [Parameter(Mandatory = $true)][string]$Directory,
+    [Parameter(Mandatory = $true)][string]$TransactionId,
+    [Parameter(Mandatory = $true)][ValidateSet('stage', 'metadata')][string]$Role,
+    [Parameter(Mandatory = $true)][string]$LogicalInstallDir
+  )
+
+  $markerPath = Join-Path $Directory ".subtitle-bridge-transaction-$Role.json"
+  if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
+    throw "Refusing to recursively remove an unowned transaction $Role directory: $Directory"
   }
 
-  $snapshot = Get-Content -LiteralPath $registrySnapshotPath -Raw | ConvertFrom-Json
-  if (-not $snapshot.exists) {
-    return
+  try {
+    $marker = Get-Content -LiteralPath $markerPath -Raw | ConvertFrom-Json
+  } catch {
+    throw "The transaction $Role ownership marker is unreadable: $markerPath"
   }
 
-  New-Item -Path $RegistryPath -Force | Out-Null
-  foreach ($property in $snapshot.values.PSObject.Properties) {
-    $propertyType = if ($property.Name -in @('NoModify', 'NoRepair')) { 'DWord' } else { 'String' }
-    New-ItemProperty -Path $RegistryPath -Name $property.Name -Value $property.Value -PropertyType $propertyType -Force | Out-Null
+  $expectedInstallDir = Get-NormalizedPath $LogicalInstallDir
+  $recordedInstallDir = Get-NormalizedPath ([string]$marker.installDir)
+  if ($marker.version -ne 1 -or
+      [string]$marker.application -ne 'Subtitle Bridge' -or
+      [string]$marker.transactionId -ne $TransactionId -or
+      [string]$marker.role -ne $Role -or
+      -not $recordedInstallDir.Equals($expectedInstallDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "The transaction $Role ownership marker does not match this installation transaction."
   }
+}
+
+function Assert-TransactionPath {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$InstallParent,
+    [Parameter(Mandatory = $true)][string]$ExpectedLeafName,
+    [Parameter(Mandatory = $true)][string]$InstallDir
+  )
+
+  $normalized = Get-NormalizedPath $Path
+  $parent = Get-NormalizedPath (Split-Path -Parent $normalized)
+  $expectedParent = Get-NormalizedPath $InstallParent
+  $leaf = Split-Path -Leaf $normalized
+  $normalizedInstallDir = Get-NormalizedPath $InstallDir
+
+  if (-not $parent.Equals($expectedParent, [System.StringComparison]::OrdinalIgnoreCase) -or
+      -not $leaf.Equals($ExpectedLeafName, [System.StringComparison]::Ordinal) -or
+      $normalized.Equals($expectedParent, [System.StringComparison]::OrdinalIgnoreCase) -or
+      $normalized.Equals($normalizedInstallDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw 'A previous Subtitle Bridge installation transaction contains an unsafe temporary path.'
+  }
+
+  return $normalized
 }
 
 function Write-TransactionMarker {
   param(
     [Parameter(Mandatory = $true)][string]$MarkerPath,
-    [Parameter(Mandatory = $true)][hashtable]$Data
+    [Parameter(Mandatory = $true)]$Data
   )
 
   $tempPath = "$MarkerPath.tmp"
   try {
-    $json = $Data | ConvertTo-Json -Depth 4
+    $json = $Data | ConvertTo-Json -Depth 6
     [System.IO.File]::WriteAllText(
       $tempPath,
       $json,
@@ -265,6 +373,33 @@ function Write-TransactionMarker {
   } finally {
     Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
   }
+}
+
+function Set-TransactionPhase {
+  param(
+    [Parameter(Mandatory = $true)][string]$MarkerPath,
+    [Parameter(Mandatory = $true)][string]$Phase
+  )
+
+  $transaction = Get-Content -LiteralPath $MarkerPath -Raw | ConvertFrom-Json
+  $transaction.phase = $Phase
+  Write-TransactionMarker -MarkerPath $MarkerPath -Data $transaction
+}
+
+function Remove-OwnedTransactionDirectory {
+  param(
+    [Parameter(Mandatory = $true)][string]$Directory,
+    [Parameter(Mandatory = $true)][string]$TransactionId,
+    [Parameter(Mandatory = $true)][ValidateSet('stage', 'metadata')][string]$Role,
+    [Parameter(Mandatory = $true)][string]$LogicalInstallDir
+  )
+
+  if (-not (Test-Path -LiteralPath $Directory -PathType Container)) {
+    return
+  }
+
+  Assert-TransactionDirectoryMarker -Directory $Directory -TransactionId $TransactionId -Role $Role -LogicalInstallDir $LogicalInstallDir
+  Remove-Item -LiteralPath $Directory -Recurse -Force -ErrorAction Stop
 }
 
 function Recover-InterruptedTransaction {
@@ -286,8 +421,13 @@ function Recover-InterruptedTransaction {
     throw 'A previous Subtitle Bridge installation transaction could not be recovered safely.'
   }
 
-  if ($transaction.version -ne 1) {
+  if ($transaction.version -ne 2) {
     throw 'A previous Subtitle Bridge installation transaction uses an unsupported format.'
+  }
+
+  $transactionId = [string]$transaction.transactionId
+  if ($transactionId -notmatch '^[0-9a-f]{32}$') {
+    throw 'A previous Subtitle Bridge installation transaction has an invalid transaction identifier.'
   }
 
   $markerInstallDir = Get-NormalizedPath ([string]$transaction.installDir)
@@ -295,33 +435,79 @@ function Recover-InterruptedTransaction {
     throw 'A previous Subtitle Bridge installation transaction targets a different install directory.'
   }
 
-  $stageDir = Get-NormalizedPath ([string]$transaction.stageDir)
-  $backupDir = Get-NormalizedPath ([string]$transaction.backupDir)
-  $metadataDir = Get-NormalizedPath ([string]$transaction.metadataDir)
+  $stageDir = Assert-TransactionPath -Path ([string]$transaction.stageDir) -InstallParent $InstallParent -ExpectedLeafName ".SubtitleBridge-stage-$transactionId" -InstallDir $ExpectedInstallDir
+  $backupDir = Assert-TransactionPath -Path ([string]$transaction.backupDir) -InstallParent $InstallParent -ExpectedLeafName ".SubtitleBridge-backup-$transactionId" -InstallDir $ExpectedInstallDir
+  $metadataDir = Assert-TransactionPath -Path ([string]$transaction.metadataDir) -InstallParent $InstallParent -ExpectedLeafName ".SubtitleBridge-metadata-$transactionId" -InstallDir $ExpectedInstallDir
 
-  foreach ($path in @($stageDir, $backupDir, $metadataDir)) {
-    if (-not (Test-IsSameOrChildPath -Candidate $path -Parent $InstallParent)) {
-      throw 'A previous Subtitle Bridge installation transaction contains an unsafe recovery path.'
+  if ($stageDir.Equals($backupDir, [System.StringComparison]::OrdinalIgnoreCase) -or
+      $stageDir.Equals($metadataDir, [System.StringComparison]::OrdinalIgnoreCase) -or
+      $backupDir.Equals($metadataDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw 'A previous Subtitle Bridge installation transaction reuses a temporary path.'
+  }
+
+  if (-not (Test-Path -LiteralPath $metadataDir -PathType Container)) {
+    throw 'A previous Subtitle Bridge installation transaction is missing its shell-metadata snapshot.'
+  }
+  Assert-TransactionDirectoryMarker -Directory $metadataDir -TransactionId $transactionId -Role 'metadata' -LogicalInstallDir $ExpectedInstallDir
+
+  $hadPreviousInstall = [bool]$transaction.hadPreviousInstall
+  $phase = [string]$transaction.phase
+  $validPhases = @('prepared', 'backup-moved', 'new-installed', 'restoring-app', 'app-restored', 'app-removed', 'metadata-restored')
+  if ($phase -notin $validPhases) {
+    throw 'A previous Subtitle Bridge installation transaction has an invalid recovery phase.'
+  }
+
+  $backupExists = Test-Path -LiteralPath $backupDir -PathType Container
+  if ($backupExists) {
+    Assert-OwnedInstallDirectory -Directory $backupDir -LogicalInstallDir $ExpectedInstallDir
+  }
+
+  if ($phase -in @('backup-moved', 'new-installed', 'restoring-app') -or $backupExists) {
+    Set-TransactionPhase -MarkerPath $MarkerPath -Phase 'restoring-app'
+
+    if ($hadPreviousInstall) {
+      if ($backupExists) {
+        if (Test-Path -LiteralPath $ExpectedInstallDir) {
+          Assert-OwnedInstallDirectory -Directory $ExpectedInstallDir -LogicalInstallDir $ExpectedInstallDir
+          Remove-Item -LiteralPath $ExpectedInstallDir -Recurse -Force -ErrorAction Stop
+        }
+        Move-Item -LiteralPath $backupDir -Destination $ExpectedInstallDir -ErrorAction Stop
+      } elseif (-not (Test-Path -LiteralPath $ExpectedInstallDir -PathType Container)) {
+        throw 'The previous installation backup is missing and the restored application is not present.'
+      }
+
+      Assert-OwnedInstallDirectory -Directory $ExpectedInstallDir -LogicalInstallDir $ExpectedInstallDir
+      Set-TransactionPhase -MarkerPath $MarkerPath -Phase 'app-restored'
+    } else {
+      if (Test-Path -LiteralPath $ExpectedInstallDir) {
+        Assert-OwnedInstallDirectory -Directory $ExpectedInstallDir -LogicalInstallDir $ExpectedInstallDir
+        Remove-Item -LiteralPath $ExpectedInstallDir -Recurse -Force -ErrorAction Stop
+      }
+      Set-TransactionPhase -MarkerPath $MarkerPath -Phase 'app-removed'
     }
   }
+
+  $transaction = Get-Content -LiteralPath $MarkerPath -Raw | ConvertFrom-Json
+  $phase = [string]$transaction.phase
+  if ($phase -in @('app-restored', 'app-removed', 'restoring-app')) {
+    Restore-ShellMetadata -MetadataDir $metadataDir -ShortcutPath $ShortcutPath -RegistryPath $RegistryPath
+    Set-TransactionPhase -MarkerPath $MarkerPath -Phase 'metadata-restored'
+  } elseif ($phase -eq 'prepared') {
+    # The existing app and shell metadata were never swapped. Only owned temporary data needs cleanup.
+  } elseif ($phase -ne 'metadata-restored') {
+    throw 'A previous Subtitle Bridge installation transaction could not determine a safe recovery action.'
+  }
+
+  Remove-OwnedTransactionDirectory -Directory $stageDir -TransactionId $transactionId -Role 'stage' -LogicalInstallDir $ExpectedInstallDir
+  Remove-OwnedTransactionDirectory -Directory $metadataDir -TransactionId $transactionId -Role 'metadata' -LogicalInstallDir $ExpectedInstallDir
 
   if (Test-Path -LiteralPath $backupDir -PathType Container) {
     Assert-OwnedInstallDirectory -Directory $backupDir -LogicalInstallDir $ExpectedInstallDir
-
-    if (Test-Path -LiteralPath $ExpectedInstallDir) {
-      Assert-OwnedInstallDirectory -Directory $ExpectedInstallDir -LogicalInstallDir $ExpectedInstallDir
-      Remove-Item -LiteralPath $ExpectedInstallDir -Recurse -Force
-    }
-
-    Move-Item -LiteralPath $backupDir -Destination $ExpectedInstallDir
-    Assert-OwnedInstallDirectory -Directory $ExpectedInstallDir -LogicalInstallDir $ExpectedInstallDir
-    Restore-ShellMetadata -MetadataDir $metadataDir -ShortcutPath $ShortcutPath -RegistryPath $RegistryPath
-    Write-Host 'Recovered the previous Subtitle Bridge installation after an interrupted upgrade.'
+    Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction Stop
   }
 
-  Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
-  Remove-Item -LiteralPath $metadataDir -Recurse -Force -ErrorAction SilentlyContinue
-  Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction Stop
+  Write-Host 'Recovered the previous Subtitle Bridge installation after an interrupted or failed upgrade.'
 }
 
 function Restore-PreviousInstallation {
@@ -330,27 +516,43 @@ function Restore-PreviousInstallation {
     [Parameter(Mandatory = $true)][string]$BackupDir,
     [Parameter(Mandatory = $true)][string]$MetadataDir,
     [Parameter(Mandatory = $true)][string]$ShortcutPath,
-    [Parameter(Mandatory = $true)][string]$RegistryPath
+    [Parameter(Mandatory = $true)][string]$RegistryPath,
+    [Parameter(Mandatory = $true)][string]$MarkerPath,
+    [Parameter(Mandatory = $true)][bool]$HadPreviousInstall
   )
-
-  if (-not (Test-Path -LiteralPath $BackupDir -PathType Container)) {
-    throw 'The previous Subtitle Bridge installation backup is missing; automatic rollback cannot continue.'
-  }
-
-  Assert-OwnedInstallDirectory -Directory $BackupDir -LogicalInstallDir $InstallDir
 
   if ($env:SUBTITLE_BRIDGE_TEST_FORCE_ROLLBACK_FAILURE -eq '1') {
     throw 'Simulated rollback restoration failure.'
   }
 
-  if (Test-Path -LiteralPath $InstallDir) {
+  Set-TransactionPhase -MarkerPath $MarkerPath -Phase 'restoring-app'
+
+  if ($HadPreviousInstall) {
+    if (Test-Path -LiteralPath $BackupDir -PathType Container) {
+      Assert-OwnedInstallDirectory -Directory $BackupDir -LogicalInstallDir $InstallDir
+
+      if (Test-Path -LiteralPath $InstallDir) {
+        Assert-OwnedInstallDirectory -Directory $InstallDir -LogicalInstallDir $InstallDir
+        Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction Stop
+      }
+
+      Move-Item -LiteralPath $BackupDir -Destination $InstallDir -ErrorAction Stop
+    } elseif (-not (Test-Path -LiteralPath $InstallDir -PathType Container)) {
+      throw 'The previous Subtitle Bridge installation backup is missing; automatic rollback cannot continue.'
+    }
+
     Assert-OwnedInstallDirectory -Directory $InstallDir -LogicalInstallDir $InstallDir
-    Remove-Item -LiteralPath $InstallDir -Recurse -Force
+    Set-TransactionPhase -MarkerPath $MarkerPath -Phase 'app-restored'
+  } else {
+    if (Test-Path -LiteralPath $InstallDir) {
+      Assert-OwnedInstallDirectory -Directory $InstallDir -LogicalInstallDir $InstallDir
+      Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction Stop
+    }
+    Set-TransactionPhase -MarkerPath $MarkerPath -Phase 'app-removed'
   }
 
-  Move-Item -LiteralPath $BackupDir -Destination $InstallDir
-  Assert-OwnedInstallDirectory -Directory $InstallDir -LogicalInstallDir $InstallDir
   Restore-ShellMetadata -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $RegistryPath
+  Set-TransactionPhase -MarkerPath $MarkerPath -Phase 'metadata-restored'
 }
 
 $SourceDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -407,22 +609,32 @@ $StageDir = Join-Path $InstallParent ".SubtitleBridge-stage-$transactionId"
 $BackupDir = Join-Path $InstallParent ".SubtitleBridge-backup-$transactionId"
 $MetadataDir = Join-Path $InstallParent ".SubtitleBridge-metadata-$transactionId"
 
-Save-ShellMetadata -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
-Write-TransactionMarker -MarkerPath $TransactionMarkerPath -Data @{
-  version = 1
+$hadPreviousInstall = Test-Path -LiteralPath $InstallDir -PathType Container
+if ($hadPreviousInstall) {
+  $existingEntries = @(Get-ChildItem -LiteralPath $InstallDir -Force -ErrorAction Stop)
+  if ($existingEntries.Count -eq 0) {
+    Remove-Item -LiteralPath $InstallDir -Force -ErrorAction Stop
+    $hadPreviousInstall = $false
+  }
+}
+
+Save-ShellMetadata -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath -TransactionId $transactionId -LogicalInstallDir $InstallDir
+Write-TransactionMarker -MarkerPath $TransactionMarkerPath -Data ([ordered]@{
+  version = 2
+  transactionId = $transactionId
+  phase = 'prepared'
+  hadPreviousInstall = $hadPreviousInstall
   installDir = $InstallDir
   stageDir = $StageDir
   backupDir = $BackupDir
   metadataDir = $MetadataDir
-}
-
-$oldInstallMoved = $false
-$newInstallMoved = $false
+})
 
 Write-Host "Installing Subtitle Bridge to $InstallDir"
 
 try {
   New-Item -ItemType Directory -Path $StageDir -Force | Out-Null
+  Write-TransactionDirectoryMarker -Directory $StageDir -TransactionId $transactionId -Role 'stage' -LogicalInstallDir $InstallDir
 
   Get-ChildItem -LiteralPath $SourceDir -Force | ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination $StageDir -Recurse -Force
@@ -469,9 +681,9 @@ try {
   Assert-OwnedInstallDirectory -Directory $StageDir -LogicalInstallDir $InstallDir
 
   try {
-    if (Test-Path -LiteralPath $InstallDir) {
-      Move-Item -LiteralPath $InstallDir -Destination $BackupDir
-      $oldInstallMoved = $true
+    if ($hadPreviousInstall) {
+      Move-Item -LiteralPath $InstallDir -Destination $BackupDir -ErrorAction Stop
+      Set-TransactionPhase -MarkerPath $TransactionMarkerPath -Phase 'backup-moved'
 
       if ($env:SUBTITLE_BRIDGE_TEST_FORCE_SWAP_TERMINATION -eq '1') {
         [System.Diagnostics.Process]::GetCurrentProcess().Kill()
@@ -479,13 +691,15 @@ try {
       }
     }
 
-    Move-Item -LiteralPath $StageDir -Destination $InstallDir
-    $newInstallMoved = $true
+    Move-Item -LiteralPath $StageDir -Destination $InstallDir -ErrorAction Stop
+    Set-TransactionPhase -MarkerPath $TransactionMarkerPath -Phase 'new-installed'
+    $installedStageMarker = Join-Path $InstallDir '.subtitle-bridge-transaction-stage.json'
+    Remove-Item -LiteralPath $installedStageMarker -Force -ErrorAction SilentlyContinue
   } catch {
     $swapError = $_
 
     try {
-      Restore-PreviousInstallation -InstallDir $InstallDir -BackupDir $BackupDir -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
+      Restore-PreviousInstallation -InstallDir $InstallDir -BackupDir $BackupDir -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath -MarkerPath $TransactionMarkerPath -HadPreviousInstall $hadPreviousInstall
       Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction Stop
     } catch {
       throw "The upgrade failed and automatic rollback also failed. Recovery data was preserved for the next setup run. Upgrade error: $($swapError.Exception.Message) Rollback error: $($_.Exception.Message)"
@@ -495,15 +709,11 @@ try {
   }
 
 } catch {
-  $recoveryPending = (Test-Path -LiteralPath $TransactionMarkerPath -PathType Leaf) -and
-    (Test-Path -LiteralPath $BackupDir -PathType Container)
+  $recoveryPending = Test-Path -LiteralPath $TransactionMarkerPath -PathType Leaf
 
   if (-not $recoveryPending) {
-    if (Test-Path -LiteralPath $StageDir) {
-      Remove-Item -LiteralPath $StageDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    Remove-Item -LiteralPath $MetadataDir -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction SilentlyContinue
+    Remove-OwnedTransactionDirectory -Directory $StageDir -TransactionId $transactionId -Role 'stage' -LogicalInstallDir $InstallDir
+    Remove-OwnedTransactionDirectory -Directory $MetadataDir -TransactionId $transactionId -Role 'metadata' -LogicalInstallDir $InstallDir
   }
 
   throw
@@ -559,8 +769,8 @@ try {
   $postInstallError = $_
 
   try {
-    Restore-PreviousInstallation -InstallDir $InstallDir -BackupDir $BackupDir -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath
-    Remove-Item -LiteralPath $MetadataDir -Recurse -Force -ErrorAction Stop
+    Restore-PreviousInstallation -InstallDir $InstallDir -BackupDir $BackupDir -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $UninstallRegistryPath -MarkerPath $TransactionMarkerPath -HadPreviousInstall $hadPreviousInstall
+    Remove-OwnedTransactionDirectory -Directory $MetadataDir -TransactionId $transactionId -Role 'metadata' -LogicalInstallDir $InstallDir
     Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction Stop
   } catch {
     throw "Post-install setup failed and automatic rollback also failed. Recovery data was preserved for the next setup run. Setup error: $($postInstallError.Exception.Message) Rollback error: $($_.Exception.Message)"
@@ -569,11 +779,12 @@ try {
   throw $postInstallError
 }
 
-if (Test-Path -LiteralPath $BackupDir) {
-  Remove-Item -LiteralPath $BackupDir -Recurse -Force -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $BackupDir -PathType Container) {
+  Assert-OwnedInstallDirectory -Directory $BackupDir -LogicalInstallDir $InstallDir
+  Remove-Item -LiteralPath $BackupDir -Recurse -Force -ErrorAction Stop
 }
-Remove-Item -LiteralPath $MetadataDir -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction SilentlyContinue
+Remove-OwnedTransactionDirectory -Directory $MetadataDir -TransactionId $transactionId -Role 'metadata' -LogicalInstallDir $InstallDir
+Remove-Item -LiteralPath $TransactionMarkerPath -Force -ErrorAction Stop
 
 if (-not $NoLaunch) {
   Start-Process -FilePath $ExePath
