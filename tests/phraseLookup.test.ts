@@ -81,6 +81,30 @@ describe('PhraseMatcher', () => {
     })
   })
 
+  it('rejects duplicate normalized variants within one phrase entry', () => {
+    expect(() =>
+      createPhraseMatcher([
+        {
+          phrase: 'give up',
+          type: 'phrasal_verb',
+          forms: ['GIVE UP'],
+          burmese: ['လက်လျှော့သည်']
+        }
+      ])
+    ).toThrow('Duplicate phrase variant within give up: give up')
+
+    expect(() =>
+      createPhraseMatcher([
+        {
+          phrase: 'look after',
+          type: 'phrasal_verb',
+          forms: ['looked after', 'LOOKED AFTER'],
+          burmese: ['စောင့်ရှောက်သည်']
+        }
+      ])
+    ).toThrow('Duplicate phrase variant within look after: looked after')
+  })
+
   it('returns null when the clicked token belongs to no known phrase', () => {
     expect(
       findLocalPhraseMatch({
