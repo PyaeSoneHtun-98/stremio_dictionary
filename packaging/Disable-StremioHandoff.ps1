@@ -97,7 +97,7 @@ function Write-AtomicUtf8([string]$Path, [string]$Text) {
   }
 }
 
-function Resolve-StremioServerJs([string]$ExplicitPath) {
+function Resolve-StremioServerJsPaths([string]$ExplicitPath) {
   if ($ExplicitPath) {
     $resolved = [System.IO.Path]::GetFullPath($ExplicitPath)
     if (-not (Test-Path -LiteralPath $resolved -PathType Leaf)) {
@@ -138,50 +138,80 @@ function Resolve-StremioServerJs([string]$ExplicitPath) {
       ForEach-Object { $candidates.Add([System.IO.Path]::GetFullPath($_.FullName)) }
   }
 
+  $patchedCandidates = New-Object System.Collections.Generic.List[string]
+  $compatibleCandidates = New-Object System.Collections.Generic.List[string]
+
   foreach ($candidate in ($candidates | Select-Object -Unique)) {
     try {
       $candidateContent = [System.IO.File]::ReadAllText($candidate)
-      if ($candidateContent.Contains($MarkerBegin) -or $candidateContent.Contains($MarkerEnd)) {
-        return $candidate
-      }
-
-      Assert-CompatibleStremioLayout $candidateContent
-      return $candidate
     } catch {
-      # Ignore unreadable or incompatible candidates and keep looking.
+      continue
+    }
+
+    if ($candidateContent.Contains($MarkerBegin) -or $candidateContent.Contains($MarkerEnd)) {
+      # Do not hide malformed markers on any discovered installation. Uninstall must fail
+      # closed rather than delete Subtitle Bridge while a Stremio patch may remain.
+      if (Get-PatchState $candidateContent) {
+        $patchedCandidates.Add($candidate)
+      }
+      continue
+    }
+
+    try {
+      Assert-CompatibleStremioLayout $candidateContent
+      $compatibleCandidates.Add($candidate)
+    } catch {
+      # Ignore incompatible unpatched Stremio files and keep looking.
     }
   }
 
+  if ($patchedCandidates.Count -gt 0) {
+    return $patchedCandidates.ToArray()
+  }
+
+  if ($compatibleCandidates.Count -gt 0) {
+    return $compatibleCandidates[0]
+  }
+
   if ($AllowMissing) {
-    return $null
+    return
   }
 
   throw 'Could not locate a compatible Stremio server.js automatically. Pass -ServerJsPath with the full path to Stremio\server.js.'
 }
 
-$ServerJsPath = Resolve-StremioServerJs $ServerJsPath
-if ([string]::IsNullOrWhiteSpace($ServerJsPath)) {
+$ServerJsPaths = @(Resolve-StremioServerJsPaths $ServerJsPath)
+if ($ServerJsPaths.Count -eq 0) {
   Write-Host 'No compatible Stremio installation was found. Nothing was changed.'
   exit 0
 }
 
-$content = [System.IO.File]::ReadAllText($ServerJsPath)
-$hasPatch = Get-PatchState $content
+$removedAny = $false
 
-if (-not $hasPatch) {
-  Write-Host 'Subtitle Bridge is not currently patched into this Stremio server.js. Nothing was changed.'
+foreach ($resolvedServerJsPath in $ServerJsPaths) {
+  $content = [System.IO.File]::ReadAllText($resolvedServerJsPath)
+  $hasPatch = Get-PatchState $content
+
+  if (-not $hasPatch) {
+    continue
+  }
+
+  $cleaned = Remove-PatchBlock $content
+  Assert-CompatibleStremioLayout $cleaned
+
+  if ($cleaned -eq $content) {
+    throw "Subtitle Bridge patch markers were found but the patch block could not be removed safely: $resolvedServerJsPath"
+  }
+
+  Write-AtomicUtf8 $resolvedServerJsPath $cleaned
+  $removedAny = $true
+  Write-Host "Removed Subtitle Bridge from Stremio external-player list: $resolvedServerJsPath"
+}
+
+if (-not $removedAny) {
+  Write-Host 'Subtitle Bridge is not currently patched into the discovered Stremio installation. Nothing was changed.'
   exit 0
 }
 
-$cleaned = Remove-PatchBlock $content
-Assert-CompatibleStremioLayout $cleaned
-
-if ($cleaned -eq $content) {
-  throw 'Subtitle Bridge patch markers were found but the patch block could not be removed safely.'
-}
-
-Write-AtomicUtf8 $ServerJsPath $cleaned
-
-Write-Host "Removed Subtitle Bridge from Stremio external-player list: $ServerJsPath"
 Write-Host 'Safety backups are retained for manual recovery and are never restored over a newer Stremio installation.'
 Write-Host 'Fully exit and reopen Stremio for the change to take effect.'
