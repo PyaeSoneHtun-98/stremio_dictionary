@@ -306,11 +306,15 @@ function Recover-InterruptedTransaction {
   }
 
   if (Test-Path -LiteralPath $backupDir -PathType Container) {
+    Assert-OwnedInstallDirectory -Directory $backupDir -LogicalInstallDir $ExpectedInstallDir
+
     if (Test-Path -LiteralPath $ExpectedInstallDir) {
+      Assert-OwnedInstallDirectory -Directory $ExpectedInstallDir -LogicalInstallDir $ExpectedInstallDir
       Remove-Item -LiteralPath $ExpectedInstallDir -Recurse -Force
     }
 
     Move-Item -LiteralPath $backupDir -Destination $ExpectedInstallDir
+    Assert-OwnedInstallDirectory -Directory $ExpectedInstallDir -LogicalInstallDir $ExpectedInstallDir
     Restore-ShellMetadata -MetadataDir $metadataDir -ShortcutPath $ShortcutPath -RegistryPath $RegistryPath
     Write-Host 'Recovered the previous Subtitle Bridge installation after an interrupted upgrade.'
   }
@@ -363,6 +367,11 @@ if ([string]::IsNullOrWhiteSpace($RuntimeCacheDir)) {
   $RuntimeCacheDir = Get-NormalizedPath (Join-Path $env:LOCALAPPDATA 'Subtitle Bridge\RuntimeCache')
 } else {
   $RuntimeCacheDir = Get-NormalizedPath $RuntimeCacheDir
+}
+
+if ((Test-IsSameOrChildPath -Candidate $RuntimeCacheDir -Parent $InstallDir) -or
+    (Test-IsSameOrChildPath -Candidate $InstallDir -Parent $RuntimeCacheDir)) {
+  throw 'The managed runtime cache and application install directory must be separate locations.'
 }
 
 if (Test-IsSameOrChildPath -Candidate $InstallDir -Parent $SourceDir) {
