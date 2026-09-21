@@ -208,8 +208,10 @@ jobs:
           $setupExe = Join-Path $PWD 'release\SubtitleBridge-Setup-x64.exe'
           $setupInstallDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeSetupInstall'
           $setupRuntimeCache = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeSetupRuntimeCache'
+          $setupStatusFile = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeSetupStatus.log'
           Remove-Item -LiteralPath $setupInstallDir -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item -LiteralPath $setupRuntimeCache -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $setupStatusFile -Force -ErrorAction SilentlyContinue
 
           $env:SUBTITLE_BRIDGE_INSTALL_DIR = $setupInstallDir
           $env:SUBTITLE_BRIDGE_RUNTIME_MANIFEST = $runtimeManifest
@@ -217,25 +219,9 @@ jobs:
           $env:SUBTITLE_BRIDGE_SETUP_NO_SHORTCUT = '1'
           $env:SUBTITLE_BRIDGE_SETUP_NO_LAUNCH = '1'
           $env:SUBTITLE_BRIDGE_SETUP_HEADLESS = '1'
-          & $setupExe
-          $setupExitCode = $LASTEXITCODE
-          $global:LASTEXITCODE = 0
+          $env:SUBTITLE_BRIDGE_SETUP_STATUS_FILE = $setupStatusFile
 
-          if ($setupExitCode -ne 0) {
-            throw "One-click setup executable failed to launch with exit code $setupExitCode."
-          }
-
-          # IExpress launches its embedded command asynchronously. Wait for the bootstrap to
-          # finish rather than treating wrapper-process exit as installation completion.
-          $setupExePath = Join-Path $setupInstallDir 'Subtitle Bridge.exe'
-          $setupDeadline = [DateTime]::UtcNow.AddSeconds(60)
-          while ([DateTime]::UtcNow -lt $setupDeadline) {
-            if ((Test-Path -LiteralPath $setupExePath -PathType Leaf) -and
-                (Test-Path -LiteralPath $uninstallKey)) {
-              break
-            }
-            Start-Sleep -Milliseconds 250
-          }
+          $setupProcess = Start-Process -FilePath $setupExe -Wait -PassThru
 
           Remove-Item Env:SUBTITLE_BRIDGE_INSTALL_DIR -ErrorAction SilentlyContinue
           Remove-Item Env:SUBTITLE_BRIDGE_RUNTIME_MANIFEST -ErrorAction SilentlyContinue
@@ -243,7 +229,18 @@ jobs:
           Remove-Item Env:SUBTITLE_BRIDGE_SETUP_NO_SHORTCUT -ErrorAction SilentlyContinue
           Remove-Item Env:SUBTITLE_BRIDGE_SETUP_NO_LAUNCH -ErrorAction SilentlyContinue
           Remove-Item Env:SUBTITLE_BRIDGE_SETUP_HEADLESS -ErrorAction SilentlyContinue
+          Remove-Item Env:SUBTITLE_BRIDGE_SETUP_STATUS_FILE -ErrorAction SilentlyContinue
 
+          if ($setupProcess.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $setupStatusFile) {
+              Write-Host '--- setup bootstrap status ---'
+              Get-Content -LiteralPath $setupStatusFile
+              Write-Host '--- end setup bootstrap status ---'
+            }
+            throw "One-click setup executable failed with exit code $($setupProcess.ExitCode)."
+          }
+
+          $setupExePath = Join-Path $setupInstallDir 'Subtitle Bridge.exe'
           foreach ($path in @(
             $setupExePath,
             (Join-Path $setupInstallDir 'resources\tools\mpv\mpv.exe'),
@@ -251,12 +248,18 @@ jobs:
             (Join-Path $setupInstallDir 'Uninstall-SubtitleBridge.ps1')
           )) {
             if (-not (Test-Path -LiteralPath $path)) {
-              throw "One-click setup did not install required file before timeout: $path"
+              if (Test-Path -LiteralPath $setupStatusFile) {
+                Get-Content -LiteralPath $setupStatusFile
+              }
+              throw "One-click setup did not install required file: $path"
             }
           }
 
           if (-not (Test-Path -LiteralPath $uninstallKey)) {
-            throw 'One-click setup did not register Windows uninstall metadata before timeout.'
+            if (Test-Path -LiteralPath $setupStatusFile) {
+              Get-Content -LiteralPath $setupStatusFile
+            }
+            throw 'One-click setup did not register Windows uninstall metadata.'
           }
           $setupUninstallInfo = Get-ItemProperty -LiteralPath $uninstallKey
           if ($setupUninstallInfo.InstallLocation -ne $setupInstallDir) {
