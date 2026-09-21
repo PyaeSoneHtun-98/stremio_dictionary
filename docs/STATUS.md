@@ -41,15 +41,20 @@ GitHub's published asset digests match the release-build hashes, and the uploade
 
 Issue #36 is closed as completed.
 
-## Active work — Issue #38
+## Phrase auto-detection MVP
 
-**Issue:** Add automatic multi-word phrase lookup
+Issue #38 / PR #39 are complete.
 
-**Branch:** `feat/issue-38-phrase-auto-detection`
-
-**State:** MVP implementation is in progress. A small separate phrase dataset is being used to prove automatic phrase detection without modifying the frozen 30,000-headword Dictionary v1.0. The user continues clicking one subtitle word; the main process inspects a bounded nearby-token window, prefers the longest known phrase containing that click, handles curated inflected phrase forms, and falls back to the existing single-word dictionary when no phrase matches.
-
-This issue intentionally proves the matcher/cache/IPC/UI architecture with a small curated dataset before any 3,000+ phrase-data expansion.
+- Users still click a single subtitle word; Subtitle Bridge automatically checks a bounded nearby-token window for a known multi-word expression before falling back to the existing word dictionary.
+- The pilot ships as a separate 12-entry phrase dataset and does not modify the frozen 30,000-headword Dictionary v1.0.
+- Longest-match selection, curated inflected forms, phrase-aware cache isolation, bounded IPC validation, and explicit detected-phrase UI are covered by tests.
+- Final reviewed feature head: `7ba26f6c0b3d2a3d07c45a4e09662e1aa1bc29cd`.
+- Codex final re-review: no remaining P1/P2/P3 findings.
+- Exact-head CI #341 passed `validate` and `package-windows`.
+- Manual local acceptance passed for canonical, inflected, three-word, fallback, popup, and playback behavior.
+- Squash merge commit: `6e1d84d7bb5d30f7b0e5d5630cab1c4390fbfeb8`.
+- Master CI #342 passed `validate` and `package-windows`, including packaged install/upgrade/Stremio acceptance.
+- Issue #38 is closed as completed.
 
 ## Later work
 
