@@ -1,5 +1,6 @@
 param(
   [string]$InstallDir = "$env:LOCALAPPDATA\Programs\Subtitle Bridge",
+  [string]$StremioServerJsPath,
   [switch]$Quiet
 )
 
@@ -38,6 +39,20 @@ function Get-RunningInstalledProcesses {
 }
 
 try {
+  $disableHandoff = Join-Path $InstallDir 'Disable-StremioHandoff.ps1'
+  if (Test-Path -LiteralPath $disableHandoff -PathType Leaf) {
+    $handoffArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $disableHandoff)
+    if (-not [string]::IsNullOrWhiteSpace($StremioServerJsPath)) {
+      $handoffArgs += @('-ServerJsPath', $StremioServerJsPath)
+    }
+
+    & powershell.exe @handoffArgs
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning 'Could not remove the optional Stremio integration during uninstall. Subtitle Bridge will still be removed.'
+      $global:LASTEXITCODE = 0
+    }
+  }
+
   foreach ($process in (Get-RunningInstalledProcesses -ExecutablePath $ExePath)) {
     try {
       Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
