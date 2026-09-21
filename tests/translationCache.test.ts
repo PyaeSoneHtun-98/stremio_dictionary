@@ -36,6 +36,74 @@ describe('TranslationService cache', () => {
     expect(service.cacheSize).toBe(1)
   })
 
+  it('keeps phrase-aware cache entries separate from ordinary clicked-word lookups', async () => {
+    const settings: TranslationRuntimeSettings = {
+      provider: 'local-dictionary',
+      targetLanguage: 'my',
+      apiKey: ''
+    }
+    const translate = vi.fn(async (request) => ({
+      originalWord: request.word,
+      translation: request.contextTokens?.join(' ') ?? request.word,
+      provider: 'fake',
+      targetLanguage: request.targetLanguage ?? 'my'
+    }))
+    const provider: TranslationProvider = { id: 'fake', translate }
+    const service = new TranslationService(
+      { getRuntimeSettings: async () => settings },
+      undefined,
+      () => provider
+    )
+
+    await service.translate({
+      word: 'up',
+      contextTokens: ['give', 'up'],
+      clickedTokenIndex: 1
+    })
+    await service.translate({
+      word: 'up',
+      contextTokens: ['look', 'up'],
+      clickedTokenIndex: 1
+    })
+
+    expect(translate).toHaveBeenCalledTimes(2)
+    expect(service.cacheSize).toBe(2)
+  })
+
+  it('reuses a canonical phrase cache entry across inflected phrase forms', async () => {
+    const settings: TranslationRuntimeSettings = {
+      provider: 'local-dictionary',
+      targetLanguage: 'my',
+      apiKey: ''
+    }
+    const translate = vi.fn(async (request) => ({
+      originalWord: request.word,
+      translation: 'အရှုံးပေးသည်',
+      provider: 'fake',
+      targetLanguage: request.targetLanguage ?? 'my'
+    }))
+    const provider: TranslationProvider = { id: 'fake', translate }
+    const service = new TranslationService(
+      { getRuntimeSettings: async () => settings },
+      undefined,
+      () => provider
+    )
+
+    await service.translate({
+      word: 'up',
+      contextTokens: ['give', 'up'],
+      clickedTokenIndex: 1
+    })
+    await service.translate({
+      word: 'up',
+      contextTokens: ['gave', 'up'],
+      clickedTokenIndex: 1
+    })
+
+    expect(translate).toHaveBeenCalledOnce()
+    expect(service.cacheSize).toBe(1)
+  })
+
   it('isolates cache entries by target language and clears on request', async () => {
     const settings: TranslationRuntimeSettings = {
       provider: 'google',
