@@ -15,10 +15,19 @@ export function registerStremioIpc(): void {
   }
 
   registered = true
-  const service = new StremioHandoffService(resolveHelperRoot(), app.getPath('exe'))
+  const service = app.isPackaged
+    ? new StremioHandoffService(resolveHelperRoot(), app.getPath('exe'))
+    : null
 
   ipcMain.handle(ENABLE_CHANNEL, async (): Promise<StremioHandoffResult> => {
     diagnosticLog('stremio.handoffEnableRequested')
+    if (!service) {
+      return {
+        ok: false,
+        message: 'Install the packaged Subtitle Bridge app before enabling Stremio integration.'
+      }
+    }
+
     try {
       await service.enable()
       diagnosticLog('stremio.handoffEnableSucceeded')
@@ -39,6 +48,13 @@ export function registerStremioIpc(): void {
 
   ipcMain.handle(DISABLE_CHANNEL, async (): Promise<StremioHandoffResult> => {
     diagnosticLog('stremio.handoffDisableRequested')
+    if (!service) {
+      return {
+        ok: false,
+        message: 'Stremio integration can be changed from the packaged Subtitle Bridge app.'
+      }
+    }
+
     try {
       await service.disable()
       diagnosticLog('stremio.handoffDisableSucceeded')
