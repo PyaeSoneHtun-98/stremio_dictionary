@@ -166,7 +166,7 @@ function Resolve-StremioServerJsPaths([string]$ExplicitPath) {
   }
 
   if ($patchedCandidates.Count -gt 0) {
-    return $patchedCandidates.ToArray()
+    return $patchedCandidates
   }
 
   if ($compatibleCandidates.Count -gt 0) {
