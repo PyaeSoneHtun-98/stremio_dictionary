@@ -1,0 +1,32 @@
+Subtitle Bridge third-party runtime notice
+
+Subtitle Bridge's normal Windows installer provisions pinned media runtimes from upstream
+release artifacts. The runtime archives are not embedded in the Subtitle Bridge setup EXE.
+Their exact download URLs and SHA-256 digests are recorded in RUNTIME_MANIFEST.json.
+
+mpv
+---
+Project: mpv
+Upstream source: https://github.com/mpv-player/mpv
+Pinned Windows artifact: mpv-v0.41.0-dev-g0b7ed670f-34806151888-x86_64-w64-mingw32.zip
+Upstream licensing: mpv documents GPL-2.0-or-later as the default whole-program license,
+with LGPL-2.1-or-later possible for qualifying builds. See the upstream Copyright,
+LICENSE.GPL, LICENSE.LGPL, and source tree for the exact terms applying to the pinned build.
+
+FFmpeg
+------
+Project: FFmpeg
+Upstream source: https://github.com/FFmpeg/FFmpeg
+Windows build provider: https://github.com/BtbN/FFmpeg-Builds
+Pinned build: ffmpeg-n8.1.2-267-gb2f422d306-win64-lgpl-shared-8.1.zip
+Build variant: LGPL shared
+See the FFmpeg source, COPYING.LGPLv2.1, COPYING.LGPLv3, and the BtbN build metadata for
+the licenses and source corresponding to this pinned build.
+
+Electron / Chromium and other application dependencies
+-------------------------------------------------------
+The Electron runtime package retains its upstream license and Chromium notices, including
+the license files shipped in the Electron distribution.
+
+Subtitle Bridge does not claim ownership of these third-party projects. Their respective
+licenses and copyright notices remain in force.
