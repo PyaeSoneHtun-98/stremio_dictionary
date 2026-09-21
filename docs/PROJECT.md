@@ -14,7 +14,7 @@ The product should feel like a normal media player first. Translation and subtit
 - Vite/electron-vite builds the application.
 - mpv handles video/audio playback.
 - FFmpeg handles full embedded text-subtitle extraction for local files.
-- An offline English → Burmese dictionary is the default translation provider.
+- The offline English → Burmese Dictionary v1.0 is the default translation provider.
 
 Release packages intentionally do not bundle mpv or FFmpeg. They are external runtime dependencies supplied by the target machine through `PATH`, `MPV_PATH`, and `FFMPEG_PATH`.
 
@@ -68,6 +68,8 @@ Interactive text support currently covers:
 - ASS
 - SSA
 
+External SRT/ASS/SSA files can be dragged onto active playback. Embedded/live and external subtitle sources remain switchable. Subtitle Bridge also provides delay/sync, font-size, and vertical-position controls for its rendered subtitle overlay.
+
 Image-based subtitles such as PGS and VobSub may be detected but are not converted into clickable text. The UI should show a clear unsupported state rather than pretending extraction succeeded.
 
 ASS/SSA handling is defensive. The overlay prioritizes readable dialogue and filters drawing/effect garbage. It does not currently reproduce full libass visual fidelity, positioning, signs, fonts, karaoke effects, or vector drawings.
@@ -78,10 +80,18 @@ A future richer architecture may allow mpv/libass to render original ASS visuals
 
 The default translation provider is `LocalDictionaryProvider`.
 
-- English → Burmese lookup works offline.
-- No cloud account or API key is required for normal use.
-- The starter dictionary is intentionally small and replaceable/expandable.
+- English → Burmese lookup works fully offline at runtime.
+- The production corpus is the frozen Dictionary v1.0 artifact from `PyaeSoneHtun-98/dictionary-dataset/dist/dictionary_v1.json`.
+- The frozen corpus contains 30,000 unique headwords and 15,864 stored inflected forms.
+- Subtitle Bridge vendors the exact frozen artifact and verifies its SHA-256 during automated checks.
+- A separate 16-entry structured core supplement preserves useful basic words intentionally absent from the frozen 30,000-headword set.
+- A collision-checked compatibility alias table restores 11 historical starter-dictionary inflections that are intentionally absent from the frozen corpus forms, without modifying the frozen JSON.
+- All local results use the same structured dictionary model: canonical headword, pronunciation, grouped parts of speech, and Burmese meanings.
+- Canonical headwords are indexed before forms, so an exact headword wins over another entry's inflection.
+- The former flat starter/legacy fallback is no longer part of the translation path.
 - Translation results are cached.
+
+The frozen v1.0 corpus is AI-authored and has passed structural and targeted quality audits, but it has not received exhaustive native/bilingual editorial review of every entry.
 
 `GoogleTranslationProvider` remains optional. Provider credentials must be protected with the existing secure settings behavior and must never be written to diagnostics.
 
@@ -157,13 +167,13 @@ Diagnostics are intentionally small and privacy-conscious. They may record lifec
 
 - Windows x64 only.
 - mpv and FFmpeg must currently be installed/configured separately.
-- The offline Burmese dictionary is still a starter dataset.
+- The Dictionary v1.0 corpus is broad but not exhaustive; unknown words still fail cleanly offline.
+- Multi-word expressions and phrasal-verb lookup are not yet supported.
 - Rich ASS/SSA styling is not recreated in the interactive overlay.
 - Image subtitles are not clickable text.
 - Stremio external subtitle-addon URLs are not yet ingested.
 - Watched/progress state is not synchronized back to Stremio.
 - Stremio compatibility currently depends on a reversible local patch rather than native upstream support.
-- Issue #26 redesigns the player controls, subtitle safe area, translation card, and launcher. Manual Windows acceptance and the targeted post-review recheck have passed; native playback architecture remains unchanged.
 
 ## Product priorities
 

@@ -1,92 +1,121 @@
 import { describe, expect, it, vi } from 'vitest'
+import { CORE_LOCAL_DICTIONARY } from '../src/main/translation/coreDictionary'
 import { GoogleTranslationProvider } from '../src/main/translation/GoogleTranslationProvider'
+import { LEGACY_COMPATIBILITY_ALIASES } from '../src/main/translation/legacyCompatibilityAliases'
 import { LocalDictionaryProvider } from '../src/main/translation/LocalDictionaryProvider'
-import { LEGACY_LOCAL_DICTIONARY } from '../src/main/translation/legacyDictionary'
-import { LOCAL_DICTIONARY } from '../src/main/translation/localDictionary'
+import {
+  LOCAL_DICTIONARY,
+  LOCAL_DICTIONARY_DATASET,
+  PRODUCTION_LOCAL_DICTIONARY
+} from '../src/main/translation/localDictionary'
 
 describe('LocalDictionaryProvider', () => {
-  it('returns a structured Burmese dictionary entry without configuration', async () => {
+  it('loads the frozen 30,000-headword production corpus plus the structured core supplement', () => {
+    expect(LOCAL_DICTIONARY_DATASET.version).toBe(1)
+    expect(PRODUCTION_LOCAL_DICTIONARY).toHaveLength(30_000)
+    expect(CORE_LOCAL_DICTIONARY).toHaveLength(16)
+    expect(LOCAL_DICTIONARY).toHaveLength(30_016)
+
+    const productionHeadwords = new Set(PRODUCTION_LOCAL_DICTIONARY.map((entry) => entry.word))
+    const coreHeadwords = CORE_LOCAL_DICTIONARY.map((entry) => entry.word)
+
+    expect(new Set(coreHeadwords).size).toBe(16)
+    for (const word of coreHeadwords) {
+      expect(productionHeadwords.has(word)).toBe(false)
+    }
+  })
+
+  it('returns structured Burmese results from the production corpus', async () => {
     const provider = new LocalDictionaryProvider()
 
-    await expect(provider.translate({ word: 'charge' })).resolves.toEqual({
-      originalWord: 'charge',
-      translation: 'ငွေတောင်းသည်၊ စွပ်စွဲသည်၊ တာဝန်',
-      pronunciation: '/tʃɑrdʒ/',
+    await expect(provider.translate({ word: 'choose' })).resolves.toMatchObject({
+      originalWord: 'choose',
       dictionaryEntry: {
-        word: 'charge',
-        pronunciation: '/tʃɑrdʒ/',
-        forms: ['charges', 'charged', 'charging'],
-        meanings: [
-          {
+        word: 'choose',
+        pronunciation: expect.stringMatching(/^\/.+\/$/),
+        meanings: expect.arrayContaining([
+          expect.objectContaining({
             partOfSpeech: 'verb',
-            burmese: ['ငွေတောင်းသည်', 'စွပ်စွဲသည်']
-          },
-          {
-            partOfSpeech: 'noun',
-            burmese: ['တာဝန်']
-          }
-        ]
+            burmese: expect.any(Array)
+          })
+        ])
       },
       provider: 'local-dictionary',
       targetLanguage: 'my'
     })
   })
 
-  it('normalizes casing and resolves an inflected form to its canonical headword', async () => {
+  it('normalizes casing and resolves a production inflected form to its canonical headword', async () => {
     const provider = new LocalDictionaryProvider()
-    const headwords = new Set(LOCAL_DICTIONARY.map((entry) => entry.word.toLocaleLowerCase('en-US')))
-    const candidate = LOCAL_DICTIONARY.flatMap((entry) =>
-      entry.forms
-        .filter((form) => !headwords.has(form.toLocaleLowerCase('en-US')))
-        .map((form) => ({ entry, form }))
-    )[0]
 
-    expect(candidate).toBeDefined()
-    if (!candidate) {
-      return
-    }
-
-    const lookupWord = candidate.form.toLocaleUpperCase('en-US')
-    await expect(provider.translate({ word: lookupWord })).resolves.toMatchObject({
-      originalWord: lookupWord,
+    await expect(provider.translate({ word: 'CHOSEN' })).resolves.toMatchObject({
+      originalWord: 'CHOSEN',
       dictionaryEntry: {
-        word: candidate.entry.word
+        word: 'choose'
       },
       provider: 'local-dictionary',
       targetLanguage: 'my'
     })
   })
 
-  it('keeps starter-dictionary coverage as a fallback until structured data supersedes it', async () => {
+  it('keeps an exact production headword ahead of another entry form', async () => {
     const provider = new LocalDictionaryProvider()
-    const structuredKeys = new Set(
-      LOCAL_DICTIONARY.flatMap((entry) => [entry.word, ...entry.forms]).map((word) =>
-        word.toLocaleLowerCase('en-US')
-      )
-    )
-    const legacyHeadword = Object.keys(LEGACY_LOCAL_DICTIONARY).find(
-      (word) => !structuredKeys.has(word.toLocaleLowerCase('en-US'))
-    )
 
-    expect(legacyHeadword).toBeDefined()
-    if (!legacyHeadword) {
-      return
-    }
+    await expect(provider.translate({ word: 'warning' })).resolves.toMatchObject({
+      dictionaryEntry: {
+        word: 'warning'
+      }
+    })
+  })
 
-    const legacyEntry = LEGACY_LOCAL_DICTIONARY[legacyHeadword]
-    await expect(provider.translate({ word: legacyHeadword })).resolves.toEqual({
-      originalWord: legacyHeadword,
-      translation: legacyEntry.translation,
-      ...(legacyEntry.pronunciation ? { pronunciation: legacyEntry.pronunciation } : {}),
+  it('provides the former legacy-only basics as structured dictionary entries', async () => {
+    const provider = new LocalDictionaryProvider()
+
+    await expect(provider.translate({ word: 'went' })).resolves.toMatchObject({
+      originalWord: 'went',
+      translation: 'သွားသည်',
+      pronunciation: '/ɡoʊ/',
+      dictionaryEntry: {
+        word: 'go',
+        forms: ['goes', 'went', 'gone', 'going'],
+        meanings: [{ partOfSpeech: 'verb', burmese: ['သွားသည်'] }]
+      },
       provider: 'local-dictionary',
       targetLanguage: 'my'
     })
+
+    await expect(provider.translate({ word: 'yes' })).resolves.toMatchObject({
+      dictionaryEntry: {
+        word: 'yes',
+        meanings: [{ partOfSpeech: 'interjection', burmese: ['ဟုတ်ကဲ့'] }]
+      }
+    })
+  })
+
+  it('preserves every legacy compatibility alias that is absent from the frozen corpus forms', async () => {
+    const provider = new LocalDictionaryProvider()
+    const compatibilityCases = Object.entries(LEGACY_COMPATIBILITY_ALIASES).flatMap(
+      ([headword, aliases]) => aliases.map((alias) => ({ alias, headword }))
+    )
+
+    expect(compatibilityCases).toHaveLength(11)
+
+    for (const { alias, headword } of compatibilityCases) {
+      await expect(provider.translate({ word: alias })).resolves.toMatchObject({
+        originalWord: alias,
+        dictionaryEntry: {
+          word: headword
+        },
+        provider: 'local-dictionary',
+        targetLanguage: 'my'
+      })
+    }
   })
 
   it('rejects target languages not present in the offline dataset', async () => {
     const provider = new LocalDictionaryProvider()
 
-    await expect(provider.translate({ word: 'charge', targetLanguage: 'ja' })).rejects.toThrow(
+    await expect(provider.translate({ word: 'choose', targetLanguage: 'ja' })).rejects.toThrow(
       'currently supports Burmese'
     )
   })
@@ -97,17 +126,6 @@ describe('LocalDictionaryProvider', () => {
     await expect(provider.translate({ word: 'zzzxqvsubtitlebridgeunknown' })).rejects.toThrow(
       'No offline Burmese translation is available'
     )
-  })
-
-  it('loads structured entries from the JSON dataset', () => {
-    expect(LOCAL_DICTIONARY.length).toBeGreaterThanOrEqual(15)
-    expect(LOCAL_DICTIONARY.find((entry) => entry.word === 'charge')).toMatchObject({
-      pronunciation: '/tʃɑrdʒ/',
-      meanings: [
-        { partOfSpeech: 'verb', burmese: ['ငွေတောင်းသည်', 'စွပ်စွဲသည်'] },
-        { partOfSpeech: 'noun', burmese: ['တာဝန်'] }
-      ]
-    })
   })
 })
 

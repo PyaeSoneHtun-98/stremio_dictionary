@@ -1,16 +1,14 @@
 import type { TranslationRequest, TranslationResult } from '../../shared/translation'
+import { LEGACY_COMPATIBILITY_ALIASES } from './legacyCompatibilityAliases'
 import type { TranslationProvider } from './TranslationProvider'
-import {
-  LEGACY_LOCAL_DICTIONARY,
-  type LegacyLocalDictionaryEntry
-} from './legacyDictionary'
 import { LOCAL_DICTIONARY, type LocalDictionaryEntry } from './localDictionary'
 
-// These indexes are immutable for the lifetime of the Electron main process. Build them once at
-// module load instead of once per provider instance/cache miss; the structured corpus is expected
-// to grow to roughly 30,000 headwords plus inflected forms.
-const STRUCTURED_DICTIONARY_INDEX = buildDictionaryIndex(LOCAL_DICTIONARY)
-const LEGACY_DICTIONARY_INDEX = buildLegacyDictionaryIndex(LEGACY_LOCAL_DICTIONARY)
+// The production corpus plus the small structured core supplement are immutable for the lifetime
+// of the Electron main process. Build the lookup index once at module load.
+const STRUCTURED_DICTIONARY_INDEX = buildDictionaryIndex(
+  LOCAL_DICTIONARY,
+  LEGACY_COMPATIBILITY_ALIASES
+)
 
 export class LocalDictionaryProvider implements TranslationProvider {
   readonly id = 'local-dictionary'
@@ -39,35 +37,42 @@ export class LocalDictionaryProvider implements TranslationProvider {
       }
     }
 
-    const legacyEntry = LEGACY_DICTIONARY_INDEX.get(lookupWord)
-    if (legacyEntry) {
-      return {
-        originalWord,
-        translation: legacyEntry.translation,
-        ...(legacyEntry.pronunciation ? { pronunciation: legacyEntry.pronunciation } : {}),
-        provider: this.id,
-        targetLanguage
-      }
-    }
-
     throw new Error(`No offline Burmese translation is available for “${originalWord}” yet.`)
   }
 }
 
 function buildDictionaryIndex(
-  dictionary: readonly LocalDictionaryEntry[]
+  dictionary: readonly LocalDictionaryEntry[],
+  compatibilityAliases: Readonly<Record<string, readonly string[]>>
 ): ReadonlyMap<string, LocalDictionaryEntry> {
   const index = new Map<string, LocalDictionaryEntry>()
+  const headwords = new Map<string, LocalDictionaryEntry>()
 
-  // Register canonical headwords first so an exact dictionary entry always wins over another
-  // entry's inflected form (for example: warn -> warning, while warning is also a headword).
+  // Register every canonical headword first so an exact dictionary entry always wins over another
+  // entry's inflected form or compatibility alias.
   for (const entry of dictionary) {
     addHeadwordKey(index, entry.word, entry)
+    headwords.set(normalizeLookupWord(entry.word), entry)
   }
 
   for (const entry of dictionary) {
     for (const form of entry.forms) {
-      addFormKey(index, form, entry)
+      addLookupAlias(index, form, entry, 'form')
+    }
+  }
+
+  // Compatibility aliases restore a small set of lookups that the old starter dictionary
+  // supported but the frozen v1 corpus intentionally does not store as forms. The frozen JSON
+  // remains byte-for-byte unchanged.
+  for (const [headword, aliases] of Object.entries(compatibilityAliases)) {
+    const normalizedHeadword = normalizeLookupWord(headword)
+    const entry = headwords.get(normalizedHeadword)
+    if (!entry) {
+      throw new Error(`Local dictionary compatibility target is missing: ${normalizedHeadword}`)
+    }
+
+    for (const alias of aliases) {
+      addLookupAlias(index, alias, entry, 'compatibility alias')
     }
   }
 
@@ -92,14 +97,15 @@ function addHeadwordKey(
   index.set(normalized, entry)
 }
 
-function addFormKey(
+function addLookupAlias(
   index: Map<string, LocalDictionaryEntry>,
-  form: string,
-  entry: LocalDictionaryEntry
+  alias: string,
+  entry: LocalDictionaryEntry,
+  kind: 'form' | 'compatibility alias'
 ): void {
-  const normalized = normalizeLookupWord(form)
+  const normalized = normalizeLookupWord(alias)
   if (!normalized) {
-    throw new Error('Local dictionary forms must use a non-empty word.')
+    throw new Error(`Local dictionary ${kind}s must use a non-empty word.`)
   }
 
   const existing = index.get(normalized)
@@ -110,42 +116,9 @@ function addFormKey(
     }
     if (existing !== entry) {
       throw new Error(
-        `Duplicate local dictionary form: ${normalized} (${existing.word}, ${entry.word})`
+        `Duplicate local dictionary ${kind}: ${normalized} (${existing.word}, ${entry.word})`
       )
     }
-  }
-
-  index.set(normalized, entry)
-}
-
-function buildLegacyDictionaryIndex(
-  dictionary: Readonly<Record<string, LegacyLocalDictionaryEntry>>
-): ReadonlyMap<string, LegacyLocalDictionaryEntry> {
-  const index = new Map<string, LegacyLocalDictionaryEntry>()
-
-  for (const [headword, entry] of Object.entries(dictionary)) {
-    addLegacyDictionaryKey(index, headword, entry)
-    for (const alias of entry.aliases ?? []) {
-      addLegacyDictionaryKey(index, alias, entry)
-    }
-  }
-
-  return index
-}
-
-function addLegacyDictionaryKey(
-  index: Map<string, LegacyLocalDictionaryEntry>,
-  word: string,
-  entry: LegacyLocalDictionaryEntry
-): void {
-  const normalized = normalizeLookupWord(word)
-  if (!normalized) {
-    throw new Error('Legacy local dictionary entries must use a non-empty word.')
-  }
-
-  const existing = index.get(normalized)
-  if (existing && existing !== entry) {
-    throw new Error(`Duplicate legacy local dictionary word: ${normalized}`)
   }
 
   index.set(normalized, entry)
