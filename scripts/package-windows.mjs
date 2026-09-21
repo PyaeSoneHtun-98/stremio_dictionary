@@ -71,6 +71,7 @@ writeFileSync(
 for (const helper of [
   'Install-SubtitleBridge.ps1',
   'Install-RuntimeTools.ps1',
+  'Uninstall-SubtitleBridge.ps1',
   'Enable-StremioHandoff.ps1',
   'Disable-StremioHandoff.ps1'
 ]) {
