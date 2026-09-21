@@ -10,6 +10,8 @@ const UPDATE_SETTINGS_CHANNEL = 'translation:update-settings'
 const CLEAR_CACHE_CHANNEL = 'translation:clear-cache'
 const MAX_WORD_LENGTH = 120
 const MAX_CONTEXT_LENGTH = 600
+const MAX_CONTEXT_TOKENS = 16
+const MAX_CONTEXT_TOKEN_LENGTH = 120
 
 let settingsStore: TranslationSettingsStore | null = null
 let service: TranslationService | null = null
@@ -77,7 +79,12 @@ export function normalizeTranslationRequest(value: unknown): TranslationRequest 
     throw new Error('Invalid translation request.')
   }
 
-  const request = value as { word?: unknown; context?: unknown }
+  const request = value as {
+    word?: unknown
+    context?: unknown
+    contextTokens?: unknown
+    clickedTokenIndex?: unknown
+  }
   if (typeof request.word !== 'string') {
     throw new Error('Invalid translation word.')
   }
@@ -99,7 +106,55 @@ export function normalizeTranslationRequest(value: unknown): TranslationRequest 
     throw new Error('The subtitle context is too long to use for translation.')
   }
 
-  return context ? { word, context } : { word }
+  const hasContextTokens = request.contextTokens !== undefined
+  const hasClickedTokenIndex = request.clickedTokenIndex !== undefined
+  if (hasContextTokens !== hasClickedTokenIndex) {
+    throw new Error('Invalid phrase lookup context.')
+  }
+
+  let contextTokens: string[] | undefined
+  let clickedTokenIndex: number | undefined
+
+  if (hasContextTokens && hasClickedTokenIndex) {
+    if (
+      !Array.isArray(request.contextTokens) ||
+      request.contextTokens.length === 0 ||
+      request.contextTokens.length > MAX_CONTEXT_TOKENS
+    ) {
+      throw new Error('Invalid phrase lookup tokens.')
+    }
+
+    contextTokens = request.contextTokens.map((token) => {
+      if (typeof token !== 'string') {
+        throw new Error('Invalid phrase lookup token.')
+      }
+
+      const normalized = token.normalize('NFKC').trim().toLocaleLowerCase('en-US')
+      if (!normalized || normalized.length > MAX_CONTEXT_TOKEN_LENGTH || /\s/u.test(normalized)) {
+        throw new Error('Invalid phrase lookup token.')
+      }
+      return normalized
+    })
+
+    if (
+      typeof request.clickedTokenIndex !== 'number' ||
+      !Number.isSafeInteger(request.clickedTokenIndex) ||
+      request.clickedTokenIndex < 0 ||
+      request.clickedTokenIndex >= contextTokens.length
+    ) {
+      throw new Error('Invalid clicked subtitle token.')
+    }
+
+    clickedTokenIndex = request.clickedTokenIndex
+  }
+
+  return {
+    word,
+    ...(context ? { context } : {}),
+    ...(contextTokens && clickedTokenIndex !== undefined
+      ? { contextTokens, clickedTokenIndex }
+      : {})
+  }
 }
 
 function requireService(): TranslationService {
