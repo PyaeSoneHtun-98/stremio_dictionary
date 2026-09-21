@@ -263,7 +263,30 @@ jobs:
             throw 'One-click setup did not update Windows uninstall metadata.'
           }
 
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $setupInstallDir 'Uninstall-SubtitleBridge.ps1') -InstallDir $setupInstallDir -Quiet
+          $setupStremioFixtureDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeSetupStremioFixture'
+          New-Item -ItemType Directory -Path $setupStremioFixtureDir -Force | Out-Null
+          $setupServerJs = Join-Path $setupStremioFixtureDir 'server.js'
+          $setupOriginalServerJs = @'
+          var players = {
+              vlc: { title: "VLC", win32: { path: [ '"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe"' ] } }
+          };
+          devices.groups.external = [], Object.keys(players).forEach(function(el) {
+              var player = players[el];
+              player[process.platform] && player[process.platform].path.forEach(function(p) {
+                  if (fs.existsSync(p.replace(/"/gi, ""))) {
+                      devices.groups.external.push({ id: el });
+                  }
+              });
+          });
+          '@
+          [System.IO.File]::WriteAllText($setupServerJs, $setupOriginalServerJs)
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $setupInstallDir 'Enable-StremioHandoff.ps1') -ExecutablePath (Join-Path $setupInstallDir 'Subtitle Bridge.exe') -ServerJsPath $setupServerJs
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not prepare Stremio fixture before uninstall.'
+          }
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $setupInstallDir 'Uninstall-SubtitleBridge.ps1') -InstallDir $setupInstallDir -StremioServerJsPath $setupServerJs -Quiet
           if ($LASTEXITCODE -ne 0) {
             throw 'Packaged uninstaller failed.'
           }
@@ -272,6 +295,9 @@ jobs:
           }
           if (Test-Path -LiteralPath $uninstallKey) {
             throw 'Packaged uninstaller left the Windows uninstall registration behind.'
+          }
+          if ([System.IO.File]::ReadAllText($setupServerJs) -ne $setupOriginalServerJs) {
+            throw 'Packaged uninstaller left the Stremio handoff patch behind.'
           }
 
           $enableHandoff = Join-Path $installDir 'Enable-StremioHandoff.ps1'
