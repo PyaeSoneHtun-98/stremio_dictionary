@@ -2,7 +2,7 @@
 
 ## Stable master
 
-The standalone Windows MVP (Issues #1–#10), Stremio handoff (Issue #24, PR #25), subtitle-first player redesign (Issue #26, PR #27), structured offline dictionary pipeline (Issue #28, PR #29), external subtitle/control work (Issue #30, PR #31), finalized 30,000-word Dictionary v1.0 integration (Issue #32, PR #33), and one-click Windows installer with managed dependency setup (Issue #34, PR #35) are merged.
+The standalone Windows MVP (Issues #1–#10), Stremio handoff (Issue #24, PR #25), subtitle-first player redesign (Issue #26, PR #27), structured offline dictionary pipeline (Issue #28, PR #29), external subtitle/control work (Issue #30, PR #31), finalized 30,000-word Dictionary v1.0 integration (Issue #32, PR #33), one-click Windows installer with managed dependency setup (Issue #34, PR #35), and first stable Windows release (Issue #36, PR #37) are complete.
 
 Stable master capabilities include local MKV playback, FFmpeg text-subtitle extraction, clickable SRT/ASS/SSA dialogue, drag-and-drop external SRT/ASS/SSA subtitles, subtitle delay/size/position controls, structured offline Burmese lookup, translation settings/cache, and a normal Windows x64 setup executable with Start Menu integration, Installed Apps uninstall support, rollback-safe upgrades, and installer-managed mpv/FFmpeg runtimes.
 
@@ -12,20 +12,35 @@ Stremio streams use mpv live subtitles. The opt-in Play in Subtitle Bridge helpe
 
 PR #35 completed Issue #34 after successive installer-safety reviews and regression fixes covering install/cache ownership, interrupted and failed rollback recovery, committed-transaction cleanup, concurrent setup serialization, and fail-closed Stremio cleanup. Exact-head CI #327 passed both jobs, Codex reported no remaining P1/P2/P3 findings, and PR #35 squash merged to `master` at `e8927e2097feccb16f72b6a2709e6078e2cd75d0`. Issue #34 is closed.
 
-## Active work — Issue #36
+## Windows v1.0.0 release
 
-**Issue:** Publish Subtitle Bridge Windows v1.0.0
+Subtitle Bridge **v1.0.0** is published as the first stable Windows release.
 
-**Branch:** `release/v1.0.0`
+Release tag:
 
-**State:** Release preparation is in progress. The app/package version is being promoted to 1.0.0, public-facing installation documentation is being refreshed, v1.0.0 release notes are being added, and a release workflow is being introduced so a successful exact-`master` CI run can publish the verified Windows setup/portable artifacts automatically.
+`v1.0.0`
 
-### Release goal
+Release source commit:
 
-Publish the first stable Windows release as `v1.0.0`, with `SubtitleBridge-Setup-x64.exe` as the recommended normal-user download and its SHA-256 checksum attached to the GitHub Release.
+`a89cf5b83f07634027e3d523626176a08751d6ac`
 
-The release must come from the exact successful `master` CI head and must not be published from a pull-request run or failed workflow.
+PR #37 passed exact-head CI #332 and final Codex review with no remaining P1/P2/P3 findings before squash merge. The resulting exact-`master` commit passed CI #333, including `validate`, Windows packaging, and the complete packaged install/upgrade/rollback/runtime/Stremio acceptance suite.
+
+The dedicated Release Windows workflow then rebuilt and revalidated that exact successful `master` SHA in a read-only build job, verified the packaged v1.0.0 version and SHA-256 files, handed off a verified release bundle, reverified it in the isolated publish job, and published the GitHub Release.
+
+Published assets:
+
+- `SubtitleBridge-Setup-x64.exe` — recommended normal-user installer
+  - SHA-256: `8655d20ee839c6d1d0c324cad021dade919d0d0904a9e5c9704415bd81e6916e`
+- `SubtitleBridge-Setup-x64.exe.sha256`
+- `SubtitleBridge-win-x64.zip`
+  - SHA-256: `d5d201afa82591531b4b441d72683baeb32bc8093b5a364bbcfed2dc050cc7ab`
+- `SubtitleBridge-win-x64.zip.sha256`
+
+GitHub's published asset digests match the release-build hashes, and the uploaded checksum-file asset digests match the deterministic checksum-file contents generated for those binaries. Tag `v1.0.0` points directly to the release source commit above.
+
+Issue #36 is closed as completed.
 
 ## Later work
 
-Multi-word/phrasal-verb lookup, pronunciation audio/TTS, broader bilingual editorial review of the 30,000-entry dataset, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support remain separate work.
+Multi-word/phrasal-verb lookup, pronunciation audio/TTS, broader bilingual editorial review of the 30,000-entry dataset, macOS packaging, automatic updates, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support remain separate work.
