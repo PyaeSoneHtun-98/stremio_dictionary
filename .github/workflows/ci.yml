@@ -102,6 +102,7 @@ jobs:
             (Join-Path $installDir 'Subtitle Bridge.exe'),
             (Join-Path $installDir 'Enable-StremioHandoff.ps1'),
             (Join-Path $installDir 'Disable-StremioHandoff.ps1'),
+            (Join-Path $installDir 'Uninstall-SubtitleBridge.ps1'),
             (Join-Path $installDir 'resources\app\package.json'),
             (Join-Path $installDir 'resources\app\out\main\index.js'),
             (Join-Path $installDir 'resources\app\out\preload\index.js'),
@@ -110,10 +111,13 @@ jobs:
             (Join-Path $installDir 'resources\tools\ffmpeg\ffmpeg.exe'),
             (Join-Path $installDir 'resources\tools\ffmpeg\avcodec-fixture.dll'),
             (Join-Path $packageDir 'Install-RuntimeTools.ps1'),
+            (Join-Path $packageDir 'Uninstall-SubtitleBridge.ps1'),
             (Join-Path $packageDir 'RUNTIME_MANIFEST.json'),
             (Join-Path $packageDir 'RUNTIME_DEPENDENCIES.txt'),
             (Join-Path $PWD 'release\SubtitleBridge-win-x64.zip'),
-            (Join-Path $PWD 'release\SubtitleBridge-win-x64.zip.sha256')
+            (Join-Path $PWD 'release\SubtitleBridge-win-x64.zip.sha256'),
+            (Join-Path $PWD 'release\SubtitleBridge-Setup-x64.exe'),
+            (Join-Path $PWD 'release\SubtitleBridge-Setup-x64.exe.sha256')
           )
 
           foreach ($path in $required) {
@@ -141,6 +145,18 @@ jobs:
             if (Test-Path -LiteralPath $path) {
               throw "Unexpected bundled third-party runtime: $path"
             }
+          }
+
+          $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SubtitleBridge'
+          if (-not (Test-Path -LiteralPath $uninstallKey)) {
+            throw 'Installer did not register Subtitle Bridge in Windows uninstall metadata.'
+          }
+          $uninstallInfo = Get-ItemProperty -LiteralPath $uninstallKey
+          if ($uninstallInfo.InstallLocation -ne $installDir) {
+            throw "Unexpected uninstall InstallLocation: $($uninstallInfo.InstallLocation)"
+          }
+          if ([string]::IsNullOrWhiteSpace([string]$uninstallInfo.UninstallString)) {
+            throw 'Installer did not register an uninstall command.'
           }
 
           $staleSentinel = Join-Path $installDir 'obsolete-from-previous-install.txt'
@@ -174,6 +190,59 @@ jobs:
           $global:LASTEXITCODE = 0
           if ($nestedExitCode -eq 0) {
             throw 'Installer accepted a destination nested inside the source package.'
+          }
+
+          $setupExe = Join-Path $PWD 'release\SubtitleBridge-Setup-x64.exe'
+          $setupInstallDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeSetupInstall'
+          $setupRuntimeCache = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeSetupRuntimeCache'
+          Remove-Item -LiteralPath $setupInstallDir -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $setupRuntimeCache -Recurse -Force -ErrorAction SilentlyContinue
+
+          $env:SUBTITLE_BRIDGE_INSTALL_DIR = $setupInstallDir
+          $env:SUBTITLE_BRIDGE_RUNTIME_MANIFEST = $runtimeManifest
+          $env:SUBTITLE_BRIDGE_RUNTIME_CACHE = $setupRuntimeCache
+          $env:SUBTITLE_BRIDGE_SETUP_NO_SHORTCUT = '1'
+          $env:SUBTITLE_BRIDGE_SETUP_NO_LAUNCH = '1'
+          $env:SUBTITLE_BRIDGE_SETUP_HEADLESS = '1'
+          & $setupExe
+          $setupExitCode = $LASTEXITCODE
+          Remove-Item Env:SUBTITLE_BRIDGE_INSTALL_DIR -ErrorAction SilentlyContinue
+          Remove-Item Env:SUBTITLE_BRIDGE_RUNTIME_MANIFEST -ErrorAction SilentlyContinue
+          Remove-Item Env:SUBTITLE_BRIDGE_RUNTIME_CACHE -ErrorAction SilentlyContinue
+          Remove-Item Env:SUBTITLE_BRIDGE_SETUP_NO_SHORTCUT -ErrorAction SilentlyContinue
+          Remove-Item Env:SUBTITLE_BRIDGE_SETUP_NO_LAUNCH -ErrorAction SilentlyContinue
+          Remove-Item Env:SUBTITLE_BRIDGE_SETUP_HEADLESS -ErrorAction SilentlyContinue
+          $global:LASTEXITCODE = 0
+
+          if ($setupExitCode -ne 0) {
+            throw "One-click setup executable failed with exit code $setupExitCode."
+          }
+
+          foreach ($path in @(
+            (Join-Path $setupInstallDir 'Subtitle Bridge.exe'),
+            (Join-Path $setupInstallDir 'resources\tools\mpv\mpv.exe'),
+            (Join-Path $setupInstallDir 'resources\tools\ffmpeg\ffmpeg.exe'),
+            (Join-Path $setupInstallDir 'Uninstall-SubtitleBridge.ps1')
+          )) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "One-click setup did not install required file: $path"
+            }
+          }
+
+          $setupUninstallInfo = Get-ItemProperty -LiteralPath $uninstallKey
+          if ($setupUninstallInfo.InstallLocation -ne $setupInstallDir) {
+            throw 'One-click setup did not update Windows uninstall metadata.'
+          }
+
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $setupInstallDir 'Uninstall-SubtitleBridge.ps1') -InstallDir $setupInstallDir -Quiet
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Packaged uninstaller failed.'
+          }
+          if (Test-Path -LiteralPath $setupInstallDir) {
+            throw 'Packaged uninstaller left the installed application directory behind.'
+          }
+          if (Test-Path -LiteralPath $uninstallKey) {
+            throw 'Packaged uninstaller left the Windows uninstall registration behind.'
           }
 
           $enableHandoff = Join-Path $installDir 'Enable-StremioHandoff.ps1'
@@ -314,6 +383,8 @@ jobs:
         with:
           name: subtitle-bridge-windows-mvp
           path: |
+            release/SubtitleBridge-Setup-x64.exe
+            release/SubtitleBridge-Setup-x64.exe.sha256
             release/SubtitleBridge-win-x64.zip
             release/SubtitleBridge-win-x64.zip.sha256
           if-no-files-found: error
