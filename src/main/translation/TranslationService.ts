@@ -8,6 +8,7 @@ import {
   serializeTranslationCacheKey
 } from './TranslationCache'
 import type { TranslationProvider } from './TranslationProvider'
+import { findLocalPhraseMatch } from './PhraseMatcher'
 
 export interface TranslationRuntimeSettings {
   provider: TranslationProviderId
@@ -39,7 +40,7 @@ export class TranslationService {
 
   async translate(request: TranslationRequest): Promise<TranslationResult> {
     const settings = await this.settingsSource.getRuntimeSettings()
-    const normalizedWord = normalizeCacheWord(request.word)
+    const normalizedWord = resolveCacheLookupWord(settings.provider, request)
     const cacheKey = {
       provider: settings.provider,
       targetLanguage: settings.targetLanguage,
@@ -109,4 +110,19 @@ function createProvider(settings: TranslationRuntimeSettings): TranslationProvid
   }
 
   return new LocalDictionaryProvider()
+}
+
+
+function resolveCacheLookupWord(
+  provider: TranslationProviderId,
+  request: TranslationRequest
+): string {
+  if (provider === 'local-dictionary') {
+    const phraseMatch = findLocalPhraseMatch(request)
+    if (phraseMatch) {
+      return `phrase:${normalizeCacheWord(phraseMatch.entry.phrase)}`
+    }
+  }
+
+  return `word:${normalizeCacheWord(request.word)}`
 }
