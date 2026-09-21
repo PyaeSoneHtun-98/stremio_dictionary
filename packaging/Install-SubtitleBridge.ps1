@@ -76,6 +76,190 @@ function Test-InstalledAppRunning {
   return $false
 }
 
+function Get-PathToken {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  $sha256 = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Path.ToLowerInvariant())
+    $hash = $sha256.ComputeHash($bytes)
+    return ([System.BitConverter]::ToString($hash)).Replace('-', '').Substring(0, 16).ToLowerInvariant()
+  } finally {
+    $sha256.Dispose()
+  }
+}
+
+function Save-ShellMetadata {
+  param(
+    [Parameter(Mandatory = $true)][string]$MetadataDir,
+    [Parameter(Mandatory = $true)][string]$ShortcutPath,
+    [Parameter(Mandatory = $true)][string]$RegistryPath
+  )
+
+  New-Item -ItemType Directory -Path $MetadataDir -Force | Out-Null
+
+  if (Test-Path -LiteralPath $ShortcutPath -PathType Leaf) {
+    Copy-Item -LiteralPath $ShortcutPath -Destination (Join-Path $MetadataDir 'Subtitle Bridge.lnk') -Force
+  }
+
+  $snapshot = [ordered]@{
+    exists = $false
+    values = [ordered]@{}
+  }
+
+  if (Test-Path -LiteralPath $RegistryPath) {
+    $snapshot.exists = $true
+    $properties = Get-ItemProperty -LiteralPath $RegistryPath
+    foreach ($name in @(
+      'DisplayName',
+      'DisplayVersion',
+      'Publisher',
+      'InstallLocation',
+      'DisplayIcon',
+      'UninstallString',
+      'QuietUninstallString',
+      'RuntimeCacheDir',
+      'NoModify',
+      'NoRepair'
+    )) {
+      if ($properties.PSObject.Properties.Name -contains $name) {
+        $snapshot.values[$name] = $properties.$name
+      }
+    }
+  }
+
+  $snapshot |
+    ConvertTo-Json -Depth 6 |
+    Set-Content -LiteralPath (Join-Path $MetadataDir 'uninstall-registry.json') -Encoding UTF8
+}
+
+function Restore-ShellMetadata {
+  param(
+    [Parameter(Mandatory = $true)][string]$MetadataDir,
+    [Parameter(Mandatory = $true)][string]$ShortcutPath,
+    [Parameter(Mandatory = $true)][string]$RegistryPath
+  )
+
+  Remove-Item -LiteralPath $ShortcutPath -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $RegistryPath -Recurse -Force -ErrorAction SilentlyContinue
+
+  $shortcutBackup = Join-Path $MetadataDir 'Subtitle Bridge.lnk'
+  if (Test-Path -LiteralPath $shortcutBackup -PathType Leaf) {
+    $shortcutParent = Split-Path -Parent $ShortcutPath
+    New-Item -ItemType Directory -Path $shortcutParent -Force | Out-Null
+    Copy-Item -LiteralPath $shortcutBackup -Destination $ShortcutPath -Force
+  }
+
+  $registrySnapshotPath = Join-Path $MetadataDir 'uninstall-registry.json'
+  if (-not (Test-Path -LiteralPath $registrySnapshotPath -PathType Leaf)) {
+    return
+  }
+
+  $snapshot = Get-Content -LiteralPath $registrySnapshotPath -Raw | ConvertFrom-Json
+  if (-not $snapshot.exists) {
+    return
+  }
+
+  New-Item -Path $RegistryPath -Force | Out-Null
+  foreach ($property in $snapshot.values.PSObject.Properties) {
+    $propertyType = if ($property.Name -in @('NoModify', 'NoRepair')) { 'DWord' } else { 'String' }
+    New-ItemProperty -Path $RegistryPath -Name $property.Name -Value $property.Value -PropertyType $propertyType -Force | Out-Null
+  }
+}
+
+function Write-TransactionMarker {
+  param(
+    [Parameter(Mandatory = $true)][string]$MarkerPath,
+    [Parameter(Mandatory = $true)][hashtable]$Data
+  )
+
+  $tempPath = "$MarkerPath.tmp"
+  try {
+    $json = $Data | ConvertTo-Json -Depth 4
+    [System.IO.File]::WriteAllText(
+      $tempPath,
+      $json,
+      [System.Text.UTF8Encoding]::new($false)
+    )
+    Move-Item -LiteralPath $tempPath -Destination $MarkerPath -Force
+  } finally {
+    Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Recover-InterruptedTransaction {
+  param(
+    [Parameter(Mandatory = $true)][string]$MarkerPath,
+    [Parameter(Mandatory = $true)][string]$ExpectedInstallDir,
+    [Parameter(Mandatory = $true)][string]$InstallParent,
+    [Parameter(Mandatory = $true)][string]$ShortcutPath,
+    [Parameter(Mandatory = $true)][string]$RegistryPath
+  )
+
+  if (-not (Test-Path -LiteralPath $MarkerPath -PathType Leaf)) {
+    return
+  }
+
+  try {
+    $transaction = Get-Content -LiteralPath $MarkerPath -Raw | ConvertFrom-Json
+  } catch {
+    throw 'A previous Subtitle Bridge installation transaction could not be recovered safely.'
+  }
+
+  if ($transaction.version -ne 1) {
+    throw 'A previous Subtitle Bridge installation transaction uses an unsupported format.'
+  }
+
+  $markerInstallDir = Get-NormalizedPath ([string]$transaction.installDir)
+  if (-not $markerInstallDir.Equals($ExpectedInstallDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw 'A previous Subtitle Bridge installation transaction targets a different install directory.'
+  }
+
+  $stageDir = Get-NormalizedPath ([string]$transaction.stageDir)
+  $backupDir = Get-NormalizedPath ([string]$transaction.backupDir)
+  $metadataDir = Get-NormalizedPath ([string]$transaction.metadataDir)
+
+  foreach ($path in @($stageDir, $backupDir, $metadataDir)) {
+    if (-not (Test-IsSameOrChildPath -Candidate $path -Parent $InstallParent)) {
+      throw 'A previous Subtitle Bridge installation transaction contains an unsafe recovery path.'
+    }
+  }
+
+  if (Test-Path -LiteralPath $backupDir -PathType Container) {
+    if (Test-Path -LiteralPath $ExpectedInstallDir) {
+      Remove-Item -LiteralPath $ExpectedInstallDir -Recurse -Force
+    }
+
+    Move-Item -LiteralPath $backupDir -Destination $ExpectedInstallDir
+    Restore-ShellMetadata -MetadataDir $metadataDir -ShortcutPath $ShortcutPath -RegistryPath $RegistryPath
+    Write-Host 'Recovered the previous Subtitle Bridge installation after an interrupted upgrade.'
+  }
+
+  Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $metadataDir -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction SilentlyContinue
+}
+
+function Restore-PreviousInstallation {
+  param(
+    [Parameter(Mandatory = $true)][string]$InstallDir,
+    [Parameter(Mandatory = $true)][string]$BackupDir,
+    [Parameter(Mandatory = $true)][string]$MetadataDir,
+    [Parameter(Mandatory = $true)][string]$ShortcutPath,
+    [Parameter(Mandatory = $true)][string]$RegistryPath
+  )
+
+  if (Test-Path -LiteralPath $InstallDir) {
+    Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+
+  if (Test-Path -LiteralPath $BackupDir -PathType Container) {
+    Move-Item -LiteralPath $BackupDir -Destination $InstallDir -ErrorAction SilentlyContinue
+  }
+
+  Restore-ShellMetadata -MetadataDir $MetadataDir -ShortcutPath $ShortcutPath -RegistryPath $RegistryPath
+}
+
 $SourceDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SourceDir = Get-NormalizedPath (Resolve-Path $SourceDir).Path
 $InstallDir = Get-NormalizedPath $InstallDir
