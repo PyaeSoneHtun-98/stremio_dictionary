@@ -202,6 +202,12 @@ try {
     throw 'Subtitle Bridge.exe was not found after installation.'
   }
 
+  # CI uses this fail-after-swap hook to prove that post-install metadata failures restore
+  # the previously working installation. If a user sets it, failing closed is safe.
+  if ($env:SUBTITLE_BRIDGE_TEST_FORCE_POST_INSTALL_FAILURE -eq '1') {
+    throw 'Simulated post-install metadata failure.'
+  }
+
   if (-not $NoShortcut) {
     $StartMenuDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
     New-Item -ItemType Directory -Path $StartMenuDir -Force | Out-Null
