@@ -8,7 +8,7 @@ import {
   serializeTranslationCacheKey
 } from './TranslationCache'
 import type { TranslationProvider } from './TranslationProvider'
-import { findLocalPhraseMatch } from './PhraseMatcher'
+import { findLocalPhraseMatch, type ResolvedPhraseMatch } from './PhraseMatcher'
 
 export interface TranslationRuntimeSettings {
   provider: TranslationProviderId
@@ -40,7 +40,9 @@ export class TranslationService {
 
   async translate(request: TranslationRequest): Promise<TranslationResult> {
     const settings = await this.settingsSource.getRuntimeSettings()
-    const normalizedWord = resolveCacheLookupWord(settings.provider, request)
+    const phraseMatch =
+      settings.provider === 'local-dictionary' ? findLocalPhraseMatch(request) : null
+    const normalizedWord = resolveCacheLookupWord(settings.provider, request, phraseMatch)
     const cacheKey = {
       provider: settings.provider,
       targetLanguage: settings.targetLanguage,
@@ -49,10 +51,7 @@ export class TranslationService {
     const cached = this.cache.get(cacheKey)
 
     if (cached) {
-      return {
-        ...cached,
-        originalWord: request.word.trim()
-      }
+      return adaptResultToRequest(cached, request, phraseMatch)
     }
 
     const generation = this.cache.generation
@@ -61,10 +60,7 @@ export class TranslationService {
 
     if (existingPending?.generation === generation) {
       const result = await existingPending.promise
-      return {
-        ...result,
-        originalWord: request.word.trim()
-      }
+      return adaptResultToRequest(result, request, phraseMatch)
     }
 
     const provider = this.providerFactory(settings)
@@ -75,7 +71,7 @@ export class TranslationService {
         targetLanguage: settings.targetLanguage
       })
       .then((result) => {
-        this.cache.setIfCurrent(cacheKey, result, generation)
+        this.cache.setIfCurrent(cacheKey, cacheStableResult(result), generation)
         return result
       })
       .finally(() => {
@@ -88,10 +84,7 @@ export class TranslationService {
     this.pendingLookups.set(pendingKey, { generation, promise: lookupPromise })
 
     const result = await lookupPromise
-    return {
-      ...result,
-      originalWord: request.word.trim()
-    }
+    return adaptResultToRequest(result, request, phraseMatch)
   }
 
   clearCache(): void {
@@ -115,14 +108,42 @@ function createProvider(settings: TranslationRuntimeSettings): TranslationProvid
 
 function resolveCacheLookupWord(
   provider: TranslationProviderId,
-  request: TranslationRequest
+  request: TranslationRequest,
+  phraseMatch: ResolvedPhraseMatch | null
 ): string {
-  if (provider === 'local-dictionary') {
-    const phraseMatch = findLocalPhraseMatch(request)
-    if (phraseMatch) {
-      return `phrase:${normalizeCacheWord(phraseMatch.entry.phrase)}`
-    }
+  if (provider === 'local-dictionary' && phraseMatch) {
+    return `phrase:${normalizeCacheWord(phraseMatch.entry.phrase)}`
   }
 
   return `word:${normalizeCacheWord(request.word)}`
+}
+
+function cacheStableResult(result: TranslationResult): TranslationResult {
+  if (!result.phraseMatch) {
+    return result
+  }
+
+  const { phraseMatch: _requestSpecificMatch, ...stableResult } = result
+  return stableResult
+}
+
+function adaptResultToRequest(
+  result: TranslationResult,
+  request: TranslationRequest,
+  phraseMatch: ResolvedPhraseMatch | null
+): TranslationResult {
+  const adapted = {
+    ...result,
+    originalWord: request.word.trim()
+  }
+
+  if (!phraseMatch) {
+    return adapted
+  }
+
+  return {
+    ...adapted,
+    phraseEntry: phraseMatch.entry,
+    phraseMatch: phraseMatch.match
+  }
 }
