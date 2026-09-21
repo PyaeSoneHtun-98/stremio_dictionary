@@ -652,6 +652,15 @@ $InstallMutex = Acquire-InstallMutex -InstallPathToken $InstallPathToken
 $InstallMutexHeld = $true
 
 try {
+  if (-not [string]::IsNullOrWhiteSpace($env:SUBTITLE_BRIDGE_TEST_INSTALL_LOCK_SIGNAL_PATH)) {
+    $lockSignalPath = [System.IO.Path]::GetFullPath($env:SUBTITLE_BRIDGE_TEST_INSTALL_LOCK_SIGNAL_PATH)
+    $lockSignalParent = Split-Path -Parent $lockSignalPath
+    if (-not [string]::IsNullOrWhiteSpace($lockSignalParent)) {
+      New-Item -ItemType Directory -Path $lockSignalParent -Force | Out-Null
+    }
+    Set-Content -LiteralPath $lockSignalPath -Value 'acquired' -Encoding ASCII
+  }
+
   if (-not [string]::IsNullOrWhiteSpace($env:SUBTITLE_BRIDGE_TEST_HOLD_INSTALL_LOCK_MS)) {
     $holdMilliseconds = 0
     if (-not [int]::TryParse($env:SUBTITLE_BRIDGE_TEST_HOLD_INSTALL_LOCK_MS, [ref]$holdMilliseconds) -or
