@@ -31,9 +31,33 @@ export interface DictionaryDataset {
   entries: DictionaryEntry[]
 }
 
+export const PHRASE_TYPES = ['phrasal_verb', 'idiom', 'expression'] as const
+
+export type PhraseType = (typeof PHRASE_TYPES)[number]
+
+export interface PhraseEntry {
+  phrase: string
+  type: PhraseType
+  forms: string[]
+  burmese: string[]
+}
+
+export interface PhraseDataset {
+  version: 1
+  entries: PhraseEntry[]
+}
+
+export interface PhraseMatch {
+  source: string
+  startTokenIndex: number
+  endTokenIndex: number
+}
+
 export interface TranslationRequest {
   word: string
   context?: string
+  contextTokens?: string[]
+  clickedTokenIndex?: number
   targetLanguage?: string
 }
 
@@ -42,6 +66,8 @@ export interface TranslationResult {
   translation: string
   pronunciation?: string
   dictionaryEntry?: DictionaryEntry
+  phraseEntry?: PhraseEntry
+  phraseMatch?: PhraseMatch
   provider: string
   targetLanguage: string
 }

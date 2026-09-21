@@ -63,3 +63,34 @@ function pushTextSegments(
     })
   }
 }
+
+
+export interface PhraseLookupContext {
+  contextTokens: string[]
+  clickedTokenIndex: number
+}
+
+const PHRASE_CONTEXT_RADIUS = 4
+
+export function buildPhraseLookupContext(
+  tokens: readonly SubtitleToken[],
+  selectedToken: SubtitleToken
+): PhraseLookupContext | null {
+  const orderedTokens = [...tokens].sort((left, right) => left.start - right.start)
+  const selectedIndex = orderedTokens.findIndex(
+    (token) => token.start === selectedToken.start && token.end === selectedToken.end
+  )
+
+  if (selectedIndex < 0) {
+    return null
+  }
+
+  const start = Math.max(0, selectedIndex - PHRASE_CONTEXT_RADIUS)
+  const end = Math.min(orderedTokens.length, selectedIndex + PHRASE_CONTEXT_RADIUS + 1)
+  const contextTokens = orderedTokens.slice(start, end).map((token) => token.lookupTerm)
+
+  return {
+    contextTokens,
+    clickedTokenIndex: selectedIndex - start
+  }
+}

@@ -15,7 +15,7 @@ import {
   resolvePlayerShortcut,
   subtitleRecoveryMessage,
 } from './playerInteraction'
-import { segmentSubtitleCue } from './subtitleSegments'
+import { buildPhraseLookupContext, segmentSubtitleCue } from './subtitleSegments'
 
 const EMPTY_STATE: PlaybackSnapshot = {
   status: 'idle',
@@ -390,8 +390,14 @@ export function PolishedOverlay(): React.JSX.Element {
     }
   }
 
-  const selectWord = (cueId: string, token: SubtitleToken, context: string): void => {
+  const selectWord = (
+    cueId: string,
+    token: SubtitleToken,
+    context: string,
+    cueTokens: readonly SubtitleToken[],
+  ): void => {
     const requestVersion = ++translationRequestVersion.current
+    const phraseContext = buildPhraseLookupContext(cueTokens, token)
     setSelectedWord({
       cueId,
       tokenStart: token.start,
@@ -408,6 +414,7 @@ export function PolishedOverlay(): React.JSX.Element {
       .translateWord({
         word: token.lookupTerm,
         context,
+        ...(phraseContext ?? {}),
       })
       .then((result) => {
         if (translationRequestVersion.current !== requestVersion) {
@@ -473,7 +480,7 @@ export function PolishedOverlay(): React.JSX.Element {
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation()
-                      selectWord(activeCue.id, segment.token, activeCue.text)
+                      selectWord(activeCue.id, segment.token, activeCue.text, activeCue.tokens)
                     }}
                   >
                     {segment.token.text}
@@ -837,7 +844,9 @@ function TranslationPopup({
     translation.status === 'ready' ? translation.result.targetLanguage : targetLanguage
   const dictionaryEntry =
     translation.status === 'ready' ? translation.result.dictionaryEntry : undefined
-  const headingWord = dictionaryEntry?.word ?? selectedWord.text
+  const phraseEntry = translation.status === 'ready' ? translation.result.phraseEntry : undefined
+  const phraseMatch = translation.status === 'ready' ? translation.result.phraseMatch : undefined
+  const headingWord = phraseEntry?.phrase ?? dictionaryEntry?.word ?? selectedWord.text
   const resolvedFromForm =
     dictionaryEntry !== undefined &&
     selectedWord.lookupTerm.normalize('NFKC').trim().toLocaleLowerCase('en-US') !==
@@ -854,9 +863,11 @@ function TranslationPopup({
         <div className="translation-popup-heading">
           <strong>{headingWord}</strong>
           <span>
-            {resolvedFromForm
-              ? `${selectedWord.text} → ${dictionaryEntry?.word}`
-              : `English → ${languageLabel(resultLanguage)}`}
+            {phraseEntry
+              ? `Detected phrase · ${phraseTypeLabel(phraseEntry.type)}`
+              : resolvedFromForm
+                ? `${selectedWord.text} → ${dictionaryEntry?.word}`
+                : `English → ${languageLabel(resultLanguage)}`}
           </span>
         </div>
         <button
@@ -875,7 +886,28 @@ function TranslationPopup({
       ) : null}
 
       {translation.status === 'ready' ? (
-        dictionaryEntry ? (
+        phraseEntry ? (
+          <>
+            <div className="translation-phrase-detected">
+              Detected phrase: <strong>{phraseEntry.phrase}</strong>
+              {phraseMatch && phraseMatch.source !== phraseEntry.phrase ? (
+                <small>
+                  {phraseMatch.source} → {phraseEntry.phrase}
+                </small>
+              ) : null}
+            </div>
+            <div className="translation-dictionary-meanings" lang="my">
+              <section className="translation-dictionary-sense">
+                <span className="translation-part-of-speech">
+                  {phraseTypeLabel(phraseEntry.type)}
+                </span>
+                <div className="translation-dictionary-burmese">
+                  {phraseEntry.burmese.join('၊ ')}
+                </div>
+              </section>
+            </div>
+          </>
+        ) : dictionaryEntry ? (
           <>
             <div className="translation-pronunciation">{dictionaryEntry.pronunciation}</div>
             <div className="translation-dictionary-meanings" lang="my">
@@ -1067,6 +1099,13 @@ function translationErrorMessage(error: unknown): string {
   return error.message
     .replace(/^Error invoking remote method '[^']+':\s*/i, '')
     .replace(/^Error:\s*/i, '')
+}
+
+function phraseTypeLabel(type: 'phrasal_verb' | 'idiom' | 'expression'): string {
+  if (type === 'phrasal_verb') {
+    return 'phrasal verb'
+  }
+  return type
 }
 
 function languageLabel(code: string): string {

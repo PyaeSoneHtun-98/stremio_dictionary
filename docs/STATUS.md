@@ -41,6 +41,16 @@ GitHub's published asset digests match the release-build hashes, and the uploade
 
 Issue #36 is closed as completed.
 
+## Active work — Issue #38
+
+**Issue:** Add automatic multi-word phrase lookup
+
+**Branch:** `feat/issue-38-phrase-auto-detection`
+
+**State:** MVP implementation is in progress. A small separate phrase dataset is being used to prove automatic phrase detection without modifying the frozen 30,000-headword Dictionary v1.0. The user continues clicking one subtitle word; the main process inspects a bounded nearby-token window, prefers the longest known phrase containing that click, handles curated inflected phrase forms, and falls back to the existing single-word dictionary when no phrase matches.
+
+This issue intentionally proves the matcher/cache/IPC/UI architecture with a small curated dataset before any 3,000+ phrase-data expansion.
+
 ## Later work
 
-Multi-word/phrasal-verb lookup, pronunciation audio/TTS, broader bilingual editorial review of the 30,000-entry dataset, macOS packaging, automatic updates, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support remain separate work.
+Large-scale phrase/phrasal-verb dataset expansion, pronunciation audio/TTS, broader bilingual editorial review of the 30,000-entry dataset, macOS packaging, automatic updates, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support remain separate work.

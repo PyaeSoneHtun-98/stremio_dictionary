@@ -2,6 +2,7 @@ import type { TranslationRequest, TranslationResult } from '../../shared/transla
 import { LEGACY_COMPATIBILITY_ALIASES } from './legacyCompatibilityAliases'
 import type { TranslationProvider } from './TranslationProvider'
 import { LOCAL_DICTIONARY, type LocalDictionaryEntry } from './localDictionary'
+import { findLocalPhraseMatch } from './PhraseMatcher'
 
 // The production corpus plus the small structured core supplement are immutable for the lifetime
 // of the Electron main process. Build the lookup index once at module load.
@@ -22,6 +23,18 @@ export class LocalDictionaryProvider implements TranslationProvider {
     const targetLanguage = request.targetLanguage ?? 'my'
     if (targetLanguage !== 'my') {
       throw new Error('The offline dictionary currently supports Burmese (my) only.')
+    }
+
+    const phraseMatch = findLocalPhraseMatch(request)
+    if (phraseMatch) {
+      return {
+        originalWord,
+        translation: phraseMatch.entry.burmese.join('၊ '),
+        phraseEntry: phraseMatch.entry,
+        phraseMatch: phraseMatch.match,
+        provider: this.id,
+        targetLanguage
+      }
     }
 
     const lookupWord = normalizeLookupWord(originalWord)
