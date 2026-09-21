@@ -146,6 +146,11 @@ export function normalizeTranslationRequest(value: unknown): TranslationRequest 
     }
 
     clickedTokenIndex = request.clickedTokenIndex
+
+    const normalizedClickedWord = word.normalize('NFKC').trim().toLocaleLowerCase('en-US')
+    if (contextTokens[clickedTokenIndex] !== normalizedClickedWord) {
+      throw new Error('Phrase lookup context does not match the clicked subtitle word.')
+    }
   }
 
   return {
