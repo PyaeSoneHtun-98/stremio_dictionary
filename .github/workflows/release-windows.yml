@@ -8,15 +8,24 @@ on:
       - completed
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-windows
+  cancel-in-progress: false
 
 jobs:
-  release-windows:
+  build-release:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'master'
     runs-on: windows-latest
+    outputs:
+      should_release: ${{ steps.release.outputs.should_release }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      notes_path: ${{ steps.release.outputs.notes_path }}
 
     steps:
       - name: Checkout exact CI head
@@ -24,6 +33,7 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Read release metadata
         id: release
@@ -45,10 +55,17 @@ jobs:
             throw "Release notes are missing: $notesPath"
           }
 
+          $head = (& git rev-parse HEAD).Trim()
+          if (-not $head.Equals($env:RELEASE_SHA, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Checked-out commit $head does not match successful CI head $env:RELEASE_SHA."
+          }
+
           & gh release view $tag --repo $env:REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) {
             "should_release=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            "notes_path=$notesPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
             Write-Host "Release $tag already exists; nothing to publish."
             exit 0
           }
@@ -59,11 +76,6 @@ jobs:
             throw "Tag $tag already exists without a GitHub Release. Refusing to publish automatically."
           }
           $global:LASTEXITCODE = 0
-
-          $head = (& git rev-parse HEAD).Trim()
-          if (-not $head.Equals($env:RELEASE_SHA, [System.StringComparison]::OrdinalIgnoreCase)) {
-            throw "Checked-out commit $head does not match successful CI head $env:RELEASE_SHA."
-          }
 
           "should_release=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
@@ -119,24 +131,101 @@ jobs:
             }
           }
 
-      - name: Publish GitHub Release
+      - name: Stage release bundle
         if: steps.release.outputs.should_release == 'true'
+        shell: pwsh
+        run: |
+          $bundle = Join-Path $PWD 'release-bundle'
+          New-Item -ItemType Directory -Path $bundle -Force | Out-Null
+
+          Copy-Item -LiteralPath 'release\SubtitleBridge-Setup-x64.exe' -Destination $bundle
+          Copy-Item -LiteralPath 'release\SubtitleBridge-Setup-x64.exe.sha256' -Destination $bundle
+          Copy-Item -LiteralPath 'release\SubtitleBridge-win-x64.zip' -Destination $bundle
+          Copy-Item -LiteralPath 'release\SubtitleBridge-win-x64.zip.sha256' -Destination $bundle
+          Copy-Item -LiteralPath '${{ steps.release.outputs.notes_path }}' -Destination (Join-Path $bundle 'RELEASE_NOTES.md')
+
+          [ordered]@{
+            version = '${{ steps.release.outputs.version }}'
+            tag = '${{ steps.release.outputs.tag }}'
+            sourceSha = '${{ github.event.workflow_run.head_sha }}'
+          } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $bundle 'release-metadata.json') -Encoding UTF8
+
+      - name: Upload verified release bundle
+        if: steps.release.outputs.should_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-${{ steps.release.outputs.tag }}
+          path: release-bundle
+          if-no-files-found: error
+
+  publish-release:
+    needs: build-release
+    if: needs.build-release.outputs.should_release == 'true'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download verified release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release-${{ needs.build-release.outputs.tag }}
+          path: release-bundle
+
+      - name: Reverify release bundle
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          EXPECTED_VERSION: ${{ needs.build-release.outputs.version }}
+          EXPECTED_TAG: ${{ needs.build-release.outputs.tag }}
+        run: |
+          $metadata = Get-Content -LiteralPath 'release-bundle\release-metadata.json' -Raw | ConvertFrom-Json
+          if ([string]$metadata.sourceSha -ne $env:EXPECTED_SHA -or
+              [string]$metadata.version -ne $env:EXPECTED_VERSION -or
+              [string]$metadata.tag -ne $env:EXPECTED_TAG) {
+            throw 'Release bundle metadata does not match the successful CI source.'
+          }
+
+          foreach ($file in @(
+            'release-bundle\SubtitleBridge-Setup-x64.exe',
+            'release-bundle\SubtitleBridge-win-x64.zip'
+          )) {
+            $checksumFile = "$file.sha256"
+            $expectedHash = ((Get-Content -LiteralPath $checksumFile -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+            $actualHash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualHash -ne $expectedHash) {
+              throw "SHA-256 mismatch after artifact handoff for $file."
+            }
+          }
+
+      - name: Publish GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          RELEASE_TAG: ${{ needs.build-release.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.build-release.outputs.version }}
         run: |
-          $tag = '${{ steps.release.outputs.tag }}'
-          $version = '${{ steps.release.outputs.version }}'
-          $notesPath = '${{ steps.release.outputs.notes_path }}'
+          & gh release view $env:RELEASE_TAG --repo $env:REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $env:RELEASE_TAG was created by another run; nothing to publish."
+            exit 0
+          }
+          $global:LASTEXITCODE = 0
 
-          gh release create $tag `
-            'release\SubtitleBridge-Setup-x64.exe' `
-            'release\SubtitleBridge-Setup-x64.exe.sha256' `
-            'release\SubtitleBridge-win-x64.zip' `
-            'release\SubtitleBridge-win-x64.zip.sha256' `
+          & gh api "repos/$env:REPOSITORY/git/ref/tags/$env:RELEASE_TAG" --silent *> $null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Tag $env:RELEASE_TAG exists without a GitHub Release. Refusing to publish automatically."
+          }
+          $global:LASTEXITCODE = 0
+
+          gh release create $env:RELEASE_TAG `
+            'release-bundle\SubtitleBridge-Setup-x64.exe' `
+            'release-bundle\SubtitleBridge-Setup-x64.exe.sha256' `
+            'release-bundle\SubtitleBridge-win-x64.zip' `
+            'release-bundle\SubtitleBridge-win-x64.zip.sha256' `
             --repo $env:REPOSITORY `
             --target $env:RELEASE_SHA `
-            --title "Subtitle Bridge v$version" `
-            --notes-file $notesPath
+            --title "Subtitle Bridge v$env:RELEASE_VERSION" `
+            --notes-file 'release-bundle\RELEASE_NOTES.md'
