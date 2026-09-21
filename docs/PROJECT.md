@@ -168,7 +168,7 @@ Diagnostics are intentionally small and privacy-conscious. They may record lifec
 - Windows x64 only.
 - The first normal Windows install requires Internet access to download the pinned mpv and FFmpeg runtime archives; verified archives are cached for later upgrades.
 - The Dictionary v1.0 corpus is broad but not exhaustive; unknown words still fail cleanly offline.
-- Multi-word expressions and phrasal-verb lookup are not yet supported.
+- Automatic multi-word phrase lookup is being introduced with a small curated pilot dataset; broad phrase/phrasal-verb coverage remains future dataset work.
 - Rich ASS/SSA styling is not recreated in the interactive overlay.
 - Image subtitles are not clickable text.
 - Stremio external subtitle-addon URLs are not yet ingested.
