@@ -41,6 +41,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate Windows PowerShell installer syntax
+        shell: pwsh
+        run: |
+          $scripts = @(
+            'packaging\Install-RuntimeTools.ps1',
+            'packaging\Install-SubtitleBridge.ps1',
+            'packaging\Uninstall-SubtitleBridge.ps1',
+            'packaging\Enable-StremioHandoff.ps1',
+            'packaging\Disable-StremioHandoff.ps1'
+          )
+
+          foreach ($script in $scripts) {
+            powershell.exe -NoProfile -Command "[scriptblock]::Create((Get-Content -LiteralPath '$script' -Raw)) | Out-Null"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Windows PowerShell failed to parse $script"
+            }
+          }
+
       - name: Package Windows MVP
         run: npm run package:win
 
