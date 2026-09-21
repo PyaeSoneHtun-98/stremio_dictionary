@@ -12,6 +12,20 @@ Stremio streams use mpv live subtitles. The opt-in Play in Subtitle Bridge helpe
 
 PR #35 completed Issue #34 after successive installer-safety reviews and regression fixes covering install/cache ownership, interrupted and failed rollback recovery, committed-transaction cleanup, concurrent setup serialization, and fail-closed Stremio cleanup. Exact-head CI #327 passed both jobs, Codex reported no remaining P1/P2/P3 findings, and PR #35 squash merged to `master` at `e8927e2097feccb16f72b6a2709e6078e2cd75d0`. Issue #34 is closed.
 
+## Active work — Issue #36
+
+**Issue:** Publish Subtitle Bridge Windows v1.0.0
+
+**Branch:** `release/v1.0.0`
+
+**State:** Release preparation is in progress. The app/package version is being promoted to 1.0.0, public-facing installation documentation is being refreshed, v1.0.0 release notes are being added, and a release workflow is being introduced so a successful exact-`master` CI run can publish the verified Windows setup/portable artifacts automatically.
+
+### Release goal
+
+Publish the first stable Windows release as `v1.0.0`, with `SubtitleBridge-Setup-x64.exe` as the recommended normal-user download and its SHA-256 checksum attached to the GitHub Release.
+
+The release must come from the exact successful `master` CI head and must not be published from a pull-request run or failed workflow.
+
 ## Later work
 
 Multi-word/phrasal-verb lookup, pronunciation audio/TTS, broader bilingual editorial review of the 30,000-entry dataset, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support remain separate work.
