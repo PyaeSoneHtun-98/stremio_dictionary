@@ -70,7 +70,7 @@ describe('TranslationService cache', () => {
     expect(service.cacheSize).toBe(2)
   })
 
-  it('reuses a canonical phrase cache entry across inflected phrase forms', async () => {
+  it('recomputes request-specific phrase metadata on completed cache hits', async () => {
     const settings: TranslationRuntimeSettings = {
       provider: 'local-dictionary',
       targetLanguage: 'my',
@@ -89,18 +89,81 @@ describe('TranslationService cache', () => {
       () => provider
     )
 
-    await service.translate({
+    const first = await service.translate({
       word: 'up',
       contextTokens: ['give', 'up'],
       clickedTokenIndex: 1
     })
-    await service.translate({
+    const second = await service.translate({
       word: 'up',
-      contextTokens: ['gave', 'up'],
-      clickedTokenIndex: 1
+      contextTokens: ['he', 'gave', 'up', 'again'],
+      clickedTokenIndex: 2
     })
 
     expect(translate).toHaveBeenCalledOnce()
+    expect(service.cacheSize).toBe(1)
+    expect(first.phraseMatch).toEqual({
+      source: 'give up',
+      startTokenIndex: 0,
+      endTokenIndex: 2
+    })
+    expect(second.phraseMatch).toEqual({
+      source: 'gave up',
+      startTokenIndex: 1,
+      endTokenIndex: 3
+    })
+    expect(second.phraseEntry?.phrase).toBe('give up')
+  })
+
+  it('recomputes request-specific phrase metadata for concurrent coalesced lookups', async () => {
+    const settings: TranslationRuntimeSettings = {
+      provider: 'local-dictionary',
+      targetLanguage: 'my',
+      apiKey: ''
+    }
+    const pending = deferred<TranslationResult>()
+    const translate = vi.fn(() => pending.promise)
+    const provider: TranslationProvider = { id: 'fake', translate }
+    const service = new TranslationService(
+      { getRuntimeSettings: async () => settings },
+      undefined,
+      () => provider
+    )
+
+    const firstLookup = service.translate({
+      word: 'up',
+      contextTokens: ['give', 'up'],
+      clickedTokenIndex: 1
+    })
+    const secondLookup = service.translate({
+      word: 'up',
+      contextTokens: ['he', 'gave', 'up', 'again'],
+      clickedTokenIndex: 2
+    })
+
+    await flushMicrotasks()
+    expect(translate).toHaveBeenCalledOnce()
+
+    pending.resolve({
+      originalWord: 'up',
+      translation: 'အရှုံးပေးသည်',
+      provider: 'fake',
+      targetLanguage: 'my'
+    })
+
+    const [first, second] = await Promise.all([firstLookup, secondLookup])
+    expect(first.phraseMatch).toEqual({
+      source: 'give up',
+      startTokenIndex: 0,
+      endTokenIndex: 2
+    })
+    expect(second.phraseMatch).toEqual({
+      source: 'gave up',
+      startTokenIndex: 1,
+      endTokenIndex: 3
+    })
+    expect(first.phraseEntry?.phrase).toBe('give up')
+    expect(second.phraseEntry?.phrase).toBe('give up')
     expect(service.cacheSize).toBe(1)
   })
 
