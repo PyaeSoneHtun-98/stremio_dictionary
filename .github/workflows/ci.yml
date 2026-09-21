@@ -461,6 +461,106 @@ jobs:
           Remove-ItemProperty -LiteralPath $uninstallKey -Name 'PhaseRecoverySentinel' -ErrorAction SilentlyContinue
           Remove-Item -LiteralPath $shortcutPath -Force -ErrorAction SilentlyContinue
 
+          # Once a successful upgrade reaches committed, crashes during artifact cleanup must
+          # never roll the new installation back or require a deleted metadata snapshot.
+          foreach ($cleanupStop in @('before-artifacts', 'after-backup', 'after-metadata')) {
+            $committedOldSentinel = Join-Path $installDir "committed-old-$cleanupStop.txt"
+            Set-Content -LiteralPath $committedOldSentinel -Value 'old-install-only'
+
+            $env:SUBTITLE_BRIDGE_TEST_COMMITTED_CLEANUP_STOP = $cleanupStop
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+            $committedCrashExitCode = $LASTEXITCODE
+            Remove-Item Env:SUBTITLE_BRIDGE_TEST_COMMITTED_CLEANUP_STOP -ErrorAction SilentlyContinue
+            $global:LASTEXITCODE = 0
+
+            if ($committedCrashExitCode -eq 0) {
+              throw "Committed-cleanup crash fixture '$cleanupStop' unexpectedly completed normally."
+            }
+            if (Test-Path -LiteralPath $committedOldSentinel) {
+              throw "Committed-cleanup crash fixture '$cleanupStop' rolled back or retained the previous installation."
+            }
+
+            $committedMarkers = @(Get-ChildItem -LiteralPath $installParent -Filter '.SubtitleBridge-transaction-*.json' -File)
+            if ($committedMarkers.Count -ne 1) {
+              throw "Committed-cleanup crash fixture '$cleanupStop' did not leave exactly one transaction marker."
+            }
+            $committedTransaction = Get-Content -LiteralPath $committedMarkers[0].FullName -Raw | ConvertFrom-Json
+            if ($committedTransaction.phase -ne 'committed') {
+              throw "Committed-cleanup crash fixture '$cleanupStop' left phase '$($committedTransaction.phase)' instead of committed."
+            }
+
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $brokenPackageDir 'Install-SubtitleBridge.ps1') -InstallDir $installDir -NoShortcut -NoLaunch -SkipRuntimeProvisioning
+            $committedRecoveryExitCode = $LASTEXITCODE
+            $global:LASTEXITCODE = 0
+            if ($committedRecoveryExitCode -eq 0) {
+              throw "Committed recovery probe '$cleanupStop' unexpectedly installed the intentionally incomplete package."
+            }
+            if (Test-Path -LiteralPath $committedOldSentinel) {
+              throw "Committed recovery '$cleanupStop' restored the old application instead of preserving the successful upgrade."
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path $installDir 'Subtitle Bridge.exe'))) {
+              throw "Committed recovery '$cleanupStop' lost the successfully installed application."
+            }
+            if (@(Get-ChildItem -LiteralPath $installParent -Filter '.SubtitleBridge-transaction-*.json' -File).Count -ne 0) {
+              throw "Committed recovery '$cleanupStop' left stale transaction state behind."
+            }
+          }
+
+          # Concurrent setup executions for the same target must serialize before recovery or
+          # transaction creation so a second double-click cannot touch the first transaction.
+          $lockSignalPath = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeInstallLock.signal'
+          $lockWrapperPath = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeInstallLockRunner.ps1'
+          Remove-Item -LiteralPath $lockSignalPath -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $lockWrapperPath -Force -ErrorAction SilentlyContinue
+
+          $escapedInstaller = $installer.Replace("'", "''")
+          $escapedInstallDir = $installDir.Replace("'", "''")
+          $escapedManifest = $runtimeManifest.Replace("'", "''")
+          $escapedCache = $runtimeCacheDir.Replace("'", "''")
+          $escapedSignal = $lockSignalPath.Replace("'", "''")
+          @(
+            '$env:SUBTITLE_BRIDGE_TEST_HOLD_INSTALL_LOCK_MS = ''5000'''
+            ('$env:SUBTITLE_BRIDGE_TEST_INSTALL_LOCK_SIGNAL_PATH = ''' + $escapedSignal + '''')
+            ('& ''' + $escapedInstaller + ''' -InstallDir ''' + $escapedInstallDir + ''' -NoShortcut -NoLaunch -RuntimeManifestPath ''' + $escapedManifest + ''' -RuntimeCacheDir ''' + $escapedCache + '''')
+          ) | Set-Content -LiteralPath $lockWrapperPath -Encoding UTF8
+
+          $firstSetup = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', $lockWrapperPath
+          ) -PassThru
+
+          $lockDeadline = [DateTime]::UtcNow.AddSeconds(15)
+          while (-not (Test-Path -LiteralPath $lockSignalPath -PathType Leaf) -and
+                 [DateTime]::UtcNow -lt $lockDeadline) {
+            Start-Sleep -Milliseconds 100
+          }
+          if (-not (Test-Path -LiteralPath $lockSignalPath -PathType Leaf)) {
+            try { Stop-Process -Id $firstSetup.Id -Force -ErrorAction SilentlyContinue } catch {}
+            throw 'Timed out waiting for the first setup process to acquire its install lock.'
+          }
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+          $secondSetupExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          if ($secondSetupExitCode -eq 0) {
+            try { Stop-Process -Id $firstSetup.Id -Force -ErrorAction SilentlyContinue } catch {}
+            throw 'A concurrent second setup unexpectedly acquired the same install-path transaction.'
+          }
+
+          $firstSetup.WaitForExit()
+          if ($firstSetup.ExitCode -ne 0) {
+            throw "The lock-owning setup process failed with exit code $($firstSetup.ExitCode)."
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $installDir 'Subtitle Bridge.exe'))) {
+            throw 'Concurrent-setup test lost the working installation.'
+          }
+          if (@(Get-ChildItem -LiteralPath $installParent -Filter '.SubtitleBridge-transaction-*.json' -File).Count -ne 0) {
+            throw 'Concurrent-setup test left transaction state behind.'
+          }
+          Remove-Item -LiteralPath $lockSignalPath -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $lockWrapperPath -Force -ErrorAction SilentlyContinue
+
           $nestedInstallDir = Join-Path $packageDir 'nested-install-should-fail'
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $nestedInstallDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
           $nestedExitCode = $LASTEXITCODE
