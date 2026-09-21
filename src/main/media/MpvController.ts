@@ -843,7 +843,7 @@ function finiteNumberOrNull(value: unknown): number | null {
 
 function toUserMessage(error: unknown): string {
   if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-    return 'mpv was not found. Install mpv and add it to PATH, or set MPV_PATH to mpv.exe before launching Subtitle Bridge.'
+    return 'mpv was not found. Reinstall Subtitle Bridge to restore its managed media runtime, or configure MPV_PATH for development.'
   }
 
   if (error instanceof Error) {
