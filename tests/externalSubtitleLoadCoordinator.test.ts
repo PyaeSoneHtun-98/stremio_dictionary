@@ -68,6 +68,9 @@ describe('ExternalSubtitleLoadCoordinator', () => {
 
     const request = coordinator.beginLoadRequest()
     expect(request).not.toBeNull()
+    if (!request) {
+      throw new Error('expected an active subtitle load request')
+    }
 
     state = {
       ...state,
@@ -76,7 +79,7 @@ describe('ExternalSubtitleLoadCoordinator', () => {
     }
 
     await expect(
-      coordinator.loadRequested('C:\\subs\\picked.ass', request!)
+      coordinator.loadRequested('C:\\subs\\picked.ass', request)
     ).resolves.toMatchObject({
       loaded: false,
       error: expect.stringContaining('video changed')
