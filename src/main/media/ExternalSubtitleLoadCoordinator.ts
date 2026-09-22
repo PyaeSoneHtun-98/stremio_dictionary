@@ -20,6 +20,11 @@ interface ExternalSubtitleLoadDependencies {
   ) => void
 }
 
+export interface ExternalSubtitleLoadRequest {
+  generation: number
+  mediaKey: string
+}
+
 export class ExternalSubtitleLoadCoordinator {
   private generation = 0
 
@@ -29,45 +34,63 @@ export class ExternalSubtitleLoadCoordinator {
     this.generation += 1
   }
 
+  beginLoadRequest(): ExternalSubtitleLoadRequest | null {
+    const state = this.dependencies.getState()
+    if (!state.filePath) {
+      return null
+    }
+
+    return {
+      generation: ++this.generation,
+      mediaKey: state.filePath
+    }
+  }
+
   async load(filePath: string): Promise<LoadExternalSubtitleResult> {
-    // Establish ordering before any async validation so a later drop always supersedes this one.
-    const requestGeneration = ++this.generation
-    const startingState = this.dependencies.getState()
-    if (!startingState.filePath) {
+    const request = this.beginLoadRequest()
+    if (!request) {
       return { loaded: false, error: 'Open a video before loading an external subtitle.' }
     }
 
-    const mediaKey = startingState.filePath
+    return this.loadRequested(filePath, request)
+  }
+
+  async loadRequested(
+    filePath: string,
+    request: ExternalSubtitleLoadRequest
+  ): Promise<LoadExternalSubtitleResult> {
+    if (!this.isCurrent(request.generation)) {
+      return supersededResult()
+    }
+
+    if (this.dependencies.getState().filePath !== request.mediaKey) {
+      return mediaChangedResult()
+    }
 
     try {
       const descriptor = await this.dependencies.validate(filePath)
-      if (!this.isCurrent(requestGeneration)) {
+      if (!this.isCurrent(request.generation)) {
         return supersededResult()
       }
 
-      // Extraction mutates the shared extractor by cancelling/replacing its active child process,
-      // so stale requests must never reach it.
+      if (this.dependencies.getState().filePath !== request.mediaKey) {
+        return mediaChangedResult()
+      }
+
       const cues = await this.dependencies.extract(filePath, descriptor.format)
-      if (!this.isCurrent(requestGeneration)) {
+      if (!this.isCurrent(request.generation)) {
         return supersededResult()
       }
 
       const latestState = this.dependencies.getState()
-      if (latestState.filePath !== mediaKey) {
-        return {
-          loaded: false,
-          error: 'The video changed before the subtitle finished loading. Drop the subtitle again.'
-        }
-      }
-
-      if (!this.isCurrent(requestGeneration)) {
-        return supersededResult()
+      if (latestState.filePath !== request.mediaKey) {
+        return mediaChangedResult()
       }
 
       this.dependencies.setExternal(latestState, descriptor.fileName, descriptor.format, cues)
       return { loaded: true, fileName: descriptor.fileName }
     } catch (error) {
-      if (!this.isCurrent(requestGeneration)) {
+      if (!this.isCurrent(request.generation)) {
         return supersededResult()
       }
 
@@ -87,5 +110,12 @@ function supersededResult(): LoadExternalSubtitleResult {
   return {
     loaded: false,
     error: 'A newer subtitle load replaced this request.'
+  }
+}
+
+function mediaChangedResult(): LoadExternalSubtitleResult {
+  return {
+    loaded: false,
+    error: 'The video changed before the subtitle was selected or loaded. Choose the subtitle again.'
   }
 }

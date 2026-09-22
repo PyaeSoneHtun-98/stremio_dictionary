@@ -77,6 +77,12 @@ The phrase auto-detection engine from Issue #38 / PR #39 is complete and the pro
 - Phrase data is limited to contiguous 2–5-token surface strings for the current matcher.
 - The app verifies the exact production phrase artifact SHA/counts during `npm run check`.
 
+## Player UX refresh
+
+Issue #44 is in progress on `feat/issue-44-player-ux`, stacked on the tested v1.0.1 installer hotfix.
+
+The work adds real mpv stream-buffering feedback (including seek/cache stalls), double-click fullscreen on the non-interactive video surface, and a compact desktop-app launcher redesign with local-video and Stremio actions plus a current-session summary. Translation, Dictionary v1, Phrase Dictionary v1, and Stremio handoff semantics are unchanged.
+
 ## Later work
 
 Further phrase coverage beyond Phrase Dictionary v1, separated-object phrasal-verb matching, pronunciation audio/TTS, broader bilingual editorial review of the 30,000-entry word dataset, macOS packaging, automatic updates, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support remain separate work.

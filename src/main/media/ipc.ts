@@ -15,6 +15,7 @@ import { SubtitlePreferencesStore } from './SubtitlePreferencesStore'
 import { SubtitleSession } from './SubtitleSession'
 import { ExternalSubtitleLoadCoordinator } from './ExternalSubtitleLoadCoordinator'
 import { ExternalSubtitleExtractor } from '../subtitles/ExternalSubtitleExtractor'
+import { getSystemDoubleClickInterval } from './windowsInput'
 import {
   describeExternalSubtitle,
   type ExternalSubtitleDescriptor,
@@ -24,8 +25,10 @@ import {
 const MEDIA_STATE_CHANNEL = 'media:state'
 const OPEN_VIDEO_CHANNEL = 'media:open-video'
 const OPEN_VIDEO_PATH_CHANNEL = 'media:open-video-path'
+const OPEN_EXTERNAL_SUBTITLE_CHANNEL = 'media:open-external-subtitle'
 const LOAD_EXTERNAL_SUBTITLE_PATH_CHANNEL = 'media:load-external-subtitle-path'
 const GET_STATE_CHANNEL = 'media:get-state'
+const GET_DOUBLE_CLICK_INTERVAL_CHANNEL = 'media:get-double-click-interval'
 const SET_PAUSED_CHANNEL = 'media:set-paused'
 const SEEK_CHANNEL = 'media:seek'
 const SET_VOLUME_CHANNEL = 'media:set-volume'
@@ -91,6 +94,32 @@ export function registerMediaIpc(): void {
   })
 
   ipcMain.handle(
+    OPEN_EXTERNAL_SUBTITLE_CHANNEL,
+    async (event): Promise<LoadExternalSubtitleResult> => {
+      const request = externalSubtitleLoadCoordinator.beginLoadRequest()
+      if (!request) {
+        return { loaded: false, error: 'Open a video before loading an external subtitle.' }
+      }
+
+      const parentWindow = BrowserWindow.fromWebContents(event.sender)
+      const options: OpenDialogOptions = {
+        title: 'Open subtitle file',
+        properties: ['openFile'],
+        filters: [{ name: 'Subtitle files', extensions: ['srt', 'ass', 'ssa'] }]
+      }
+      const result = parentWindow
+        ? await dialog.showOpenDialog(parentWindow, options)
+        : await dialog.showOpenDialog(options)
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { loaded: false, cancelled: true }
+      }
+
+      return externalSubtitleLoadCoordinator.loadRequested(result.filePaths[0], request)
+    }
+  )
+
+  ipcMain.handle(
     LOAD_EXTERNAL_SUBTITLE_PATH_CHANNEL,
     async (_event, filePath: unknown): Promise<LoadExternalSubtitleResult> => {
       if (typeof filePath !== 'string') {
@@ -102,6 +131,7 @@ export function registerMediaIpc(): void {
   )
 
   ipcMain.handle(GET_STATE_CHANNEL, () => subtitleSession.getState(controller.getState()))
+  ipcMain.handle(GET_DOUBLE_CLICK_INTERVAL_CHANNEL, () => getSystemDoubleClickInterval())
   ipcMain.handle(SET_PAUSED_CHANNEL, (_event, paused: unknown) => {
     if (typeof paused !== 'boolean') {
       throw new Error('Invalid play/pause value.')
@@ -199,8 +229,10 @@ export function disposeMediaIpc(): void {
 
   ipcMain.removeHandler(OPEN_VIDEO_CHANNEL)
   ipcMain.removeHandler(OPEN_VIDEO_PATH_CHANNEL)
+  ipcMain.removeHandler(OPEN_EXTERNAL_SUBTITLE_CHANNEL)
   ipcMain.removeHandler(LOAD_EXTERNAL_SUBTITLE_PATH_CHANNEL)
   ipcMain.removeHandler(GET_STATE_CHANNEL)
+  ipcMain.removeHandler(GET_DOUBLE_CLICK_INTERVAL_CHANNEL)
   ipcMain.removeHandler(SET_PAUSED_CHANNEL)
   ipcMain.removeHandler(SEEK_CHANNEL)
   ipcMain.removeHandler(SET_VOLUME_CHANNEL)

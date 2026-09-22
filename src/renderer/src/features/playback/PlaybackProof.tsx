@@ -11,6 +11,7 @@ const EMPTY_STATE: PlaybackSnapshot = {
   duration: null,
   volume: 100,
   speed: 1,
+  buffering: false,
   tracks: [],
   subtitle: createEmptySubtitleModel(),
   error: null,
@@ -28,15 +29,11 @@ export function PlaybackProof(): React.JSX.Element {
     let active = true
 
     void window.desktop.media.getState().then((snapshot) => {
-      if (active) {
-        setState(snapshot)
-      }
+      if (active) setState(snapshot)
     })
 
     const unsubscribe = window.desktop.media.onState((snapshot) => {
-      if (active) {
-        setState(snapshot)
-      }
+      if (active) setState(snapshot)
     })
 
     return () => {
@@ -57,15 +54,12 @@ export function PlaybackProof(): React.JSX.Element {
   }, [])
 
   const applyOpenResult = (result: OpenVideoResult): void => {
-    if (result.error) {
-      setLocalError(result.error)
-    }
+    if (result.error) setLocalError(result.error)
   }
 
   const openVideo = async (): Promise<void> => {
     setOpening(true)
     setLocalError(null)
-
     try {
       applyOpenResult(await window.desktop.media.openVideo())
     } catch (error) {
@@ -78,7 +72,6 @@ export function PlaybackProof(): React.JSX.Element {
   const openDroppedFile = async (file: File): Promise<void> => {
     setOpening(true)
     setLocalError(null)
-
     try {
       if (!file.name.toLowerCase().endsWith('.mkv')) {
         setLocalError('Subtitle Bridge currently supports MKV files only.')
@@ -115,6 +108,8 @@ export function PlaybackProof(): React.JSX.Element {
     }
   }
 
+  const displayStatus = state.buffering ? 'buffering' : state.status
+
   return (
     <section
       className={`playback-proof${dragActive ? ' is-dragging' : ''}`}
@@ -136,56 +131,101 @@ export function PlaybackProof(): React.JSX.Element {
         event.preventDefault()
         setDragActive(false)
         const file = event.dataTransfer.files.item(0)
-        if (file) {
-          void openDroppedFile(file)
-        }
+        if (file) void openDroppedFile(file)
       }}
     >
-      <div className="playback-proof-header">
+      <div className="launcher-panel-heading">
         <div>
-          <span className="eyebrow">Your next watch</span>
-          <h2 id="playback-proof-title">Settle in. Press play.</h2>
+          <span className="eyebrow">Start watching</span>
+          <h2 id="playback-proof-title">Your player, ready when you are.</h2>
         </div>
-        <span className={`status-pill status-${state.status}`}>{state.status}</span>
+        <span className={`status-pill status-${displayStatus}`}>
+          <span className="status-indicator" aria-hidden="true" />
+          {displayStatus}
+        </span>
       </div>
 
-      <div className="video-dropzone">
-        <div>
-          <strong>{dragActive ? 'Drop the MKV to open it' : 'Drop your movie here'}</strong>
-          <span>Choose an MKV file to start watching</span>
-        </div>
-        <button className="primary-action" type="button" onClick={openVideo} disabled={opening}>
-          {opening ? 'Opening…' : 'Open video'}
-        </button>
+      <div className="launcher-action-grid">
+        <section className="launch-card launch-card-primary">
+          <div className="launch-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <title>Local video</title>
+              <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h4l2 2H18a2 2 0 0 1 2 2v8.5A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" />
+              <path d="m10 10 5 3-5 3z" />
+            </svg>
+          </div>
+          <div className="launch-card-copy">
+            <span className="launch-card-kicker">Local video</span>
+            <h3>{dragActive ? 'Drop your MKV here' : 'Open a video'}</h3>
+            <p>Play an MKV with clickable English subtitles and Burmese lookup.</p>
+          </div>
+          <button className="primary-action" type="button" onClick={openVideo} disabled={opening}>
+            {opening ? 'Opening…' : 'Choose video'}
+          </button>
+          <span className="drop-hint">or drag and drop an MKV anywhere on this panel</span>
+        </section>
+
+        <section className="launch-card">
+          <div className="launch-card-icon stremio-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <title>Stremio streaming</title>
+              <path d="m8 5 10 7-10 7z" />
+            </svg>
+          </div>
+          <div className="launch-card-copy">
+            <span className="launch-card-kicker">Streaming</span>
+            <h3>Play from Stremio</h3>
+            <p>Enable the handoff once, restart Stremio, then choose Play in Subtitle Bridge.</p>
+          </div>
+          <div className="stremio-actions">
+            <button
+              className="secondary-action"
+              type="button"
+              disabled={stremioBusy}
+              onClick={() => void updateStremioHandoff(true)}
+            >
+              {stremioBusy ? 'Working…' : 'Enable'}
+            </button>
+            <button
+              className="secondary-action secondary-action-quiet"
+              type="button"
+              disabled={stremioBusy}
+              onClick={() => void updateStremioHandoff(false)}
+            >
+              Disable
+            </button>
+          </div>
+        </section>
       </div>
 
-      <div className="stremio-integration">
-        <div>
-          <strong>Watching with Stremio?</strong>
-          <span>
-            Enable the optional handoff, restart Stremio, then choose{' '}
-            <strong>Play in Subtitle Bridge</strong> from its player menu.
-          </span>
-        </div>
-        <div className="stremio-actions">
-          <button
-            className="secondary-action"
-            type="button"
-            disabled={stremioBusy}
-            onClick={() => void updateStremioHandoff(true)}
-          >
-            {stremioBusy ? 'Working…' : 'Enable Stremio'}
-          </button>
-          <button
-            className="secondary-action"
-            type="button"
-            disabled={stremioBusy}
-            onClick={() => void updateStremioHandoff(false)}
-          >
-            Disable
-          </button>
-        </div>
-      </div>
+      {state.fileName ? (
+        <section className="current-session">
+          <div className="current-session-state">
+            <span className={`session-dot status-${displayStatus}`} aria-hidden="true" />
+            <div>
+              <span aria-live="polite">
+                {displayStatus === 'buffering' ? 'Buffering stream' : displayStatus}
+              </span>
+              <strong title={state.fileName}>{state.fileName}</strong>
+            </div>
+          </div>
+
+          <div className="session-stats">
+            <span>
+              <small>Position</small>
+              <strong>{formatTime(state.currentTime)}</strong>
+            </span>
+            <span>
+              <small>Duration</small>
+              <strong>{formatTime(state.duration)}</strong>
+            </span>
+            <span>
+              <small>Subtitles</small>
+              <strong>{state.subtitle.status}</strong>
+            </span>
+          </div>
+        </section>
+      ) : null}
 
       {stremioMessage ? (
         <p className="playback-help" aria-live="polite">
@@ -198,7 +238,8 @@ export function PlaybackProof(): React.JSX.Element {
       ) : null}
 
       <details className="media-details">
-        <summary>Playback details{state.fileName ? ` · ${state.fileName}` : ''}</summary>
+        <summary>Technical playback details{state.fileName ? ` · ${state.fileName}` : ''}</summary>
+
         <div className="playback-metrics">
           <Metric label="File" value={state.fileName ?? 'No video loaded'} />
           <Metric label="Position" value={formatTime(state.currentTime)} />
@@ -228,20 +269,12 @@ export function PlaybackProof(): React.JSX.Element {
                 {formatTime(state.subtitle.activeCue.endTime)}
               </div>
               <div className="active-cue-text">{state.subtitle.activeCue.text}</div>
-              <div className="token-preview">
-                {state.subtitle.activeCue.tokens.map((token) => (
-                  <span className="token-chip" key={`${token.start}-${token.end}`}>
-                    <strong>{token.text}</strong>
-                    <small>{token.lookupTerm}</small>
-                  </span>
-                ))}
-              </div>
             </div>
           ) : (
             <div className="empty-subtitle-state">
               {state.subtitle.status === 'ready'
                 ? 'No subtitle cue is active at the current playback position.'
-                : (state.subtitle.error ?? 'Open an MKV with an embedded text subtitle track.')}
+                : (state.subtitle.error ?? 'Open a video with an embedded text subtitle track.')}
             </div>
           )}
         </div>
@@ -271,9 +304,7 @@ export function PlaybackProof(): React.JSX.Element {
                     <td>{track.codec ?? 'unknown'}</td>
                     <td>{track.subtitleKind ?? '—'}</td>
                     <td>
-                      {track.type === 'subtitle' && state.subtitle.trackId === track.id
-                        ? 'yes'
-                        : '—'}
+                      {track.type === 'subtitle' && state.subtitle.trackId === track.id ? 'yes' : '—'}
                     </td>
                     <td>{track.ffIndex ?? '—'}</td>
                   </tr>
@@ -281,7 +312,7 @@ export function PlaybackProof(): React.JSX.Element {
               ) : (
                 <tr>
                   <td colSpan={8} className="empty-table-cell">
-                    Open an MKV file to inspect its embedded tracks.
+                    Open a video to inspect its tracks.
                   </td>
                 </tr>
               )}
@@ -303,9 +334,7 @@ function Metric({ label, value }: { label: string; value: string }): React.JSX.E
 }
 
 function subtitleTrackLabel(state: PlaybackSnapshot): string {
-  if (state.subtitle.trackId === null) {
-    return 'No text subtitle track selected'
-  }
+  if (state.subtitle.trackId === null) return 'No text subtitle track selected'
 
   const parts = [
     `Track ${state.subtitle.trackId}`,
@@ -318,15 +347,12 @@ function subtitleTrackLabel(state: PlaybackSnapshot): string {
 }
 
 function formatTime(seconds: number | null): string {
-  if (seconds === null || !Number.isFinite(seconds)) {
-    return '—'
-  }
+  if (seconds === null || !Number.isFinite(seconds)) return '—'
 
   const wholeSeconds = Math.max(0, Math.floor(seconds))
   const hours = Math.floor(wholeSeconds / 3600)
   const minutes = Math.floor((wholeSeconds % 3600) / 60)
   const remainingSeconds = wholeSeconds % 60
-
   const clock = `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
   return hours > 0 ? `${hours}:${clock}` : clock
 }

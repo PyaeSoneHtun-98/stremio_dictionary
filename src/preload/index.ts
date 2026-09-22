@@ -8,9 +8,11 @@ const desktopBridge: DesktopBridge = {
     openVideoPath: (filePath) => ipcRenderer.invoke('media:open-video-path', filePath),
     getPathForFile: (file) =>
       webUtils.getPathForFile(file as Parameters<typeof webUtils.getPathForFile>[0]),
+    openExternalSubtitle: () => ipcRenderer.invoke('media:open-external-subtitle'),
     loadExternalSubtitlePath: (filePath) =>
       ipcRenderer.invoke('media:load-external-subtitle-path', filePath),
     getState: () => ipcRenderer.invoke('media:get-state'),
+    getDoubleClickInterval: () => ipcRenderer.invoke('media:get-double-click-interval'),
     setPaused: (paused) => ipcRenderer.invoke('media:set-paused', paused),
     seek: (seconds) => ipcRenderer.invoke('media:seek', seconds),
     setVolume: (volume) => ipcRenderer.invoke('media:set-volume', volume),

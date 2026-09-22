@@ -78,6 +78,7 @@ export interface PlaybackSnapshot {
   volume: number
   speed: number
   subtitleDelay?: number
+  buffering?: boolean
   tracks: MediaTrack[]
   subtitle: SubtitleModelSnapshot
   error: string | null
@@ -90,6 +91,7 @@ export interface OpenVideoResult {
 
 export interface LoadExternalSubtitleResult {
   loaded: boolean
+  cancelled?: boolean
   fileName?: string
   error?: string
 }
@@ -105,8 +107,10 @@ export interface DesktopBridge {
     openVideo: () => Promise<OpenVideoResult>
     openVideoPath: (filePath: string) => Promise<OpenVideoResult>
     getPathForFile: (file: unknown) => string
+    openExternalSubtitle: () => Promise<LoadExternalSubtitleResult>
     loadExternalSubtitlePath: (filePath: string) => Promise<LoadExternalSubtitleResult>
     getState: () => Promise<PlaybackSnapshot>
+    getDoubleClickInterval: () => Promise<number>
     setPaused: (paused: boolean) => Promise<void>
     seek: (seconds: number) => Promise<void>
     setVolume: (volume: number) => Promise<void>

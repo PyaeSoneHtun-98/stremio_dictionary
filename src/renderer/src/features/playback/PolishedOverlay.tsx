@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MediaTrack, PlaybackSnapshot, SubtitleToken } from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
 import {
@@ -12,8 +12,12 @@ import { PlayerIcon } from './PlayerIcon'
 import { usePlayerChrome } from './usePlayerChrome'
 import {
   clampPlayerValue,
+  isInteractiveKeyboardTarget,
+  isInteractiveSurfaceTarget,
   resolvePlayerShortcut,
+  shouldHandleSurfacePointer,
   subtitleRecoveryMessage,
+  SurfaceGestureCoordinator,
 } from './playerInteraction'
 import { buildPhraseLookupContext, segmentSubtitleCue } from './subtitleSegments'
 
@@ -102,10 +106,31 @@ export function PolishedOverlay(): React.JSX.Element {
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [controlError, setControlError] = useState<string | null>(null)
+  const [doubleClickIntervalMs, setDoubleClickIntervalMs] = useState(500)
+
+  const runControl = useCallback(async (action: () => Promise<void>): Promise<void> => {
+    setControlError(null)
+    try {
+      await action()
+    } catch (error) {
+      setControlError(error instanceof Error ? error.message : 'The player control failed.')
+    }
+  }, [])
   const currentFilePath = useRef<string | null>(null)
   const currentCueId = useRef<string | null>(null)
   const currentSubtitleTrackId = useRef<number | null>(null)
   const translationRequestVersion = useRef(0)
+  const stateRef = useRef<PlaybackSnapshot>(EMPTY_STATE)
+  const surfaceGestureCoordinator = useMemo(
+    () =>
+      new SurfaceGestureCoordinator(
+        () => stateRef.current,
+        (paused) => {
+          void runControl(() => window.desktop.media.setPaused(paused))
+        },
+      ),
+    [runControl],
+  )
 
   const dismissTranslation = useCallback((): void => {
     translationRequestVersion.current += 1
@@ -120,6 +145,9 @@ export function PolishedOverlay(): React.JSX.Element {
       if (!active) {
         return
       }
+
+      surfaceGestureCoordinator.handleStateTransition(stateRef.current, snapshot)
+      stateRef.current = snapshot
 
       const nextCueId = snapshot.subtitle.activeCue?.id ?? null
       const selectionContextChanged =
@@ -149,7 +177,27 @@ export function PolishedOverlay(): React.JSX.Element {
     return () => {
       active = false
       translationRequestVersion.current += 1
+      surfaceGestureCoordinator.cancelPending()
       unsubscribe()
+    }
+  }, [surfaceGestureCoordinator])
+
+  useEffect(() => {
+    let active = true
+
+    void window.desktop.media
+      .getDoubleClickInterval()
+      .then((interval) => {
+        if (active) {
+          setDoubleClickIntervalMs(interval)
+        }
+      })
+      .catch(() => {
+        // Keep the Windows default fallback if the native timing query fails.
+      })
+
+    return () => {
+      active = false
     }
   }, [])
 
@@ -251,12 +299,16 @@ export function PolishedOverlay(): React.JSX.Element {
       Boolean(panel) ||
       Boolean(selectedWord) ||
       Boolean(controlError || state.error) ||
+      Boolean(state.buffering) ||
       controlsHovered ||
       dragging,
   )
 
   const canControl =
     Boolean(state.filePath) && !['loading', 'error', 'unavailable'].includes(state.status)
+  const canToggleFullscreen =
+    Boolean(state.filePath) && !['error', 'unavailable'].includes(state.status)
+  const buffering = state.status === 'loading' || Boolean(state.buffering)
   const playing = state.status === 'playing'
   const duration = state.duration ?? 0
   const currentTime = Math.min(state.currentTime ?? 0, duration || Number.MAX_SAFE_INTEGER)
@@ -270,15 +322,6 @@ export function PolishedOverlay(): React.JSX.Element {
   const subtitleMessage = activeCue
     ? null
     : subtitleRecoveryMessage(state.subtitle.status, state.subtitle.error)
-
-  const runControl = useCallback(async (action: () => Promise<void>): Promise<void> => {
-    setControlError(null)
-    try {
-      await action()
-    } catch (error) {
-      setControlError(error instanceof Error ? error.message : 'The player control failed.')
-    }
-  }, [])
 
   useEffect(() => {
     const handlePlayerShortcut = (event: KeyboardEvent): void => {
@@ -439,14 +482,50 @@ export function PolishedOverlay(): React.JSX.Element {
     <main
       className={`overlay-probe${chromeVisible ? '' : ' chrome-hidden'}`}
       aria-label="Subtitle Bridge video controls"
+      onPointerUp={(event) => {
+        if (
+          !shouldHandleSurfacePointer({
+            button: event.button,
+            isPrimary: event.isPrimary,
+            interactiveTarget: isInteractiveSurfaceTarget(event.target),
+            canControl,
+          })
+        ) {
+          return
+        }
+
+        surfaceGestureCoordinator.schedule(doubleClickIntervalMs)
+      }}
+      onDoubleClick={(event) => {
+        surfaceGestureCoordinator.cancelPending()
+
+        if (
+          event.button !== 0 ||
+          !canToggleFullscreen ||
+          isInteractiveSurfaceTarget(event.target)
+        ) {
+          return
+        }
+
+        event.preventDefault()
+        void runControl(() => window.desktop.media.toggleFullscreen())
+      }}
     >
       <div className="overlay-topline" inert={!chromeVisible}>
-        <span className={`overlay-status status-${state.status}`}>
+        <span className={`overlay-status status-${state.buffering ? 'buffering' : state.status}`}>
           <span className="status-dot" />
-          {state.status}
+          {state.buffering ? 'buffering' : state.status}
         </span>
         <strong title={state.fileName ?? undefined}>{state.fileName ?? 'No video loaded'}</strong>
       </div>
+
+      {buffering ? (
+        <div className="player-buffering-layer" role="status" aria-live="polite">
+          <span className="player-buffering-spinner" aria-hidden="true" />
+          <strong>{state.status === 'loading' ? 'Opening video…' : 'Buffering…'}</strong>
+          <span>{state.buffering ? 'Waiting for stream data' : 'Preparing playback'}</span>
+        </div>
+      ) : null}
 
       <section
         className="subtitle-overlay"
@@ -612,7 +691,7 @@ export function PolishedOverlay(): React.JSX.Element {
                 <div>
                   <dt>Play / pause</dt>
                   <dd>
-                    <kbd>Space</kbd> / <kbd>K</kbd>
+                    click video / <kbd>Space</kbd> / <kbd>K</kbd>
                   </dd>
                 </div>
                 <div>
@@ -630,7 +709,7 @@ export function PolishedOverlay(): React.JSX.Element {
                 <div>
                   <dt>Fullscreen</dt>
                   <dd>
-                    <kbd>F</kbd>
+                    <kbd>F</kbd> / double-click video
                   </dd>
                 </div>
                 <div>
@@ -1110,18 +1189,6 @@ function phraseTypeLabel(type: 'phrasal_verb' | 'idiom' | 'expression'): string 
 
 function languageLabel(code: string): string {
   return TARGET_LANGUAGE_OPTIONS.find((language) => language.code === code)?.label ?? code
-}
-
-function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
-
-  if (target.isContentEditable || target.closest('.player-panel')) {
-    return true
-  }
-
-  return ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'A'].includes(target.tagName)
 }
 
 function isSelectableSubtitleTrack(track: MediaTrack, filePath: string | null): boolean {

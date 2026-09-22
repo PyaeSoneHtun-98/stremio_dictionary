@@ -123,6 +123,35 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
     }
   }, [])
 
+  const openExternalSubtitleFile = async (): Promise<void> => {
+    const requestVersion = ++externalLoadVersion.current
+    setError(null)
+    setMessage(null)
+    setLoadingExternal(true)
+
+    try {
+      const result = await window.desktop.media.openExternalSubtitle()
+      if (requestVersion !== externalLoadVersion.current || result.cancelled) {
+        return
+      }
+
+      if (!result.loaded) {
+        setError(result.error ?? 'Could not load this subtitle file.')
+        return
+      }
+
+      setMessage(`${result.fileName ?? 'External subtitle'} loaded`)
+    } catch (reason) {
+      if (requestVersion === externalLoadVersion.current) {
+        setError(cleanErrorMessage(reason, 'Could not open this subtitle file.'))
+      }
+    } finally {
+      if (requestVersion === externalLoadVersion.current) {
+        setLoadingExternal(false)
+      }
+    }
+  }
+
   useEffect(() => {
     const preventNavigation = (event: DragEvent): void => event.preventDefault()
     const enter = (event: DragEvent): void => {
@@ -191,6 +220,7 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
   const selectableTracks = tracks.filter((track) => isSelectableTrack(track, state?.filePath ?? null))
   const delay = state?.subtitleDelay ?? 0
   const canControl = Boolean(state?.filePath) && !['loading', 'error', 'unavailable'].includes(state?.status ?? '')
+  const canOpenExternal = canControl && !loadingExternal
   const canSwitch = state?.status === 'paused' && selectableTracks.length > 0
 
   return (
@@ -213,7 +243,7 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
             <div className="subtitle-tools-heading">
               <div>
                 <strong>Subtitle controls</strong>
-                <span>Drop SRT, ASS, or SSA anywhere on the player</span>
+                <span>Open or drop SRT, ASS, or SSA subtitles</span>
               </div>
               <button
                 type="button"
@@ -249,6 +279,19 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
                   : 'Pause playback before switching subtitle sources.'}
               </small>
             </label>
+
+            <div className="subtitle-tools-external-action">
+              <button
+                type="button"
+                className="subtitle-tools-open"
+                disabled={!canOpenExternal}
+                onClick={() => void openExternalSubtitleFile()}
+              >
+                <PlayerIcon name="captions" />
+                Choose subtitle file
+              </button>
+              <small>SRT · ASS · SSA</small>
+            </div>
 
             <div className="subtitle-tools-control-group">
               <div className="subtitle-tools-control-heading">

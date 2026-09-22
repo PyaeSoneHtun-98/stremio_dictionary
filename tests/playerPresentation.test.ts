@@ -29,6 +29,13 @@ describe('player presentation contracts', () => {
     expect(refinementCss).toMatch(/max-height:\s*calc\(100vh - 36px\);/)
   })
 
+  it('keeps visible top chrome hit-testable while disabling it when chrome is hidden', () => {
+    expect(playerCss).toMatch(/\.overlay-topline\s*\{[\s\S]*?pointer-events:\s*auto;/)
+    expect(playerCss).toMatch(
+      /\.chrome-hidden \.player-controls,[\s\S]*?\.chrome-hidden \.overlay-topline\s*\{[\s\S]*?pointer-events:\s*none;/,
+    )
+  })
+
   it('keeps the obsolete saved popup-position control out of the visible settings UI', () => {
     expect(refinementCss).toMatch(
       /\.translation-settings-grid\s*>\s*label:nth-of-type\(3\)\s*\{[\s\S]*?display:\s*none;/,

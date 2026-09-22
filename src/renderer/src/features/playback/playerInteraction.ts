@@ -1,4 +1,4 @@
-import type { SubtitleModelStatus } from '../../../../shared/media'
+import type { PlaybackStatus, SubtitleModelStatus } from '../../../../shared/media'
 
 export type PlayerShortcut =
   | { kind: 'dismiss' }
@@ -13,6 +13,106 @@ export interface PlayerShortcutOptions {
   altKey?: boolean
   ctrlKey?: boolean
   metaKey?: boolean
+}
+
+export interface SurfacePlaybackState {
+  status: PlaybackStatus
+  filePath: string | null
+}
+
+export interface SurfacePointerOptions {
+  button: number
+  isPrimary: boolean
+  interactiveTarget: boolean
+  canControl: boolean
+}
+
+interface ClosestCapableTarget {
+  tagName: string
+  isContentEditable?: boolean
+  closest: (selector: string) => unknown
+}
+
+export const SURFACE_INTERACTIVE_SELECTOR =
+  '.player-controls, .player-panel, .translation-popup, .subtitle-overlay, .overlay-topline'
+
+export class SurfaceGestureCoordinator {
+  private timer: ReturnType<typeof setTimeout> | null = null
+
+  constructor(
+    private readonly getState: () => SurfacePlaybackState,
+    private readonly togglePlayback: (paused: boolean) => void
+  ) {}
+
+  schedule(delayMs: number): boolean {
+    if (this.timer !== null) {
+      return false
+    }
+
+    const startingState = this.getState()
+    if (!isSurfaceControllable(startingState)) {
+      return false
+    }
+
+    const mediaKey = startingState.filePath
+    this.timer = setTimeout(() => {
+      this.timer = null
+      const currentState = this.getState()
+      if (currentState.filePath !== mediaKey || !isSurfaceControllable(currentState)) {
+        return
+      }
+
+      this.togglePlayback(currentState.status === 'playing')
+    }, Math.max(0, delayMs))
+
+    return true
+  }
+
+  handleStateTransition(previous: SurfacePlaybackState, next: SurfacePlaybackState): void {
+    if (previous.filePath !== next.filePath || previous.status !== next.status) {
+      this.cancelPending()
+    }
+  }
+
+  cancelPending(): void {
+    if (this.timer !== null) {
+      clearTimeout(this.timer)
+      this.timer = null
+    }
+  }
+}
+
+export function shouldHandleSurfacePointer(options: SurfacePointerOptions): boolean {
+  return (
+    options.button === 0 &&
+    options.isPrimary &&
+    options.canControl &&
+    !options.interactiveTarget
+  )
+}
+
+export function isInteractiveSurfaceTarget(target: EventTarget | null): boolean {
+  const element = asClosestCapableTarget(target)
+  if (!element) {
+    return false
+  }
+
+  return (
+    isInteractiveKeyboardTarget(target) || Boolean(element.closest(SURFACE_INTERACTIVE_SELECTOR))
+  )
+}
+
+export function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
+  const element = asClosestCapableTarget(target)
+  if (!element) {
+    return false
+  }
+
+  if (element.isContentEditable || element.closest('.player-panel')) {
+    return true
+  }
+
+  return ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'A'].includes(element.tagName)
 }
 
 export function resolvePlayerShortcut(
@@ -80,4 +180,21 @@ export function subtitleRecoveryMessage(
   }
 
   return null
+}
+
+function asClosestCapableTarget(target: EventTarget | null): ClosestCapableTarget | null {
+  if (!target || typeof target !== 'object') {
+    return null
+  }
+
+  const candidate = target as unknown as Partial<ClosestCapableTarget>
+  if (typeof candidate.tagName !== 'string' || typeof candidate.closest !== 'function') {
+    return null
+  }
+
+  return candidate as ClosestCapableTarget
+}
+
+function isSurfaceControllable(state: SurfacePlaybackState): boolean {
+  return Boolean(state.filePath) && !['loading', 'error', 'unavailable'].includes(state.status)
 }
