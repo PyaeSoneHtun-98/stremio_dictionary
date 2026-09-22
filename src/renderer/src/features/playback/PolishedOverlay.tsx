@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MediaTrack, PlaybackSnapshot, SubtitleToken } from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
 import {
@@ -12,8 +12,12 @@ import { PlayerIcon } from './PlayerIcon'
 import { usePlayerChrome } from './usePlayerChrome'
 import {
   clampPlayerValue,
+  isInteractiveKeyboardTarget,
+  isInteractiveSurfaceTarget,
   resolvePlayerShortcut,
+  shouldHandleSurfacePointer,
   subtitleRecoveryMessage,
+  SurfaceGestureCoordinator,
 } from './playerInteraction'
 import { buildPhraseLookupContext, segmentSubtitleCue } from './subtitleSegments'
 
@@ -31,7 +35,6 @@ const EMPTY_STATE: PlaybackSnapshot = {
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
-const SURFACE_SINGLE_CLICK_DELAY_MS = 275
 const TARGET_LANGUAGE_OPTIONS = [
   { code: 'my', label: 'Burmese' },
   { code: 'ja', label: 'Japanese' },
@@ -103,28 +106,37 @@ export function PolishedOverlay(): React.JSX.Element {
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [controlError, setControlError] = useState<string | null>(null)
+  const [doubleClickIntervalMs, setDoubleClickIntervalMs] = useState(500)
+
+  const runControl = useCallback(async (action: () => Promise<void>): Promise<void> => {
+    setControlError(null)
+    try {
+      await action()
+    } catch (error) {
+      setControlError(error instanceof Error ? error.message : 'The player control failed.')
+    }
+  }, [])
   const currentFilePath = useRef<string | null>(null)
   const currentCueId = useRef<string | null>(null)
   const currentSubtitleTrackId = useRef<number | null>(null)
   const translationRequestVersion = useRef(0)
-  const surfaceClickTimer = useRef<number | null>(null)
+  const stateRef = useRef<PlaybackSnapshot>(EMPTY_STATE)
+  const surfaceGestureCoordinator = useMemo(
+    () =>
+      new SurfaceGestureCoordinator(
+        () => stateRef.current,
+        (paused) => {
+          void runControl(() => window.desktop.media.setPaused(paused))
+        },
+      ),
+    [runControl],
+  )
 
   const dismissTranslation = useCallback((): void => {
     translationRequestVersion.current += 1
     setSelectedWord(null)
     setTranslation({ status: 'idle' })
   }, [])
-
-  const clearPendingSurfaceClick = useCallback((): void => {
-    if (surfaceClickTimer.current !== null) {
-      window.clearTimeout(surfaceClickTimer.current)
-      surfaceClickTimer.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    return () => clearPendingSurfaceClick()
-  }, [clearPendingSurfaceClick])
 
   useEffect(() => {
     let active = true
@@ -133,6 +145,9 @@ export function PolishedOverlay(): React.JSX.Element {
       if (!active) {
         return
       }
+
+      surfaceGestureCoordinator.handleStateTransition(stateRef.current, snapshot)
+      stateRef.current = snapshot
 
       const nextCueId = snapshot.subtitle.activeCue?.id ?? null
       const selectionContextChanged =
@@ -162,7 +177,27 @@ export function PolishedOverlay(): React.JSX.Element {
     return () => {
       active = false
       translationRequestVersion.current += 1
+      surfaceGestureCoordinator.cancelPending()
       unsubscribe()
+    }
+  }, [surfaceGestureCoordinator])
+
+  useEffect(() => {
+    let active = true
+
+    void window.desktop.media
+      .getDoubleClickInterval()
+      .then((interval) => {
+        if (active) {
+          setDoubleClickIntervalMs(interval)
+        }
+      })
+      .catch(() => {
+        // Keep the Windows default fallback if the native timing query fails.
+      })
+
+    return () => {
+      active = false
     }
   }, [])
 
@@ -287,15 +322,6 @@ export function PolishedOverlay(): React.JSX.Element {
   const subtitleMessage = activeCue
     ? null
     : subtitleRecoveryMessage(state.subtitle.status, state.subtitle.error)
-
-  const runControl = useCallback(async (action: () => Promise<void>): Promise<void> => {
-    setControlError(null)
-    try {
-      await action()
-    } catch (error) {
-      setControlError(error instanceof Error ? error.message : 'The player control failed.')
-    }
-  }, [])
 
   useEffect(() => {
     const handlePlayerShortcut = (event: KeyboardEvent): void => {
@@ -457,23 +483,27 @@ export function PolishedOverlay(): React.JSX.Element {
       className={`overlay-probe${chromeVisible ? '' : ' chrome-hidden'}`}
       aria-label="Subtitle Bridge video controls"
       onPointerUp={(event) => {
-        if (!canControl || isInteractiveDoubleClickTarget(event.target)) {
+        if (
+          !shouldHandleSurfacePointer({
+            button: event.button,
+            isPrimary: event.isPrimary,
+            interactiveTarget: isInteractiveSurfaceTarget(event.target),
+            canControl,
+          })
+        ) {
           return
         }
 
-        if (surfaceClickTimer.current !== null) {
-          return
-        }
-
-        surfaceClickTimer.current = window.setTimeout(() => {
-          surfaceClickTimer.current = null
-          void runControl(() => window.desktop.media.setPaused(playing))
-        }, SURFACE_SINGLE_CLICK_DELAY_MS)
+        surfaceGestureCoordinator.schedule(doubleClickIntervalMs)
       }}
       onDoubleClick={(event) => {
-        clearPendingSurfaceClick()
+        surfaceGestureCoordinator.cancelPending()
 
-        if (!canToggleFullscreen || isInteractiveDoubleClickTarget(event.target)) {
+        if (
+          event.button !== 0 ||
+          !canToggleFullscreen ||
+          isInteractiveSurfaceTarget(event.target)
+        ) {
           return
         }
 
@@ -1159,36 +1189,6 @@ function phraseTypeLabel(type: 'phrasal_verb' | 'idiom' | 'expression'): string 
 
 function languageLabel(code: string): string {
   return TARGET_LANGUAGE_OPTIONS.find((language) => language.code === code)?.label ?? code
-}
-
-function isInteractiveDoubleClickTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) {
-    return false
-  }
-
-  return (
-    isInteractiveKeyboardTarget(target) ||
-    Boolean(
-      target.closest(
-        '.player-controls, .player-panel, .translation-popup, .subtitle-overlay, .overlay-topline',
-      ),
-    )
-  )
-}
-
-function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) {
-    return false
-  }
-
-  if (
-    (target instanceof HTMLElement && target.isContentEditable) ||
-    target.closest('.player-panel')
-  ) {
-    return true
-  }
-
-  return ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'A'].includes(target.tagName)
 }
 
 function isSelectableSubtitleTrack(track: MediaTrack, filePath: string | null): boolean {
