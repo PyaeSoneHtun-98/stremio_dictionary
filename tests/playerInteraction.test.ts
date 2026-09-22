@@ -86,7 +86,7 @@ describe('video-surface gestures', () => {
 
   it('treats top chrome and SVG descendants of controls as interactive', () => {
     expect(isInteractiveSurfaceTarget(fakeTarget('DIV', ['.overlay-topline']))).toBe(true)
-    expect(isInteractiveSurfaceTarget(fakeTarget('svg', ['button']))).toBe(true)
+    expect(isInteractiveSurfaceTarget(fakeTarget('svg', ['.player-controls']))).toBe(true)
     expect(isInteractiveSurfaceTarget(fakeTarget('DIV', []))).toBe(false)
   })
 })
