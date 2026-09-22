@@ -10,6 +10,14 @@ const refinementCss = readFileSync(
   fileURLToPath(new URL('../src/renderer/src/features/playback/PlayerRefinement.css', import.meta.url)),
   'utf8',
 )
+const overlaySource = readFileSync(
+  fileURLToPath(new URL('../src/renderer/src/features/playback/PolishedOverlay.tsx', import.meta.url)),
+  'utf8',
+)
+const mpvSource = readFileSync(
+  fileURLToPath(new URL('../src/main/media/MpvController.ts', import.meta.url)),
+  'utf8',
+)
 
 describe('player presentation contracts', () => {
   it('keeps clickable subtitle targets stationary when chrome hides or reveals', () => {
@@ -27,6 +35,22 @@ describe('player presentation contracts', () => {
   it('keeps the centered popup fixed within small viewports', () => {
     expect(refinementCss).toMatch(/\.translation-popup\s*\{[\s\S]*?position:\s*fixed;/)
     expect(refinementCss).toMatch(/max-height:\s*calc\(100vh - 36px\);/)
+  })
+
+  it('shows real stream buffering feedback instead of making a stalled frame look frozen', () => {
+    expect(mpvSource).toContain("'paused-for-cache'")
+    expect(mpvSource).toContain("message.event === 'seek'")
+    expect(mpvSource).toContain("message.event === 'playback-restart'")
+    expect(overlaySource).toContain('player-buffering-layer')
+    expect(playerCss).toContain('.player-buffering-spinner')
+  })
+
+  it('supports double-click fullscreen while protecting interactive player UI', () => {
+    expect(overlaySource).toContain('onDoubleClick')
+    expect(overlaySource).toContain('isInteractiveDoubleClickTarget')
+    expect(overlaySource).toContain(
+      '.player-controls, .player-panel, .translation-popup, .subtitle-overlay, .overlay-topline',
+    )
   })
 
   it('keeps the obsolete saved popup-position control out of the visible settings UI', () => {
