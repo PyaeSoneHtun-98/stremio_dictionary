@@ -15,21 +15,27 @@ export function App(): React.JSX.Element {
 
   return (
     <AppShell>
-      <section className="hero" aria-labelledby="hero-title">
-        <span className="eyebrow">A little closer to every word</span>
-        <h1 id="hero-title">
-          Your movie.
-          <br />
-          <span>A new way to understand.</span>
-        </h1>
-        <p className="hero-copy">
-          Watch, click a subtitle word, and discover its meaning in Burmese. Stay in the story.
-        </p>
+      <section className="launcher-hero" aria-labelledby="launcher-title">
+        <div>
+          <span className="eyebrow">Subtitle-first video player</span>
+          <h1 id="launcher-title">Watch the story. Understand the words.</h1>
+          <p>
+            Open a video or send a stream from Stremio. Click English subtitle words and phrases
+            for instant Burmese meanings without leaving the player.
+          </p>
+        </div>
+        <div className="launcher-capabilities" aria-label="Subtitle Bridge capabilities">
+          <span>30K word dictionary</span>
+          <span>3K phrase dictionary</span>
+          <span>Offline lookup</span>
+        </div>
       </section>
+
       <PlaybackProof />
+
       <footer className="launcher-footer">
-        <span>Made for curious viewers.</span>
-        <span>English → Burmese · Offline dictionary</span>
+        <span>Subtitle Bridge</span>
+        <span>English → Burmese · Windows</span>
       </footer>
     </AppShell>
   )
