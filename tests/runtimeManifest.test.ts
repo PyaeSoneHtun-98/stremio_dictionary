@@ -47,12 +47,14 @@ describe('Windows runtime manifest', () => {
     )
   })
 
-  it('pins the mpv artifact by commit-named archive and hash', () => {
-    expect(manifest.mpv.archiveUrl).toContain(
-      'mpv-v0.41.0-dev-g0b7ed670f-34806151888-x86_64-w64-mingw32.zip'
+  it('pins mpv to the immutable stable MSVC release asset instead of the rotating git-release', () => {
+    expect(manifest.mpv.archiveUrl).toBe(
+      'https://github.com/mpv-player/mpv/releases/download/v0.41.0/mpv-v0.41.0-x86_64-pc-windows-msvc.zip'
     )
+    expect(manifest.mpv.archiveUrl).not.toContain('/git-release/')
     expect(manifest.mpv.archiveSha256).toBe(
-      '456318b7cbd4f8186ba8a68e9469048bd72ad9f8d474a0a1602b293fff430982'
+      '4e197f729f5071c6772f35fffd96e0f36e3e8a044bd9479b136bb09b7c6a80ff'
     )
+    expect(manifest.mpv.provenance).toContain('stable v0.41.0')
   })
 })

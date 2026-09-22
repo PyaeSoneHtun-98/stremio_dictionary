@@ -10,6 +10,7 @@ internal static class SubtitleBridgeSetup
 {
     private const string FooterMagic = "SBSETUP1";
     private static int exitCode = 1;
+    private static string failureDetail = null;
 
     [STAThread]
     private static int Main()
@@ -35,8 +36,17 @@ internal static class SubtitleBridgeSetup
 
         if (exitCode != 0)
         {
+            var message =
+                "Subtitle Bridge could not be installed. A required runtime source may be unavailable, " +
+                "your network may be offline, or Subtitle Bridge may still be running.";
+
+            if (!string.IsNullOrWhiteSpace(failureDetail))
+            {
+                message += Environment.NewLine + Environment.NewLine + "Details: " + failureDetail;
+            }
+
             MessageBox.Show(
-                "Subtitle Bridge could not be installed. Close any running Subtitle Bridge window, check your internet connection, and try again.",
+                message,
                 "Subtitle Bridge setup failed",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
@@ -87,6 +97,7 @@ internal static class SubtitleBridgeSetup
 
     private static int RunSetup()
     {
+        failureDetail = null;
         var statusFile = Environment.GetEnvironmentVariable("SUBTITLE_BRIDGE_SETUP_STATUS_FILE");
         WriteStatus(statusFile, "starting");
 
@@ -112,6 +123,7 @@ internal static class SubtitleBridgeSetup
             var installer = Path.Combine(packageDir, "Install-SubtitleBridge.ps1");
             if (!File.Exists(installer))
             {
+                failureDetail = "The embedded installer script is missing.";
                 WriteStatus(statusFile, "installer-missing");
                 return 2;
             }
@@ -133,6 +145,7 @@ internal static class SubtitleBridgeSetup
             {
                 if (process == null)
                 {
+                    failureDetail = "Windows could not start the installer process.";
                     WriteStatus(statusFile, "installer-process-missing");
                     return 3;
                 }
@@ -152,12 +165,25 @@ internal static class SubtitleBridgeSetup
                     WriteStatus(statusFile, "installer-stderr:" + FlattenForStatus(standardError));
                 }
 
+                if (process.ExitCode != 0)
+                {
+                    failureDetail = ExtractFailureDetail(
+                        !string.IsNullOrWhiteSpace(standardError) ? standardError : standardOutput
+                    );
+
+                    if (string.IsNullOrWhiteSpace(failureDetail))
+                    {
+                        failureDetail = "The installer process exited with code " + process.ExitCode + ".";
+                    }
+                }
+
                 WriteStatus(statusFile, "installer-exit:" + process.ExitCode);
                 return process.ExitCode;
             }
         }
         catch (Exception exception)
         {
+            failureDetail = exception.Message;
             WriteStatus(statusFile, "exception:" + exception.GetType().Name + ":" + exception.Message);
             return 4;
         }
@@ -175,6 +201,31 @@ internal static class SubtitleBridgeSetup
                 // Temporary cleanup must not hide the setup result.
             }
         }
+    }
+
+    private static string ExtractFailureDetail(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        using (var reader = new StringReader(value))
+        {
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                line = line.Trim();
+                if (line.Length == 0)
+                {
+                    continue;
+                }
+
+                return line.Length > 500 ? line.Substring(0, 500) + "..." : line;
+            }
+        }
+
+        return null;
     }
 
     private static string FlattenForStatus(string value)
