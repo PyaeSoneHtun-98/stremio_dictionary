@@ -12,6 +12,7 @@ const desktopBridge: DesktopBridge = {
     loadExternalSubtitlePath: (filePath) =>
       ipcRenderer.invoke('media:load-external-subtitle-path', filePath),
     getState: () => ipcRenderer.invoke('media:get-state'),
+    getDoubleClickInterval: () => ipcRenderer.invoke('media:get-double-click-interval'),
     setPaused: (paused) => ipcRenderer.invoke('media:set-paused', paused),
     seek: (seconds) => ipcRenderer.invoke('media:seek', seconds),
     setVolume: (volume) => ipcRenderer.invoke('media:set-volume', volume),
