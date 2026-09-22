@@ -96,6 +96,11 @@ export function registerMediaIpc(): void {
   ipcMain.handle(
     OPEN_EXTERNAL_SUBTITLE_CHANNEL,
     async (event): Promise<LoadExternalSubtitleResult> => {
+      const request = externalSubtitleLoadCoordinator.beginLoadRequest()
+      if (!request) {
+        return { loaded: false, error: 'Open a video before loading an external subtitle.' }
+      }
+
       const parentWindow = BrowserWindow.fromWebContents(event.sender)
       const options: OpenDialogOptions = {
         title: 'Open subtitle file',
@@ -110,7 +115,7 @@ export function registerMediaIpc(): void {
         return { loaded: false, cancelled: true }
       }
 
-      return externalSubtitleLoadCoordinator.load(result.filePaths[0])
+      return externalSubtitleLoadCoordinator.loadRequested(result.filePaths[0], request)
     }
   )
 
