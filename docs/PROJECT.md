@@ -84,6 +84,10 @@ The default translation provider is `LocalDictionaryProvider`.
 - The production corpus is the frozen Dictionary v1.0 artifact from `PyaeSoneHtun-98/dictionary-dataset/dist/dictionary_v1.json`.
 - The frozen corpus contains 30,000 unique headwords and 15,864 stored inflected forms.
 - Subtitle Bridge vendors the exact frozen artifact and verifies its SHA-256 during automated checks.
+- Automatic multi-word lookup uses the separately frozen Phrase Dictionary v1.0.0 from `PyaeSoneHtun-98/dictionary-dataset/dist/phrases_v1.json`.
+- Phrase Dictionary v1 contains 3,000 canonical phrases, 4,827 stored forms, 7,827 collision-free lookup keys, and 4,092 Burmese semantic meanings.
+- The vendored phrase artifact SHA-256 is `951a8bbe54824cf76728393791607798f878a062b19eca63e572278ba8f62926` and is verified during `npm run check`.
+- Phrase matching is longest-match-first within the bounded current subtitle cue; clicking any token inside a known contiguous 2–5-token phrase can resolve the phrase before single-word fallback.
 - A separate 16-entry structured core supplement preserves useful basic words intentionally absent from the frozen 30,000-headword set.
 - A collision-checked compatibility alias table restores 11 historical starter-dictionary inflections that are intentionally absent from the frozen corpus forms, without modifying the frozen JSON.
 - All local results use the same structured dictionary model: canonical headword, pronunciation, grouped parts of speech, and Burmese meanings.
@@ -168,7 +172,7 @@ Diagnostics are intentionally small and privacy-conscious. They may record lifec
 - Windows x64 only.
 - The first normal Windows install requires Internet access to download the pinned mpv and FFmpeg runtime archives; verified archives are cached for later upgrades.
 - The Dictionary v1.0 corpus is broad but not exhaustive; unknown words still fail cleanly offline.
-- Automatic multi-word phrase lookup is supported through a small curated pilot dataset with longest-match detection and single-word fallback; broad phrase/phrasal-verb coverage remains future dataset work.
+- Phrase Dictionary v1 covers 3,000 contiguous 2–5-token expressions with longest-match detection and single-word fallback. Separated-object phrasal verbs, cross-cue matching, and phrases longer than five tokens are not supported yet.
 - Rich ASS/SSA styling is not recreated in the interactive overlay.
 - Image subtitles are not clickable text.
 - Stremio external subtitle-addon URLs are not yet ingested.

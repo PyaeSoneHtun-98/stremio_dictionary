@@ -41,21 +41,24 @@ GitHub's published asset digests match the release-build hashes, and the uploade
 
 Issue #36 is closed as completed.
 
-## Phrase auto-detection MVP
+## Phrase Dictionary v1.0.0
 
-Issue #38 / PR #39 are complete.
+The phrase auto-detection engine from Issue #38 / PR #39 is complete and the production phrase corpus is now the frozen **Phrase Dictionary v1.0.0** from `PyaeSoneHtun-98/dictionary-dataset`.
 
-- Users still click a single subtitle word; Subtitle Bridge automatically checks a bounded nearby-token window for a known multi-word expression before falling back to the existing word dictionary.
-- The pilot ships as a separate 12-entry phrase dataset and does not modify the frozen 30,000-headword Dictionary v1.0.
-- Longest-match selection, curated inflected forms, phrase-aware cache isolation, bounded IPC validation, and explicit detected-phrase UI are covered by tests.
-- Final reviewed feature head: `7ba26f6c0b3d2a3d07c45a4e09662e1aa1bc29cd`.
-- Codex final re-review: no remaining P1/P2/P3 findings.
-- Exact-head CI #341 passed `validate` and `package-windows`.
-- Manual local acceptance passed for canonical, inflected, three-word, fallback, popup, and playback behavior.
-- Squash merge commit: `6e1d84d7bb5d30f7b0e5d5630cab1c4390fbfeb8`.
-- Master CI #342 passed `validate` and `package-windows`, including packaged install/upgrade/Stremio acceptance.
-- Issue #38 is closed as completed.
+- Users still click a single subtitle word; Subtitle Bridge checks the bounded current-cue token window for the longest known phrase containing that click before falling back to the existing word dictionary.
+- Production phrase artifact: `src/main/translation/data/phrases.json`.
+- Frozen dataset finalization commit: `aa6b3a4ebe55e38307e56bc40323327998e4cb32`.
+- Artifact SHA-256: `951a8bbe54824cf76728393791607798f878a062b19eca63e572278ba8f62926`.
+- Canonical phrases: **3,000**.
+- Stored phrase forms: **4,827**.
+- Unique phrase lookup keys: **7,827**.
+- Burmese semantic meanings: **4,092**.
+- Dataset composition: 1,185 phrasal verbs, 935 idioms, and 880 expressions.
+- Two editorial QA passes replaced 96 low-value/artificial/incomplete entries before the dataset was frozen.
+- The frozen 30,000-headword single-word Dictionary v1.0 remains unchanged.
+- Phrase data is limited to contiguous 2–5-token surface strings for the current matcher.
+- The app verifies the exact production phrase artifact SHA/counts during `npm run check`.
 
 ## Later work
 
-Large-scale phrase/phrasal-verb dataset expansion, pronunciation audio/TTS, broader bilingual editorial review of the 30,000-entry dataset, macOS packaging, automatic updates, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support remain separate work.
+Further phrase coverage beyond Phrase Dictionary v1, separated-object phrasal-verb matching, pronunciation audio/TTS, broader bilingual editorial review of the 30,000-entry word dataset, macOS packaging, automatic updates, rich ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support remain separate work.
