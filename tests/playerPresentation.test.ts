@@ -70,7 +70,7 @@ describe('player presentation contracts', () => {
 
   it('uses a single video-surface click for play/pause without stealing double-click fullscreen', () => {
     expect(overlaySource).toContain('SURFACE_SINGLE_CLICK_DELAY_MS')
-    expect(overlaySource).toContain('onClick')
+    expect(overlaySource).toContain('onPointerUp')
     expect(overlaySource).toContain('window.desktop.media.setPaused(playing)')
     expect(overlaySource).toContain('clearPendingSurfaceClick()')
   })

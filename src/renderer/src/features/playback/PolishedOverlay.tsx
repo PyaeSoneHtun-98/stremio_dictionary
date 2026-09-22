@@ -456,7 +456,7 @@ export function PolishedOverlay(): React.JSX.Element {
     <main
       className={`overlay-probe${chromeVisible ? '' : ' chrome-hidden'}`}
       aria-label="Subtitle Bridge video controls"
-      onClick={(event) => {
+      onPointerUp={(event) => {
         if (!canControl || isInteractiveDoubleClickTarget(event.target)) {
           return
         }
