@@ -149,6 +149,7 @@ export function PlaybackProof(): React.JSX.Element {
         <section className="launch-card launch-card-primary">
           <div className="launch-card-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
+              <title>Local video</title>
               <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h4l2 2H18a2 2 0 0 1 2 2v8.5A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" />
               <path d="m10 10 5 3-5 3z" />
             </svg>
@@ -167,6 +168,7 @@ export function PlaybackProof(): React.JSX.Element {
         <section className="launch-card">
           <div className="launch-card-icon stremio-card-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
+              <title>Stremio streaming</title>
               <path d="m8 5 10 7-10 7z" />
             </svg>
           </div>
