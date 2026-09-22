@@ -1133,7 +1133,7 @@ function languageLabel(code: string): string {
 }
 
 function isInteractiveDoubleClickTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
+  if (!(target instanceof Element)) {
     return false
   }
 
@@ -1148,11 +1148,14 @@ function isInteractiveDoubleClickTarget(target: EventTarget | null): boolean {
 }
 
 function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
+  if (!(target instanceof Element)) {
     return false
   }
 
-  if (target.isContentEditable || target.closest('.player-panel')) {
+  if (
+    (target instanceof HTMLElement && target.isContentEditable) ||
+    target.closest('.player-panel')
+  ) {
     return true
   }
 
