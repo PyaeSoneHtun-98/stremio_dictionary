@@ -48,6 +48,7 @@ describe('player presentation contracts', () => {
   it('supports double-click fullscreen while protecting interactive player UI', () => {
     expect(overlaySource).toContain('onDoubleClick')
     expect(overlaySource).toContain('isInteractiveDoubleClickTarget')
+    expect(overlaySource).toContain('target instanceof Element')
     expect(overlaySource).toContain(
       '.player-controls, .player-panel, .translation-popup, .subtitle-overlay, .overlay-topline',
     )
