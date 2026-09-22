@@ -464,7 +464,7 @@ export function PolishedOverlay(): React.JSX.Element {
         <div className="player-buffering-layer" role="status" aria-live="polite">
           <span className="player-buffering-spinner" aria-hidden="true" />
           <strong>{state.status === 'loading' ? 'Opening video…' : 'Buffering…'}</strong>
-          <span>{state.buffering ? 'Loading stream data after the seek' : 'Preparing playback'}</span>
+          <span>{state.buffering ? 'Waiting for stream data' : 'Preparing playback'}</span>
         </div>
       ) : null}
 
