@@ -41,6 +41,23 @@ GitHub's published asset digests match the release-build hashes, and the uploade
 
 Issue #36 is closed as completed.
 
+## Windows v1.0.1 installer hotfix
+
+Issue #42 is in progress after a real-world v1.0.0 setup failure exposed a dead mpv runtime URL.
+
+The v1.0.0 installer itself matches its published checksum, but its runtime manifest pinned mpv to the rotating upstream `git-release` prerelease. Upstream replaced that development-build asset, so fresh v1.0.0 installs can fail with HTTP 404 during mpv provisioning.
+
+The hotfix branch:
+
+- bumps Subtitle Bridge to **v1.0.1**;
+- pins mpv to the immutable first-party stable `v0.41.0` x86_64 MinGW ZIP;
+- verifies upstream SHA-256 `a49811c0752c108b8260636f9c6f6fcb97406641c98b30f1e7b500dfb20177de`;
+- rejects the rotating `/git-release/` mpv URL in tests;
+- improves GUI setup failure details so runtime-source outages are not presented only as an internet problem;
+- keeps the existing FFmpeg pin, whose exact dated release asset and digest remain valid.
+
+The v1.0.1 installer must pass exact-head CI and a real manual install before this hotfix is merged and automatically published.
+
 ## Phrase Dictionary v1.0.0
 
 The phrase auto-detection engine from Issue #38 / PR #39 is complete and the production phrase corpus is now the frozen **Phrase Dictionary v1.0.0** from `PyaeSoneHtun-98/dictionary-dataset`.

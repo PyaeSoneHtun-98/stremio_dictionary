@@ -185,7 +185,11 @@ function Install-Runtime {
         try {
           Copy-OrDownloadArchive -Source $archiveUrl -Destination $downloadPath
         } catch {
-          throw "Could not download the required $displayName runtime. Check your internet connection and try again."
+          $sourceError = $_.Exception.Message
+          if ([string]::IsNullOrWhiteSpace($sourceError)) {
+            $sourceError = 'unknown download error'
+          }
+          throw "Could not download the required $displayName runtime from the pinned source. The source may be unavailable or your network may be offline. Source error: $sourceError"
         }
 
         $actualHash = Get-FileSha256 -Path $downloadPath
