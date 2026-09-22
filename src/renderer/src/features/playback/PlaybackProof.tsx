@@ -199,11 +199,13 @@ export function PlaybackProof(): React.JSX.Element {
       </div>
 
       {state.fileName ? (
-        <section className="current-session" aria-live="polite">
+        <section className="current-session">
           <div className="current-session-state">
             <span className={`session-dot status-${displayStatus}`} aria-hidden="true" />
             <div>
-              <span>{displayStatus === 'buffering' ? 'Buffering stream' : 'Current session'}</span>
+              <span aria-live="polite">
+                {displayStatus === 'buffering' ? 'Buffering stream' : displayStatus}
+              </span>
               <strong title={state.fileName}>{state.fileName}</strong>
             </div>
           </div>
