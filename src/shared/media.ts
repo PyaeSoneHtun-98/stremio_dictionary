@@ -110,6 +110,7 @@ export interface DesktopBridge {
     openExternalSubtitle: () => Promise<LoadExternalSubtitleResult>
     loadExternalSubtitlePath: (filePath: string) => Promise<LoadExternalSubtitleResult>
     getState: () => Promise<PlaybackSnapshot>
+    getDoubleClickInterval: () => Promise<number>
     setPaused: (paused: boolean) => Promise<void>
     seek: (seconds: number) => Promise<void>
     setVolume: (volume: number) => Promise<void>
