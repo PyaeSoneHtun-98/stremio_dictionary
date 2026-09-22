@@ -5,7 +5,7 @@ export function AppShell({ children }: PropsWithChildren): React.JSX.Element {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="brand" aria-label="Subtitle Bridge">
+        <div className="brand">
           <span className="brand-mark" aria-hidden="true">
             SB
           </span>
