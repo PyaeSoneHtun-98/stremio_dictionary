@@ -24,11 +24,11 @@ export function App(): React.JSX.Element {
             for instant Burmese meanings without leaving the player.
           </p>
         </div>
-        <div className="launcher-capabilities" aria-label="Subtitle Bridge capabilities">
-          <span>30K word dictionary</span>
-          <span>3K phrase dictionary</span>
-          <span>Offline lookup</span>
-        </div>
+        <ul className="launcher-capabilities" aria-label="Subtitle Bridge capabilities">
+          <li>30K word dictionary</li>
+          <li>3K phrase dictionary</li>
+          <li>Offline lookup</li>
+        </ul>
       </section>
 
       <PlaybackProof />
