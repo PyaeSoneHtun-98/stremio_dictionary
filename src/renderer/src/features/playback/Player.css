@@ -140,6 +140,7 @@ html.overlay-mode #root {
   padding: 22px 28px 48px;
   background: linear-gradient(#080e14bd, transparent);
   transition: opacity 180ms ease;
+  pointer-events: auto;
 }
 .overlay-topline strong {
   font-size: 13px;
