@@ -24,6 +24,7 @@ import {
 const MEDIA_STATE_CHANNEL = 'media:state'
 const OPEN_VIDEO_CHANNEL = 'media:open-video'
 const OPEN_VIDEO_PATH_CHANNEL = 'media:open-video-path'
+const OPEN_EXTERNAL_SUBTITLE_CHANNEL = 'media:open-external-subtitle'
 const LOAD_EXTERNAL_SUBTITLE_PATH_CHANNEL = 'media:load-external-subtitle-path'
 const GET_STATE_CHANNEL = 'media:get-state'
 const SET_PAUSED_CHANNEL = 'media:set-paused'
@@ -89,6 +90,27 @@ export function registerMediaIpc(): void {
 
     return openMediaTarget(filePath)
   })
+
+  ipcMain.handle(
+    OPEN_EXTERNAL_SUBTITLE_CHANNEL,
+    async (event): Promise<LoadExternalSubtitleResult> => {
+      const parentWindow = BrowserWindow.fromWebContents(event.sender)
+      const options: OpenDialogOptions = {
+        title: 'Open subtitle file',
+        properties: ['openFile'],
+        filters: [{ name: 'Subtitle files', extensions: ['srt', 'ass', 'ssa'] }]
+      }
+      const result = parentWindow
+        ? await dialog.showOpenDialog(parentWindow, options)
+        : await dialog.showOpenDialog(options)
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { loaded: false, cancelled: true }
+      }
+
+      return externalSubtitleLoadCoordinator.load(result.filePaths[0])
+    }
+  )
 
   ipcMain.handle(
     LOAD_EXTERNAL_SUBTITLE_PATH_CHANNEL,
@@ -199,6 +221,7 @@ export function disposeMediaIpc(): void {
 
   ipcMain.removeHandler(OPEN_VIDEO_CHANNEL)
   ipcMain.removeHandler(OPEN_VIDEO_PATH_CHANNEL)
+  ipcMain.removeHandler(OPEN_EXTERNAL_SUBTITLE_CHANNEL)
   ipcMain.removeHandler(LOAD_EXTERNAL_SUBTITLE_PATH_CHANNEL)
   ipcMain.removeHandler(GET_STATE_CHANNEL)
   ipcMain.removeHandler(SET_PAUSED_CHANNEL)

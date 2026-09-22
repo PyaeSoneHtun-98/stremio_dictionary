@@ -18,6 +18,20 @@ const mpvSource = readFileSync(
   fileURLToPath(new URL('../src/main/media/MpvController.ts', import.meta.url)),
   'utf8',
 )
+const subtitleToolsSource = readFileSync(
+  fileURLToPath(
+    new URL('../src/renderer/src/features/playback/SubtitleToolsOverlay.tsx', import.meta.url),
+  ),
+  'utf8',
+)
+const preloadSource = readFileSync(
+  fileURLToPath(new URL('../src/preload/index.ts', import.meta.url)),
+  'utf8',
+)
+const mediaIpcSource = readFileSync(
+  fileURLToPath(new URL('../src/main/media/ipc.ts', import.meta.url)),
+  'utf8',
+)
 
 describe('player presentation contracts', () => {
   it('keeps clickable subtitle targets stationary when chrome hides or reveals', () => {
@@ -52,6 +66,21 @@ describe('player presentation contracts', () => {
     expect(overlaySource).toContain(
       '.player-controls, .player-panel, .translation-popup, .subtitle-overlay, .overlay-topline',
     )
+  })
+
+  it('uses a single video-surface click for play/pause without stealing double-click fullscreen', () => {
+    expect(overlaySource).toContain('SURFACE_SINGLE_CLICK_DELAY_MS')
+    expect(overlaySource).toContain('onClick')
+    expect(overlaySource).toContain('window.desktop.media.setPaused(playing)')
+    expect(overlaySource).toContain('clearPendingSurfaceClick()')
+  })
+
+  it('lets users choose an external subtitle file as well as drag and drop one', () => {
+    expect(subtitleToolsSource).toContain('Choose subtitle file')
+    expect(subtitleToolsSource).toContain('window.desktop.media.openExternalSubtitle()')
+    expect(preloadSource).toContain("ipcRenderer.invoke('media:open-external-subtitle')")
+    expect(mediaIpcSource).toContain("const OPEN_EXTERNAL_SUBTITLE_CHANNEL = 'media:open-external-subtitle'")
+    expect(mediaIpcSource).toContain("extensions: ['srt', 'ass', 'ssa']")
   })
 
   it('keeps the obsolete saved popup-position control out of the visible settings UI', () => {

@@ -91,6 +91,7 @@ export interface OpenVideoResult {
 
 export interface LoadExternalSubtitleResult {
   loaded: boolean
+  cancelled?: boolean
   fileName?: string
   error?: string
 }
@@ -106,6 +107,7 @@ export interface DesktopBridge {
     openVideo: () => Promise<OpenVideoResult>
     openVideoPath: (filePath: string) => Promise<OpenVideoResult>
     getPathForFile: (file: unknown) => string
+    openExternalSubtitle: () => Promise<LoadExternalSubtitleResult>
     loadExternalSubtitlePath: (filePath: string) => Promise<LoadExternalSubtitleResult>
     getState: () => Promise<PlaybackSnapshot>
     setPaused: (paused: boolean) => Promise<void>

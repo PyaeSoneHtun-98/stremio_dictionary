@@ -31,6 +31,7 @@ const EMPTY_STATE: PlaybackSnapshot = {
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
+const SURFACE_SINGLE_CLICK_DELAY_MS = 275
 const TARGET_LANGUAGE_OPTIONS = [
   { code: 'my', label: 'Burmese' },
   { code: 'ja', label: 'Japanese' },
@@ -106,12 +107,24 @@ export function PolishedOverlay(): React.JSX.Element {
   const currentCueId = useRef<string | null>(null)
   const currentSubtitleTrackId = useRef<number | null>(null)
   const translationRequestVersion = useRef(0)
+  const surfaceClickTimer = useRef<number | null>(null)
 
   const dismissTranslation = useCallback((): void => {
     translationRequestVersion.current += 1
     setSelectedWord(null)
     setTranslation({ status: 'idle' })
   }, [])
+
+  const clearPendingSurfaceClick = useCallback((): void => {
+    if (surfaceClickTimer.current !== null) {
+      window.clearTimeout(surfaceClickTimer.current)
+      surfaceClickTimer.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => clearPendingSurfaceClick()
+  }, [clearPendingSurfaceClick])
 
   useEffect(() => {
     let active = true
@@ -443,7 +456,23 @@ export function PolishedOverlay(): React.JSX.Element {
     <main
       className={`overlay-probe${chromeVisible ? '' : ' chrome-hidden'}`}
       aria-label="Subtitle Bridge video controls"
+      onClick={(event) => {
+        if (!canControl || isInteractiveDoubleClickTarget(event.target)) {
+          return
+        }
+
+        if (surfaceClickTimer.current !== null) {
+          return
+        }
+
+        surfaceClickTimer.current = window.setTimeout(() => {
+          surfaceClickTimer.current = null
+          void runControl(() => window.desktop.media.setPaused(playing))
+        }, SURFACE_SINGLE_CLICK_DELAY_MS)
+      }}
       onDoubleClick={(event) => {
+        clearPendingSurfaceClick()
+
         if (!canToggleFullscreen || isInteractiveDoubleClickTarget(event.target)) {
           return
         }
@@ -632,7 +661,7 @@ export function PolishedOverlay(): React.JSX.Element {
                 <div>
                   <dt>Play / pause</dt>
                   <dd>
-                    <kbd>Space</kbd> / <kbd>K</kbd>
+                    click video / <kbd>Space</kbd> / <kbd>K</kbd>
                   </dd>
                 </div>
                 <div>
