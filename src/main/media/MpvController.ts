@@ -7,6 +7,7 @@ import { resolveMpvExecutable } from '../runtimeTools'
 import { SubtitleExtractor } from '../subtitles/SubtitleExtractor'
 import { findActiveCue, tokenizeSubtitleText } from '../subtitles/normalize'
 import { adjustedSubtitleTime, normalizeSubtitleDelay } from '../subtitles/timing'
+import { deriveBufferingState } from './bufferingState'
 
 const PIPE_PATH = `\\\\.\\pipe\\subtitle-bridge-mpv-${process.pid}`
 const CONNECT_RETRIES = 50
@@ -28,6 +29,7 @@ export class MpvController {
   private incomingBuffer = ''
   private paused = false
   private pausedForCache = false
+  private seekPending = false
   private readonly expectedExits = new WeakSet<ChildProcess>()
   private readonly subtitleExtractor = new SubtitleExtractor()
   private subtitleCues: SubtitleCue[] = []
@@ -81,6 +83,7 @@ export class MpvController {
       this.selectedSubtitleTrackId = null
       this.paused = false
       this.pausedForCache = false
+      this.seekPending = false
       this.patchState({
         status: 'loading',
         filePath: mediaTarget,
@@ -124,7 +127,8 @@ export class MpvController {
     const target = Math.min(Math.max(seconds, 0), upperBound)
 
     if (isHttpMediaTarget(this.state.filePath)) {
-      this.patchState({ buffering: true })
+      this.seekPending = true
+      this.patchState({ buffering: this.currentBufferingState() })
     }
 
     this.sendCommand(['seek', target, 'absolute+exact'])
@@ -378,19 +382,22 @@ export class MpvController {
   private handleMessage(message: MpvEvent): void {
     if (message.event === 'start-file') {
       this.pausedForCache = false
+      this.seekPending = false
       this.patchState({ status: 'loading', buffering: false, error: null })
       return
     }
 
     if (message.event === 'seek') {
       if (isHttpMediaTarget(this.state.filePath)) {
-        this.patchState({ buffering: true })
+        this.seekPending = true
+        this.patchState({ buffering: this.currentBufferingState() })
       }
       return
     }
 
     if (message.event === 'playback-restart') {
       this.pausedForCache = false
+      this.seekPending = false
       if (this.state.buffering) {
         this.patchState({ buffering: false })
       }
@@ -401,7 +408,7 @@ export class MpvController {
       diagnosticLog('media.fileLoaded', { fileName: this.state.fileName })
       this.patchState({
         status: this.paused ? 'paused' : 'playing',
-        buffering: this.pausedForCache,
+        buffering: this.currentBufferingState(),
         error: null
       })
       return
@@ -419,6 +426,7 @@ export class MpvController {
       }
 
       this.pausedForCache = false
+      this.seekPending = false
       this.patchState({ status: 'ended', buffering: false })
       return
     }
@@ -457,15 +465,16 @@ export class MpvController {
       case 'pause':
         if (typeof message.data === 'boolean' && this.state.filePath) {
           this.paused = message.data
-          this.patchState({ status: message.data ? 'paused' : 'playing' })
+          this.patchState({
+            status: message.data ? 'paused' : 'playing',
+            buffering: this.currentBufferingState()
+          })
         }
         break
       case 'paused-for-cache':
         if (typeof message.data === 'boolean') {
           this.pausedForCache = message.data
-          this.patchState({
-            buffering: isHttpMediaTarget(this.state.filePath) && message.data
-          })
+          this.patchState({ buffering: this.currentBufferingState() })
         }
         break
       case 'volume': {
@@ -503,6 +512,15 @@ export class MpvController {
       default:
         break
     }
+  }
+
+  private currentBufferingState(): boolean {
+    return deriveBufferingState({
+      networkTarget: isHttpMediaTarget(this.state.filePath),
+      paused: this.paused,
+      pausedForCache: this.pausedForCache,
+      seekPending: this.seekPending
+    })
   }
 
   private async refreshSubtitleModel(tracks: MediaTrack[]): Promise<void> {
@@ -745,6 +763,7 @@ export class MpvController {
     }
 
     this.pausedForCache = false
+    this.seekPending = false
     this.patchState({
       status: 'error',
       currentTime: null,
