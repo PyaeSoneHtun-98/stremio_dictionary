@@ -2,10 +2,10 @@
   "version": 1,
   "mpv": {
     "displayName": "mpv",
-    "archiveUrl": "https://github.com/mpv-player/mpv/releases/download/git-release/mpv-v0.41.0-dev-g0b7ed670f-34806151888-x86_64-w64-mingw32.zip",
-    "archiveSha256": "456318b7cbd4f8186ba8a68e9469048bd72ad9f8d474a0a1602b293fff430982",
+    "archiveUrl": "https://github.com/mpv-player/mpv/releases/download/v0.41.0/mpv-v0.41.0-x86_64-w64-mingw32.zip",
+    "archiveSha256": "a49811c0752c108b8260636f9c6f6fcb97406641c98b30f1e7b500dfb20177de",
     "executableName": "mpv.exe",
-    "provenance": "mpv-player/mpv first-party GitHub CI build, git 0b7ed670f",
+    "provenance": "mpv-player/mpv first-party stable v0.41.0 GitHub release, x86_64 MinGW",
     "sourceUrl": "https://github.com/mpv-player/mpv"
   },
   "ffmpeg": {
