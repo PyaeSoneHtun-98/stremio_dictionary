@@ -27,6 +27,7 @@ export class MpvController {
   private socket: Socket | null = null
   private incomingBuffer = ''
   private paused = false
+  private pausedForCache = false
   private readonly expectedExits = new WeakSet<ChildProcess>()
   private readonly subtitleExtractor = new SubtitleExtractor()
   private subtitleCues: SubtitleCue[] = []
@@ -47,6 +48,7 @@ export class MpvController {
     volume: 100,
     speed: 1,
     subtitleDelay: 0,
+    buffering: false,
     tracks: [],
     subtitle: createEmptySubtitleModel(),
     error: null
@@ -78,6 +80,7 @@ export class MpvController {
       this.resetSubtitleProcessing()
       this.selectedSubtitleTrackId = null
       this.paused = false
+      this.pausedForCache = false
       this.patchState({
         status: 'loading',
         filePath: mediaTarget,
@@ -86,6 +89,7 @@ export class MpvController {
         duration: null,
         speed: 1,
         subtitleDelay: 0,
+        buffering: false,
         tracks: [],
         subtitle: createEmptySubtitleModel(),
         error: null
@@ -118,6 +122,11 @@ export class MpvController {
     this.assertControllable()
     const upperBound = this.state.duration ?? Number.MAX_SAFE_INTEGER
     const target = Math.min(Math.max(seconds, 0), upperBound)
+
+    if (isHttpMediaTarget(this.state.filePath)) {
+      this.patchState({ buffering: true })
+    }
+
     this.sendCommand(['seek', target, 'absolute+exact'])
   }
 
@@ -323,6 +332,7 @@ export class MpvController {
     this.sendCommand(['observe_property', 8, 'sub-text'])
     this.sendCommand(['observe_property', 9, 'sub-start/full'])
     this.sendCommand(['observe_property', 10, 'sub-end/full'])
+    this.sendCommand(['observe_property', 11, 'paused-for-cache'])
   }
 
   private handleSocketFailure(socket: Socket, child: ChildProcess, message: string): void {
@@ -367,13 +377,33 @@ export class MpvController {
 
   private handleMessage(message: MpvEvent): void {
     if (message.event === 'start-file') {
-      this.patchState({ status: 'loading', error: null })
+      this.pausedForCache = false
+      this.patchState({ status: 'loading', buffering: false, error: null })
+      return
+    }
+
+    if (message.event === 'seek') {
+      if (isHttpMediaTarget(this.state.filePath)) {
+        this.patchState({ buffering: true })
+      }
+      return
+    }
+
+    if (message.event === 'playback-restart') {
+      this.pausedForCache = false
+      if (this.state.buffering) {
+        this.patchState({ buffering: false })
+      }
       return
     }
 
     if (message.event === 'file-loaded') {
       diagnosticLog('media.fileLoaded', { fileName: this.state.fileName })
-      this.patchState({ status: this.paused ? 'paused' : 'playing', error: null })
+      this.patchState({
+        status: this.paused ? 'paused' : 'playing',
+        buffering: this.pausedForCache,
+        error: null
+      })
       return
     }
 
@@ -388,7 +418,8 @@ export class MpvController {
         return
       }
 
-      this.patchState({ status: 'ended' })
+      this.pausedForCache = false
+      this.patchState({ status: 'ended', buffering: false })
       return
     }
 
@@ -427,6 +458,14 @@ export class MpvController {
         if (typeof message.data === 'boolean' && this.state.filePath) {
           this.paused = message.data
           this.patchState({ status: message.data ? 'paused' : 'playing' })
+        }
+        break
+      case 'paused-for-cache':
+        if (typeof message.data === 'boolean') {
+          this.pausedForCache = message.data
+          this.patchState({
+            buffering: isHttpMediaTarget(this.state.filePath) && message.data
+          })
         }
         break
       case 'volume': {
@@ -705,9 +744,11 @@ export class MpvController {
       subtitle.error = 'Subtitle processing stopped because playback failed.'
     }
 
+    this.pausedForCache = false
     this.patchState({
       status: 'error',
       currentTime: null,
+      buffering: false,
       subtitle,
       error: message
     })
