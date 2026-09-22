@@ -50,9 +50,10 @@ The v1.0.0 installer itself matches its published checksum, but its runtime mani
 The hotfix branch:
 
 - bumps Subtitle Bridge to **v1.0.1**;
-- pins mpv to the immutable first-party stable `v0.41.0` x86_64 MinGW ZIP;
-- verifies upstream SHA-256 `a49811c0752c108b8260636f9c6f6fcb97406641c98b30f1e7b500dfb20177de`;
+- pins mpv to the immutable first-party stable `v0.41.0` x86_64 **MSVC** ZIP, whose outer archive directly contains `mpv.exe`;
+- verifies upstream SHA-256 `4e197f729f5071c6772f35fffd96e0f36e3e8a044bd9479b136bb09b7c6a80ff`;
 - rejects the rotating `/git-release/` mpv URL in tests;
+- adds live Windows CI provisioning against the public runtime manifest, including real downloads, SHA verification, archive extraction, and `mpv --version` / `ffmpeg -version` execution;
 - improves GUI setup failure details so runtime-source outages are not presented only as an internet problem;
 - keeps the existing FFmpeg pin, whose exact dated release asset and digest remain valid.
 

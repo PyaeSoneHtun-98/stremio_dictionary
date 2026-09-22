@@ -59,6 +59,43 @@ jobs:
             }
           }
 
+      - name: Verify live public runtime assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $runtimeRoot = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeLiveRuntime'
+          $runtimeCache = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeLiveRuntimeCache'
+          Remove-Item -LiteralPath $runtimeRoot -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $runtimeCache -Recurse -Force -ErrorAction SilentlyContinue
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'packaging\Install-RuntimeTools.ps1' `
+            -DestinationRoot $runtimeRoot `
+            -ManifestPath 'packaging\runtime-manifest.json' `
+            -CacheDir $runtimeCache
+
+          $mpv = Join-Path $runtimeRoot 'mpv\mpv.exe'
+          $ffmpeg = Join-Path $runtimeRoot 'ffmpeg\ffmpeg.exe'
+
+          if (-not (Test-Path -LiteralPath $mpv -PathType Leaf)) {
+            throw "Live mpv runtime provisioning did not produce mpv.exe."
+          }
+          if (-not (Test-Path -LiteralPath $ffmpeg -PathType Leaf)) {
+            throw "Live FFmpeg runtime provisioning did not produce ffmpeg.exe."
+          }
+
+          & $mpv --version
+          if ($LASTEXITCODE -ne 0) {
+            throw "Provisioned mpv.exe could not start successfully."
+          }
+
+          & $ffmpeg -version
+          if ($LASTEXITCODE -ne 0) {
+            throw "Provisioned ffmpeg.exe could not start successfully."
+          }
+
+          Remove-Item -LiteralPath $runtimeRoot -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $runtimeCache -Recurse -Force -ErrorAction SilentlyContinue
+
       - name: Package Windows MVP
         run: npm run package:win
 
