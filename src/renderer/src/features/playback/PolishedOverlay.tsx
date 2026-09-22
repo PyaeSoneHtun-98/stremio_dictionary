@@ -251,12 +251,16 @@ export function PolishedOverlay(): React.JSX.Element {
       Boolean(panel) ||
       Boolean(selectedWord) ||
       Boolean(controlError || state.error) ||
+      Boolean(state.buffering) ||
       controlsHovered ||
       dragging,
   )
 
   const canControl =
     Boolean(state.filePath) && !['loading', 'error', 'unavailable'].includes(state.status)
+  const canToggleFullscreen =
+    Boolean(state.filePath) && !['error', 'unavailable'].includes(state.status)
+  const buffering = state.status === 'loading' || Boolean(state.buffering)
   const playing = state.status === 'playing'
   const duration = state.duration ?? 0
   const currentTime = Math.min(state.currentTime ?? 0, duration || Number.MAX_SAFE_INTEGER)
@@ -439,14 +443,30 @@ export function PolishedOverlay(): React.JSX.Element {
     <main
       className={`overlay-probe${chromeVisible ? '' : ' chrome-hidden'}`}
       aria-label="Subtitle Bridge video controls"
+      onDoubleClick={(event) => {
+        if (!canToggleFullscreen || isInteractiveDoubleClickTarget(event.target)) {
+          return
+        }
+
+        event.preventDefault()
+        void runControl(() => window.desktop.media.toggleFullscreen())
+      }}
     >
       <div className="overlay-topline" inert={!chromeVisible}>
-        <span className={`overlay-status status-${state.status}`}>
+        <span className={`overlay-status status-${state.buffering ? 'buffering' : state.status}`}>
           <span className="status-dot" />
-          {state.status}
+          {state.buffering ? 'buffering' : state.status}
         </span>
         <strong title={state.fileName ?? undefined}>{state.fileName ?? 'No video loaded'}</strong>
       </div>
+
+      {buffering ? (
+        <div className="player-buffering-layer" role="status" aria-live="polite">
+          <span className="player-buffering-spinner" aria-hidden="true" />
+          <strong>{state.status === 'loading' ? 'Opening video…' : 'Buffering…'}</strong>
+          <span>{state.buffering ? 'Loading stream data after the seek' : 'Preparing playback'}</span>
+        </div>
+      ) : null}
 
       <section
         className="subtitle-overlay"
@@ -630,7 +650,7 @@ export function PolishedOverlay(): React.JSX.Element {
                 <div>
                   <dt>Fullscreen</dt>
                   <dd>
-                    <kbd>F</kbd>
+                    <kbd>F</kbd> / double-click video
                   </dd>
                 </div>
                 <div>
@@ -1110,6 +1130,21 @@ function phraseTypeLabel(type: 'phrasal_verb' | 'idiom' | 'expression'): string 
 
 function languageLabel(code: string): string {
   return TARGET_LANGUAGE_OPTIONS.find((language) => language.code === code)?.label ?? code
+}
+
+function isInteractiveDoubleClickTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return (
+    isInteractiveKeyboardTarget(target) ||
+    Boolean(
+      target.closest(
+        '.player-controls, .player-panel, .translation-popup, .subtitle-overlay, .overlay-topline',
+      ),
+    )
+  )
 }
 
 function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
