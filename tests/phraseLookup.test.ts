@@ -8,10 +8,36 @@ import {
 import type { PhraseEntry } from '../src/shared/translation'
 
 describe('PhraseMatcher', () => {
-  it('loads the separate v1 pilot phrase dataset', () => {
+  it('loads the frozen Phrase Dictionary v1 dataset', () => {
     expect(LOCAL_PHRASE_DATASET.version).toBe(1)
-    expect(LOCAL_PHRASES).toHaveLength(12)
-    expect(LOCAL_PHRASES.map((entry) => entry.phrase)).toContain('run out of')
+    expect(LOCAL_PHRASES).toHaveLength(3000)
+    expect(LOCAL_PHRASES.reduce((total, entry) => total + entry.forms.length, 0)).toBe(4827)
+
+    const phrases = new Set(LOCAL_PHRASES.map((entry) => entry.phrase))
+    expect(phrases).toContain('give up')
+    expect(phrases).toContain('run out of')
+    expect(phrases).toContain("what's going on")
+    expect(phrases).toContain('over the moon')
+  })
+
+  it('matches a phrase added by the production v1 dataset', () => {
+    expect(
+      findLocalPhraseMatch({
+        word: 'price',
+        contextTokens: ['you', 'paid', 'the', 'price'],
+        clickedTokenIndex: 3
+      })
+    ).toMatchObject({
+      entry: {
+        phrase: 'pay the price',
+        burmese: ['အကျိုးဆက်ကို ခံရသည်', 'တန်ဖိုးပေးဆပ်ရသည်']
+      },
+      match: {
+        source: 'paid the price',
+        startTokenIndex: 1,
+        endTokenIndex: 4
+      }
+    })
   })
 
   it('matches a phrase when any token inside it is clicked', () => {
