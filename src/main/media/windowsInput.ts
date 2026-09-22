@@ -35,7 +35,7 @@ async function readWindowsDoubleClickInterval(): Promise<number> {
     const { stdout } = await execFileAsync(
       'powershell.exe',
       ['-NoProfile', '-NonInteractive', '-Command', GET_DOUBLE_CLICK_TIME_SCRIPT],
-      { windowsHide: true, timeout: 3_000 }
+      { windowsHide: true, timeout: 3_000, encoding: 'utf8' }
     )
     const numericLine = stdout
       .split(/\r?\n/)
