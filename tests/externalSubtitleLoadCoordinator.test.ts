@@ -50,6 +50,40 @@ function deferred<T>(): {
 }
 
 describe('ExternalSubtitleLoadCoordinator', () => {
+  it('rejects a picker selection when the video changes while the native dialog is open', async () => {
+    let state = baseState()
+    let validateCalls = 0
+
+    const coordinator = new ExternalSubtitleLoadCoordinator({
+      getState: () => state,
+      validate: async () => {
+        validateCalls += 1
+        return descriptor('picked.ass')
+      },
+      extract: async () => CUES,
+      setExternal: () => {
+        throw new Error('stale subtitle must not activate')
+      },
+    })
+
+    const request = coordinator.beginLoadRequest()
+    expect(request).not.toBeNull()
+
+    state = {
+      ...state,
+      filePath: 'https://stream.example/new-video',
+      fileName: 'new-video'
+    }
+
+    await expect(
+      coordinator.loadRequested('C:\\subs\\picked.ass', request!)
+    ).resolves.toMatchObject({
+      loaded: false,
+      error: expect.stringContaining('video changed')
+    })
+    expect(validateCalls).toBe(0)
+  })
+
   it('prevents an older request from starting extraction when its validation finishes last', async () => {
     const firstValidation = deferred<ExternalSubtitleDescriptor>()
     const secondValidation = deferred<ExternalSubtitleDescriptor>()
