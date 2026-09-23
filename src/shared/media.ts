@@ -1,5 +1,6 @@
 import type { TranslationSettingsSnapshot, TranslationSettingsUpdate } from './settings'
 import type { TranslationRequest, TranslationResult } from './translation'
+import type { UpdateBridge } from './update'
 
 export type PlaybackStatus =
   | 'idle'
@@ -124,6 +125,7 @@ export interface DesktopBridge {
     toggleFullscreen: () => Promise<void>
     onState: (listener: (state: PlaybackSnapshot) => void) => () => void
   }
+  update: UpdateBridge
   stremio: {
     enableHandoff: () => Promise<StremioHandoffResult>
     disableHandoff: () => Promise<StremioHandoffResult>
