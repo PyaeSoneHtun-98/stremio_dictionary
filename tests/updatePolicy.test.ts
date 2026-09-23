@@ -3,7 +3,8 @@ import {
   assertAllowedUpdateUrl,
   compareStableVersions,
   parseInstallerChecksum,
-  parseLatestRelease
+  parseLatestRelease,
+  parseStableVersion
 } from '../src/main/update/updatePolicy'
 
 function releaseFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -38,6 +39,9 @@ describe('updater release policy', () => {
     expect(() => compareStableVersions('1.0.3-beta.1', '1.0.2')).toThrow()
     expect(() => compareStableVersions('01.0.3', '1.0.2')).toThrow()
     expect(() => compareStableVersions('1.0.3 ', '1.0.2')).toThrow()
+    expect(parseStableVersion('1.0.3\n')).toBeNull()
+    expect(parseStableVersion('1.0.3\r')).toBeNull()
+    expect(parseStableVersion('1.0.3\r\n')).toBeNull()
   })
 
   it('rejects noncanonical release tags even when their numeric value is newer', () => {
