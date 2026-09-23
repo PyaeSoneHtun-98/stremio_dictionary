@@ -75,7 +75,7 @@ export function UpdatePanel(): React.JSX.Element | null {
     return (
       <aside className="update-strip update-strip-error" aria-live="polite">
         <div>
-          <strong>Update check unavailable</strong>
+          <strong>Update unavailable</strong>
           <span>{actionError ?? state.error ?? 'Try again later.'}</span>
         </div>
         <button
