@@ -36,6 +36,16 @@ describe('updater release policy', () => {
     expect(compareStableVersions('1.0.2', '1.0.2')).toBe(0)
     expect(compareStableVersions('1.0.1', '1.0.2')).toBe(-1)
     expect(() => compareStableVersions('1.0.3-beta.1', '1.0.2')).toThrow()
+    expect(() => compareStableVersions('01.0.3', '1.0.2')).toThrow()
+    expect(() => compareStableVersions('1.0.3 ', '1.0.2')).toThrow()
+  })
+
+  it('rejects noncanonical release tags even when their numeric value is newer', () => {
+    for (const tag_name of ['v01.0.3', 'v1.00.3', 'v1.0.03', ' v1.0.3', 'v1.0.3 ', '1.0.3']) {
+      expect(() => parseLatestRelease(releaseFixture({ tag_name }), '1.0.2')).toThrow(
+        'canonical stable semantic-version tag'
+      )
+    }
   })
 
   it('accepts a newer stable release only when both exact Windows assets exist', () => {
