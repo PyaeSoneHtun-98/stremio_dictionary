@@ -1,9 +1,9 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { spawn } from 'node:child_process'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import type { UpdateActionResult, UpdateSnapshot } from '../../shared/update'
 import { GithubUpdateClient } from './GithubUpdateClient'
-import { createInstallerEnvironment } from './installLaunch'
+import { createInstallerEnvironment, currentInstallDirectory } from './installLaunch'
 import { UpdateService } from './UpdateService'
 
 const UPDATE_STATE_CHANNEL = 'update:state'
@@ -31,7 +31,7 @@ export function registerUpdateIpc(options: RegisterUpdateIpcOptions): void {
     client: new GithubUpdateClient(),
     isPlaybackActive: options.isPlaybackActive,
     launchInstaller: (installerPath) =>
-      launchInstaller(installerPath, dirname(app.getPath('exe'))),
+      launchInstaller(installerPath, currentInstallDirectory(app.getPath('exe'))),
     quitApp: () => app.quit(),
     onState: broadcastState
   })
