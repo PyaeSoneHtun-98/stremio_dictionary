@@ -37,8 +37,11 @@ interface GithubRelease {
   assets?: unknown
 }
 
+const STABLE_VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
+const STABLE_RELEASE_TAG_PATTERN = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
+
 export function parseStableVersion(value: string): [number, number, number] | null {
-  const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(value.trim())
+  const match = STABLE_VERSION_PATTERN.exec(value)
   if (!match) {
     return null
   }
@@ -84,12 +87,16 @@ export function parseLatestRelease(
     throw new Error('The latest release has no valid version tag.')
   }
 
-  const parsedVersion = parseStableVersion(release.tag_name)
-  if (!parsedVersion) {
-    throw new Error('The latest release does not use a stable semantic version.')
+  const tagMatch = STABLE_RELEASE_TAG_PATTERN.exec(release.tag_name)
+  if (!tagMatch) {
+    throw new Error('The latest release does not use a canonical stable semantic-version tag.')
   }
 
-  const version = parsedVersion.join('.')
+  const version = tagMatch.slice(1).join('.')
+  const parsedVersion = parseStableVersion(version)
+  if (!parsedVersion || release.tag_name !== `v${version}`) {
+    throw new Error('The latest release does not use a canonical stable semantic-version tag.')
+  }
   if (compareStableVersions(version, currentVersion) <= 0) {
     return null
   }
@@ -104,7 +111,7 @@ export function parseLatestRelease(
     throw new Error('The latest release is missing the required Windows update assets.')
   }
 
-  const tag = release.tag_name.trim()
+  const tag = release.tag_name
   const installerUrl = requireOfficialAssetUrl(installer, tag, SETUP_ASSET_NAME)
   const checksumUrl = requireOfficialAssetUrl(checksum, tag, CHECKSUM_ASSET_NAME)
 
