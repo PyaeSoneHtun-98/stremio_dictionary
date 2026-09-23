@@ -135,8 +135,8 @@
   accent-color: #b5e6d1;
 }
 
-.update-action-error {
-  color: #f1aaa7 !important;
+.update-panel .update-action-error {
+  color: #f1aaa7;
 }
 
 @media (max-width: 800px) {
