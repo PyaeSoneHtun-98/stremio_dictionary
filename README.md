@@ -2,9 +2,9 @@
 
 Subtitle Bridge is a Windows desktop video player for English learners. It plays local MKV files and supported HTTP/HTTPS media streams, shows supported English text subtitles as clickable words, and provides offline English → Burmese word and phrase lookup without leaving the player.
 
-## Windows v1.0.2
+## Windows v1.0.3
 
-Subtitle Bridge v1.0.2 packages the current stable player UX, dictionary/phrase lookup, Stremio handoff, and installer/runtime fixes into the normal Windows release.
+Subtitle Bridge v1.0.3 packages the current stable player UX, dictionary/phrase lookup, Stremio handoff, installer/runtime fixes, and secure user-approved in-app updater into the normal Windows release.
 
 ### Normal installation
 
@@ -50,7 +50,7 @@ The one-click setup EXE is the recommended download for normal users.
 
 ## In-app update support
 
-Development after v1.0.2 adds a user-approved Windows updater built around the existing GitHub Release installer pipeline.
+Subtitle Bridge v1.0.3 includes a user-approved Windows updater built around the existing GitHub Release installer pipeline.
 
 - Subtitle Bridge checks the official stable GitHub Release shortly after startup and periodically.
 - Up-to-date checks stay unobtrusive.
@@ -62,9 +62,9 @@ Development after v1.0.2 adds a user-approved Windows updater built around the e
 - Installation is blocked while video playback is loading, playing, or paused.
 - Offline/update-server failures do not block normal playback or dictionary use.
 
-The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository.
+The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository. Public v1.0.2 predates the updater, so existing v1.0.2 users must install v1.0.3 manually once; later releases can then be handled in-app.
 
-## What v1.0.2 includes
+## What v1.0.3 includes
 
 - local MKV playback;
 - HTTP/HTTPS and Stremio stream playback;
@@ -81,6 +81,8 @@ The updater only trusts stable releases and the exact Windows assets from the of
 - Start Menu and Windows uninstall integration;
 - rollback-safe upgrades and recovery after interrupted setup;
 - opt-in in-app Stremio enable/disable controls;
+- secure user-approved GitHub Release update checking/downloading with SHA-256 verification;
+- custom install-directory preservation during in-app updates;
 - redacted rotating diagnostics;
 - Electron renderer isolation with Node integration disabled and context isolation enabled.
 
