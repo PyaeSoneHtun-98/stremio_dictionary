@@ -1,10 +1,11 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import { join } from 'node:path'
 import { diagnosticLog, disposeDiagnostics, initializeDiagnostics } from './diagnostics'
-import { disposeMediaIpc, openMediaTarget, registerMediaIpc } from './media/ipc'
+import { disposeMediaIpc, isMediaPlaybackActive, openMediaTarget, registerMediaIpc } from './media/ipc'
 import { findLaunchTargetArgument } from './media/launchTarget'
 import { disposeStremioIpc, registerStremioIpc } from './stremio/ipc'
 import { disposeTranslationIpc, registerTranslationIpc } from './translation/ipc'
+import { disposeUpdateIpc, registerUpdateIpc } from './update/ipc'
 
 // On some Windows x64 systems, Chromium's accelerated transparent windows render their
 // transparent region as black. The subtitle overlay is a transparent BrowserWindow above mpv's
@@ -46,6 +47,7 @@ if (!hasSingleInstanceLock) {
     registerMediaIpc()
     registerStremioIpc()
     registerTranslationIpc()
+    registerUpdateIpc({ isPlaybackActive: isMediaPlaybackActive })
 
     const initialLaunchTarget = findLaunchTargetArgument(process.argv)
     createWindow({ activateOnReady: !initialLaunchTarget })
@@ -63,6 +65,7 @@ if (!hasSingleInstanceLock) {
   })
 
   app.on('before-quit', () => {
+    disposeUpdateIpc()
     disposeTranslationIpc()
     disposeStremioIpc()
     disposeMediaIpc()
