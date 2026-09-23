@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type {
   DownloadProgress,
@@ -166,6 +166,7 @@ class FakeClient implements UpdateClient {
     onProgress: (progress: DownloadProgress) => void
   ): Promise<InstallerDownloadResult> {
     const content = this.options.content ?? Buffer.from('installer')
+    await mkdir(dirname(destination), { recursive: true })
     await writeFile(destination, content)
     onProgress({ receivedBytes: content.length, totalBytes: content.length })
     return {
