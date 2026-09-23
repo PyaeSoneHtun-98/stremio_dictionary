@@ -48,6 +48,22 @@ SubtitleBridge-win-x64.zip.sha256
 
 The one-click setup EXE is the recommended download for normal users.
 
+## In-app update support
+
+Development after v1.0.2 adds a user-approved Windows updater built around the existing GitHub Release installer pipeline.
+
+- Subtitle Bridge checks the official stable GitHub Release shortly after startup and periodically.
+- Up-to-date checks stay unobtrusive.
+- A newer stable release shows its version and release notes in the launcher.
+- **Download update** downloads the normal setup EXE plus its published SHA-256 file.
+- Networking, disk writes, hashing, and installer launch stay in the Electron main process.
+- The setup EXE is SHA-256 verified after download and re-verified immediately before launch.
+- Installation is explicit; there are no forced or silent installs.
+- Installation is blocked while video playback is loading, playing, or paused.
+- Offline/update-server failures do not block normal playback or dictionary use.
+
+The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository.
+
 ## What v1.0.2 includes
 
 - local MKV playback;
@@ -212,4 +228,4 @@ issue
 → confirm issue closed
 ```
 
-Future work includes automatic updates, macOS/Linux packaging, separated-object phrasal-verb matching, pronunciation/TTS, richer ASS/libass fidelity, broader bilingual editorial review, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support.
+Future work includes macOS/Linux packaging, separated-object phrasal-verb matching, pronunciation/TTS, richer ASS/libass fidelity, broader bilingual editorial review, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support.
