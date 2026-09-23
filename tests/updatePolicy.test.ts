@@ -64,6 +64,9 @@ describe('updater release policy', () => {
   it('ignores drafts, prereleases, and versions that are not newer', () => {
     expect(parseLatestRelease(releaseFixture({ draft: true }), '1.0.2')).toBeNull()
     expect(parseLatestRelease(releaseFixture({ prerelease: true }), '1.0.2')).toBeNull()
+    const incomplete = releaseFixture()
+    delete incomplete.draft
+    expect(parseLatestRelease(incomplete, '1.0.2')).toBeNull()
     expect(parseLatestRelease(releaseFixture({ tag_name: 'v1.0.2' }), '1.0.2')).toBeNull()
     expect(parseLatestRelease(releaseFixture({ tag_name: 'v1.0.1' }), '1.0.2')).toBeNull()
   })
