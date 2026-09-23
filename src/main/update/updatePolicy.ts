@@ -76,7 +76,7 @@ export function parseLatestRelease(
   }
 
   const release = payload as GithubRelease
-  if (release.draft === true || release.prerelease === true) {
+  if (release.draft !== false || release.prerelease !== false) {
     return null
   }
 
