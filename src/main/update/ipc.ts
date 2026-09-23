@@ -1,8 +1,9 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { spawn } from 'node:child_process'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { UpdateActionResult, UpdateSnapshot } from '../../shared/update'
 import { GithubUpdateClient } from './GithubUpdateClient'
+import { createInstallerEnvironment } from './installLaunch'
 import { UpdateService } from './UpdateService'
 
 const UPDATE_STATE_CHANNEL = 'update:state'
@@ -29,7 +30,8 @@ export function registerUpdateIpc(options: RegisterUpdateIpcOptions): void {
     updatesRoot: join(app.getPath('userData'), 'updates'),
     client: new GithubUpdateClient(),
     isPlaybackActive: options.isPlaybackActive,
-    launchInstaller,
+    launchInstaller: (installerPath) =>
+      launchInstaller(installerPath, dirname(app.getPath('exe'))),
     quitApp: () => app.quit(),
     onState: broadcastState
   })
@@ -63,11 +65,15 @@ export function disposeUpdateIpc(): void {
   registered = false
 }
 
-async function launchInstaller(installerPath: string): Promise<void> {
+async function launchInstaller(
+  installerPath: string,
+  installDirectory: string
+): Promise<void> {
   const child = spawn(installerPath, [], {
     detached: true,
     stdio: 'ignore',
-    windowsHide: false
+    windowsHide: false,
+    env: createInstallerEnvironment(installDirectory)
   })
 
   await new Promise<void>((resolve, reject) => {
