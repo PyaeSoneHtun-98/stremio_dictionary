@@ -1,0 +1,159 @@
+.update-strip,
+.update-panel {
+  margin-bottom: 14px;
+  border: 1px solid rgb(181 230 209 / 0.18);
+  border-radius: 17px;
+  background: rgb(181 230 209 / 0.055);
+}
+
+.update-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  color: #9fb8ad;
+  font-size: 0.76rem;
+}
+
+.update-strip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b5e6d1;
+  box-shadow: 0 0 12px rgb(181 230 209 / 0.35);
+}
+
+.update-strip-error {
+  justify-content: space-between;
+  border-color: rgb(255 170 168 / 0.2);
+  background: rgb(255 170 168 / 0.045);
+}
+
+.update-strip-error div {
+  display: grid;
+  gap: 3px;
+}
+
+.update-strip-error strong {
+  color: #efc0bd;
+  font-size: 0.76rem;
+}
+
+.update-strip-error span {
+  color: #8f817f;
+  font-size: 0.7rem;
+}
+
+.update-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  padding: 18px 20px;
+  background:
+    radial-gradient(circle at 92% 0%, rgb(181 230 209 / 0.11), transparent 34%),
+    rgb(11 22 27 / 0.86);
+}
+
+.update-panel h2 {
+  margin: 6px 0;
+  color: #f0f6f3;
+  font-size: 1.12rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.update-panel p {
+  max-width: 650px;
+  margin-bottom: 0;
+  color: #8da198;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.update-panel-action {
+  display: flex;
+  min-width: 190px;
+  align-items: flex-end;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+}
+
+.update-panel-action small {
+  color: #657a70;
+  font-size: 0.64rem;
+  text-align: right;
+}
+
+.update-release-notes {
+  margin-top: 12px;
+}
+
+.update-release-notes summary {
+  width: fit-content;
+  color: #9fc4b4;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.update-release-notes pre {
+  max-height: 210px;
+  overflow: auto;
+  margin: 10px 0 0;
+  border: 1px solid rgb(255 255 255 / 0.07);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgb(0 0 0 / 0.18);
+  color: #83968d;
+  font-family: inherit;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.update-progress {
+  width: min(260px, 32vw);
+}
+
+.update-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+  color: #8fa59a;
+  font-size: 0.68rem;
+}
+
+.update-progress-label strong {
+  color: #b5e6d1;
+}
+
+.update-progress progress {
+  width: 100%;
+  height: 8px;
+  accent-color: #b5e6d1;
+}
+
+.update-panel .update-action-error {
+  color: #f1aaa7;
+}
+
+@media (max-width: 800px) {
+  .update-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .update-panel-action {
+    min-width: 0;
+    align-items: flex-start;
+  }
+
+  .update-panel-action small {
+    text-align: left;
+  }
+
+  .update-progress {
+    width: min(100%, 360px);
+  }
+}

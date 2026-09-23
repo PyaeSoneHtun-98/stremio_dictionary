@@ -2,6 +2,7 @@ import { AppShell } from './components/AppShell'
 import { PlaybackProof } from './features/playback/PlaybackProof'
 import { PolishedOverlay } from './features/playback/PolishedOverlay'
 import { SubtitleToolsOverlay } from './features/playback/SubtitleToolsOverlay'
+import { UpdatePanel } from './features/update/UpdatePanel'
 
 export function App(): React.JSX.Element {
   if (new URLSearchParams(window.location.search).get('mode') === 'overlay') {
@@ -31,6 +32,7 @@ export function App(): React.JSX.Element {
         </ul>
       </section>
 
+      <UpdatePanel />
       <PlaybackProof />
 
       <footer className="launcher-footer">

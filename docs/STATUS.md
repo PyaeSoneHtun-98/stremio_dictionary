@@ -2,13 +2,15 @@
 
 ## Stable master
 
-Current stable `master` commit before the v1.0.2 release branch:
+Current stable `master`:
 
-`0abac1ebdd36b2d2a25113f9c9e7324c0021f8fd`
+`dd61510c6a115417a25e8f4b369731f4c8c19c82`
 
-There are currently no open feature/bug PRs ahead of the v1.0.2 release work.
+That commit is the source of the published **Subtitle Bridge v1.0.2** Windows release.
 
-Stable capabilities include:
+Post-merge CI #375 passed `validate` and `package-windows`, including live mpv/FFmpeg verification and packaged install/upgrade/Stremio acceptance. Release Windows #43 rebuilt and revalidated the exact successful `master` SHA before publishing v1.0.2.
+
+Stable released capabilities include:
 
 - local MKV and supported HTTP/HTTPS/Stremio playback through mpv;
 - FFmpeg full-track text-subtitle extraction for local MKV files;
@@ -17,7 +19,7 @@ Stable capabilities include:
 - native external SRT/ASS/SSA picker plus drag-and-drop loading;
 - subtitle delay, size, and position controls;
 - centered stream buffering/loading feedback that distinguishes manual pause from cache/seek stalls;
-- single-click video-surface play/pause and system-aware double-click fullscreen;
+- single-click video-surface play/pause and Windows-system-aware double-click fullscreen;
 - compact launcher with Local video, Stremio, and current-session status;
 - frozen 30,000-headword Dictionary v1.0;
 - frozen 3,000-entry Phrase Dictionary v1.0.0 with longest-match phrase lookup and single-word fallback;
@@ -30,17 +32,37 @@ Stable capabilities include:
 - structured/redacted diagnostics;
 - renderer Node integration disabled and context isolation enabled.
 
-Post-merge CI #371 passed on the current stable `master` commit after PR #45.
+## Windows releases
+
+### v1.0.0
+
+The first stable Windows release. Its setup executable remained intact, but the runtime manifest referenced a rotating upstream mpv development asset that was later removed.
+
+### v1.0.1
+
+Issue #42 / PR #43 replaced that dead runtime dependency with the immutable first-party **mpv v0.41.0 x86_64 MSVC** archive and upstream SHA-256:
+
+`4e197f729f5071c6772f35fffd96e0f36e3e8a044bd9479b136bb09b7c6a80ff`
+
+It also added live public-runtime CI verification and clearer setup failure reporting.
+
+### v1.0.2
+
+Issue #46 / PR #47 packaged the completed player UX refresh and current dictionaries into the public release.
+
+Release source:
+
+`dd61510c6a115417a25e8f4b369731f4c8c19c82`
+
+The v1.0.2 release includes the launcher redesign, stream buffering feedback, single-click play/pause, system-aware double-click fullscreen, native external subtitle picker, Phrase Dictionary v1.0.0, and the v1.0.1 runtime hotfix.
+
+A real v1.0.1 → v1.0.2 Windows upgrade exposed and fixed a stale hardcoded launcher version badge before release. A regression test now requires renderer app metadata to match `package.json`.
 
 ## Dictionary v1.0
 
-The production word dictionary is the frozen 30,000-headword Dictionary v1.0 plus the structured core supplement and collision-checked compatibility aliases.
-
-PR #33 passed final CI and Codex review before merging. Issue #32 is closed.
+The production word dictionary remains the frozen 30,000-headword Dictionary v1.0 plus the structured core supplement and collision-checked compatibility aliases.
 
 ## Phrase Dictionary v1.0.0
-
-Issue #38 / PR #39 implemented automatic phrase detection. PR #41 finalized the frozen production phrase corpus.
 
 Production artifact: `src/main/translation/data/phrases.json`
 
@@ -51,83 +73,51 @@ Production artifact: `src/main/translation/data/phrases.json`
 - composition: 1,185 phrasal verbs, 935 idioms, 880 expressions
 - artifact SHA-256: `951a8bbe54824cf76728393791607798f878a062b19eca63e572278ba8f62926`
 
-The 30,000-headword word dictionary remains unchanged.
+Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
-## Windows v1.0.0
+## Active work — secure in-app updates
 
-v1.0.0 was the first stable Windows release.
+Issue #48 / Draft PR #49 are active on:
 
-The release later exposed a real-world installer problem: its runtime manifest referenced a rotating upstream mpv development-build asset that was subsequently removed.
+`feat/issue-48-auto-update`
 
-## Windows v1.0.1 runtime hotfix
+The updater is intentionally built around the existing GitHub Release + setup EXE pipeline rather than `electron-updater`.
 
-Issue #42 / PR #43 are complete.
+Implemented scope:
 
-PR #43 replaced the dead rotating mpv dependency with the immutable first-party stable **mpv v0.41.0 x86_64 MSVC** archive and SHA-256:
+- delayed startup and six-hour periodic stable-release checks;
+- fixed trust root: `PyaeSoneHtun-98/stremio_dictionary`;
+- stable semantic-version comparison;
+- fail-closed draft/prerelease/incomplete release metadata handling;
+- exact required assets:
+  - `SubtitleBridge-Setup-x64.exe`
+  - `SubtitleBridge-Setup-x64.exe.sha256`;
+- bounded HTTPS requests restricted to approved GitHub hosts;
+- strict SHA-256 checksum parsing;
+- app-owned temporary/atomic installer download;
+- checksum verification after download;
+- installer re-hash immediately before launch;
+- explicit **Download update** and **Install and restart** actions;
+- installation blocked while media is loading, playing, or paused;
+- narrow preload/IPC surface with all network/filesystem/process operations kept in the main process;
+- non-fatal retryable update errors;
+- behavioral tests for release policy, version comparison, hash mismatch, playback blocking, verified launch, and post-download tampering.
 
-`4e197f729f5071c6772f35fffd96e0f36e3e8a044bd9479b136bb09b7c6a80ff`
+CI #378 passed the implementation before the final documentation/policy tightening pass, including validation, Windows packaging, runtime verification, packaged install/upgrade/Stremio acceptance, and artifact upload.
 
-The hotfix also added live public-runtime CI verification and improved setup failure details.
+Pending gates:
 
-PR #43 was Codex-reviewed with no remaining P1/P2/P3 findings and squash merged at:
-
-`1328fa7b83609b26f1c4e44090abaf6d946ca17b`
-
-Issue #42 is closed.
-
-GitHub Release **v1.0.1** was published from that commit with the normal setup EXE, portable ZIP, and SHA-256 files.
-
-## Player UX refresh
-
-Issue #44 / PR #45 are complete.
-
-The merged work includes:
-
-- real stream buffering feedback for seek/cache stalls;
-- manual-pause-safe buffering semantics;
-- single-click surface play/pause;
-- Windows-system-timed double-click fullscreen;
-- primary-pointer filtering and interaction exclusions;
-- correct top-chrome hit testing;
-- native external subtitle picker with media/generation race protection;
-- launcher redesign and current-session summary;
-- accessibility fix preventing continuous playback-position live announcements;
-- behavioral regression tests for the relevant races and gesture states.
-
-PR #45 passed exact-head CI #370, real Windows manual acceptance, and final Codex review with no remaining P1/P2/P3 findings.
-
-It squash merged at:
-
-`0abac1ebdd36b2d2a25113f9c9e7324c0021f8fd`
-
-Post-merge CI #371 passed. Issue #44 is closed.
-
-## Active work — Windows v1.0.2
-
-Issue #46 is the active release task on:
-
-`release/issue-46-v1.0.2`
-
-v1.0.2 is a release-only change. It packages the already-stable current `master` feature set into a new downloadable Windows release.
-
-Release-branch scope:
-
-- bump package metadata from 1.0.1 to 1.0.2;
-- add `docs/releases/v1.0.2.md`;
-- update README and STATUS;
-- keep runtime/playback/subtitle/dictionary/Stremio semantics unchanged.
-
-Pending release gates:
-
-- exact-head PR CI;
-- real Windows setup/upgrade smoke test;
-- representative playback, dictionary/phrase, buffering, click/fullscreen, subtitle-picker, and Stremio smoke tests;
+- final exact-head CI after documentation/policy tightening;
+- real Windows smoke test:
+  - normal startup;
+  - official v1.0.2 check reports up-to-date;
+  - retry/error UI does not affect normal use;
+  - local/Stremio playback remains unaffected;
 - final Codex review with no remaining P1/P2/P3 findings;
-- squash merge;
-- successful exact-`master` push CI;
-- successful Release Windows workflow;
-- verification of published v1.0.2 assets and checksums.
+- squash merge and confirmation that Issue #48 closes.
+
+A real live **newer-version download/install** cannot be exercised against the official latest-release endpoint until a release newer than the installed app exists. The newer-release path is therefore covered now by deterministic behavioral tests; the official live path can be exercised on the next public version after this updater lands.
 
 ## Later work
 
-Separate future issues include automatic updates, macOS packaging, Linux packaging, separated-object phrasal-verb matching, pronunciation audio/TTS, broader bilingual editorial review of the 30,000-entry word dataset, richer ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support.
+Separate future issues include macOS packaging, Linux packaging, separated-object phrasal-verb matching, pronunciation audio/TTS, broader bilingual editorial review of the 30,000-entry word dataset, richer ASS/libass fidelity, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support.

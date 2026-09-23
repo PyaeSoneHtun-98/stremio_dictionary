@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent, webUtils } from 'electron'
 import type { DesktopBridge, PlaybackSnapshot } from '../shared/media'
+import type { UpdateSnapshot } from '../shared/update'
 
 const desktopBridge: DesktopBridge = {
   platform: process.platform,
@@ -28,6 +29,17 @@ const desktopBridge: DesktopBridge = {
       ipcRenderer.on('media:state', subscription)
 
       return () => ipcRenderer.removeListener('media:state', subscription)
+    }
+  },
+  update: {
+    getState: () => ipcRenderer.invoke('update:get-state'),
+    check: () => ipcRenderer.invoke('update:check'),
+    download: () => ipcRenderer.invoke('update:download'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onState: (listener) => {
+      const subscription = (_event: IpcRendererEvent, state: UpdateSnapshot): void => listener(state)
+      ipcRenderer.on('update:state', subscription)
+      return () => ipcRenderer.removeListener('update:state', subscription)
     }
   },
   stremio: {
