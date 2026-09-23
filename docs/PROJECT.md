@@ -121,6 +121,37 @@ React renderer
 
 Renderer Node integration remains disabled and context isolation remains enabled.
 
+## Windows update architecture
+
+The in-app updater reuses Subtitle Bridge's existing GitHub Release and rollback-safe setup pipeline rather than introducing a second installer system.
+
+```text
+official stable GitHub Release
+  ↓
+Electron main-process update client
+  ├─ validates stable semantic version + exact official repository
+  ├─ requires SubtitleBridge-Setup-x64.exe
+  ├─ requires SubtitleBridge-Setup-x64.exe.sha256
+  ├─ downloads through bounded approved HTTPS GitHub hosts
+  ├─ verifies SHA-256
+  └─ stores only app-owned update files
+          ↓
+narrow preload/IPC update state
+          ↓
+React launcher
+  ├─ release notes
+  ├─ Download update
+  └─ Install and restart (explicit user action)
+          ↓
+re-hash installer immediately before launch
+          ↓
+existing rollback-safe Subtitle Bridge setup
+```
+
+Update checks run shortly after startup and periodically. A failed check is non-fatal and must never prevent playback, subtitle interaction, or offline dictionary lookup. Draft, prerelease, malformed, older, or equal-version releases are not offered.
+
+The renderer never receives arbitrary network, filesystem, hashing, or process-launch capability. Installation is rejected while media is loading, playing, or paused, so an update cannot interrupt active playback. There is no silent or forced installation.
+
 ## Stremio integration
 
 The first Stremio integration supports streams served by Stremio's local streaming server.
