@@ -184,6 +184,14 @@ export function registerMediaIpc(): void {
   ipcMain.handle(TOGGLE_FULLSCREEN_CHANNEL, () => playbackSurface.toggleFullscreen())
 }
 
+export function isMediaPlaybackActive(): boolean {
+  const state = controller.getState()
+  return (
+    state.filePath !== null &&
+    (state.status === 'loading' || state.status === 'playing' || state.status === 'paused')
+  )
+}
+
 export function openMediaTarget(rawTarget: string): Promise<OpenVideoResult> {
   return openMediaQueue.run(() => openMediaTargetNow(rawTarget))
 }
