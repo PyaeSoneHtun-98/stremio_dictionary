@@ -2,15 +2,17 @@
 
 ## Stable master
 
-Current stable `master`:
+Current `master` before the v1.0.3 release branch:
 
-`dd61510c6a115417a25e8f4b369731f4c8c19c82`
+`e138a55aee5859ace0749878c1f1db7bc42ccfad`
 
-That commit is the source of the published **Subtitle Bridge v1.0.2** Windows release.
+PR #49 / Issue #48 added secure in-app Windows update support to `master`.
 
-Post-merge CI #375 passed `validate` and `package-windows`, including live mpv/FFmpeg verification and packaged install/upgrade/Stremio acceptance. Release Windows #43 rebuilt and revalidated the exact successful `master` SHA before publishing v1.0.2.
+Post-merge CI #393 passed on that exact commit, including `validate`, Windows packaging, live mpv/FFmpeg verification, packaged install/upgrade acceptance, custom-directory installer behavior, Stremio acceptance, and artifact upload.
 
-Stable released capabilities include:
+Release Windows #61 correctly detected that the package version was still 1.0.2 and did not republish or overwrite the existing v1.0.2 GitHub Release.
+
+Current stable capabilities on `master` include:
 
 - local MKV and supported HTTP/HTTPS/Stremio playback through mpv;
 - FFmpeg full-track text-subtitle extraction for local MKV files;
@@ -29,6 +31,12 @@ Stable released capabilities include:
 - Windows x64 setup with Start Menu / Installed Apps integration;
 - installer-managed pinned mpv/FFmpeg runtimes;
 - rollback-safe upgrades, interrupted-upgrade recovery, ownership checks, and fail-closed Stremio cleanup;
+- secure user-approved GitHub Release update checking and download;
+- SHA-256 verification after update download and again immediately before installer launch;
+- canonical stable-version/release-tag validation;
+- custom install-directory preservation during in-app updates;
+- active-playback installation blocking;
+- non-fatal offline/retry update behavior;
 - structured/redacted diagnostics;
 - renderer Node integration disabled and context isolation enabled.
 
@@ -36,27 +44,49 @@ Stable released capabilities include:
 
 ### v1.0.0
 
-The first stable Windows release. Its setup executable remained intact, but the runtime manifest referenced a rotating upstream mpv development asset that was later removed.
+The first stable Windows release. Its setup executable later encountered a removed rotating upstream mpv development asset.
 
 ### v1.0.1
 
-Issue #42 / PR #43 replaced that dead runtime dependency with the immutable first-party **mpv v0.41.0 x86_64 MSVC** archive and upstream SHA-256:
-
-`4e197f729f5071c6772f35fffd96e0f36e3e8a044bd9479b136bb09b7c6a80ff`
-
-It also added live public-runtime CI verification and clearer setup failure reporting.
+Issue #42 / PR #43 replaced the dead runtime dependency with immutable first-party stable **mpv v0.41.0 x86_64 MSVC** and added live runtime CI verification plus clearer setup failures.
 
 ### v1.0.2
 
 Issue #46 / PR #47 packaged the completed player UX refresh and current dictionaries into the public release.
 
-Release source:
+Published source:
 
 `dd61510c6a115417a25e8f4b369731f4c8c19c82`
 
-The v1.0.2 release includes the launcher redesign, stream buffering feedback, single-click play/pause, system-aware double-click fullscreen, native external subtitle picker, Phrase Dictionary v1.0.0, and the v1.0.1 runtime hotfix.
+v1.0.2 includes the launcher redesign, stream buffering feedback, single-click play/pause, system-aware double-click fullscreen, native external subtitle picker, Phrase Dictionary v1.0.0, and the v1.0.1 runtime hotfix.
 
-A real v1.0.1 → v1.0.2 Windows upgrade exposed and fixed a stale hardcoded launcher version badge before release. A regression test now requires renderer app metadata to match `package.json`.
+Public v1.0.2 does **not** contain the in-app updater.
+
+## Secure in-app updater
+
+Issue #48 / PR #49 are complete.
+
+Merged source:
+
+`e138a55aee5859ace0749878c1f1db7bc42ccfad`
+
+The updater:
+
+- checks the fixed official repository for stable releases;
+- requires exact canonical `vX.Y.Z` tags;
+- rejects drafts, prereleases, malformed/noncanonical versions, older versions, and equal versions;
+- requires exact setup EXE + SHA-256 assets;
+- restricts update network traffic to approved HTTPS GitHub hosts with request/redirect/size bounds;
+- downloads to app-owned update storage;
+- verifies SHA-256 after download;
+- re-hashes immediately before installation;
+- exposes only narrow updater state/actions through preload/IPC;
+- never gives the renderer arbitrary URL/path/filesystem/process capability;
+- blocks installation while media is loading, playing, or paused;
+- derives the install target from the running executable and forwards it through `SUBTITLE_BRIDGE_INSTALL_DIR`;
+- keeps update failures non-fatal and retryable.
+
+Real Windows smoke testing confirmed the live official v1.0.2 up-to-date path, offline/retry behavior, and no playback/Stremio/dictionary regression.
 
 ## Dictionary v1.0
 
@@ -75,48 +105,31 @@ Production artifact: `src/main/translation/data/phrases.json`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
-## Active work — secure in-app updates
+## Active work — Windows v1.0.3
 
-Issue #48 / Draft PR #49 are active on:
+Issue #50 is the active release task on:
 
-`feat/issue-48-auto-update`
+`release/issue-50-v1.0.3`
 
-The updater is intentionally built around the existing GitHub Release + setup EXE pipeline rather than `electron-updater`.
+v1.0.3 is intended to be a release-only change that publishes the already-reviewed updater and current stable `master` behavior.
 
-Implemented scope:
+Release-branch scope:
 
-- delayed startup and six-hour periodic stable-release checks;
-- fixed trust root: `PyaeSoneHtun-98/stremio_dictionary`;
-- stable semantic-version comparison;
-- fail-closed draft/prerelease/incomplete release metadata handling;
-- exact required assets:
-  - `SubtitleBridge-Setup-x64.exe`
-  - `SubtitleBridge-Setup-x64.exe.sha256`;
-- bounded HTTPS requests restricted to approved GitHub hosts;
-- strict SHA-256 checksum parsing;
-- app-owned temporary/atomic installer download;
-- checksum verification after download;
-- installer re-hash immediately before launch;
-- explicit **Download update** and **Install and restart** actions;
-- installation blocked while media is loading, playing, or paused;
-- narrow preload/IPC surface with all network/filesystem/process operations kept in the main process;
-- non-fatal retryable update errors;
-- behavioral tests for release policy, version comparison, hash mismatch, playback blocking, verified launch, and post-download tampering.
+- bump package/app metadata from 1.0.2 to 1.0.3;
+- add `docs/releases/v1.0.3.md`;
+- update README and STATUS;
+- keep updater/playback/subtitle/dictionary/runtime/Stremio behavior unchanged unless a release-blocking defect is found.
 
-CI #378 passed the implementation before the final documentation/policy tightening pass, including validation, Windows packaging, runtime verification, packaged install/upgrade/Stremio acceptance, and artifact upload.
+Pending release gates:
 
-Pending gates:
-
-- final exact-head CI after documentation/policy tightening;
-- real Windows smoke test:
-  - normal startup;
-  - official v1.0.2 check reports up-to-date;
-  - retry/error UI does not affect normal use;
-  - local/Stremio playback remains unaffected;
+- exact-head PR CI;
+- real Windows public-v1.0.2 → v1.0.3 manual installer upgrade smoke test;
 - final Codex review with no remaining P1/P2/P3 findings;
-- squash merge and confirmation that Issue #48 closes.
-
-A real live **newer-version download/install** cannot be exercised against the official latest-release endpoint until a release newer than the installed app exists. The newer-release path is therefore covered now by deterministic behavioral tests; the official live path can be exercised on the next public version after this updater lands.
+- squash merge;
+- successful exact-`master` push CI;
+- successful Release Windows publication of v1.0.3;
+- verification of published installer/ZIP/checksum assets;
+- first real official end-to-end in-app update from an updater-enabled v1.0.2 feature build to published v1.0.3.
 
 ## Later work
 
