@@ -125,8 +125,164 @@ function Assert-OwnedInstallDirectory {
   throw "Refusing to replace a non-empty directory without a Subtitle Bridge ownership marker: $Directory"
 }
 
+function Initialize-LimitedProcessQuery {
+  if ('SubtitleBridgeProcessQuery.NativeMethods' -as [type]) {
+    return
+  }
+
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+namespace SubtitleBridgeProcessQuery
+{
+    public static class NativeMethods
+    {
+        public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern IntPtr OpenProcess(
+            uint dwDesiredAccess,
+            bool bInheritHandle,
+            int dwProcessId
+        );
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool QueryFullProcessImageName(
+            IntPtr hProcess,
+            int dwFlags,
+            StringBuilder lpExeName,
+            ref int lpdwSize
+        );
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool CloseHandle(IntPtr hObject);
+    }
+}
+'@
+}
+
+function Get-LimitedProcessExecutablePath {
+  param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+  Initialize-LimitedProcessQuery
+
+  $handle = [SubtitleBridgeProcessQuery.NativeMethods]::OpenProcess(
+    [SubtitleBridgeProcessQuery.NativeMethods]::PROCESS_QUERY_LIMITED_INFORMATION,
+    $false,
+    $ProcessId
+  )
+
+  if ($handle -eq [IntPtr]::Zero) {
+    return $null
+  }
+
+  try {
+    $capacity = 32768
+    $buffer = New-Object System.Text.StringBuilder $capacity
+    if (-not [SubtitleBridgeProcessQuery.NativeMethods]::QueryFullProcessImageName(
+        $handle,
+        0,
+        $buffer,
+        [ref]$capacity
+      )) {
+      return $null
+    }
+
+    if ($buffer.Length -eq 0) {
+      return $null
+    }
+
+    return Get-NormalizedPath $buffer.ToString()
+  } finally {
+    [void][SubtitleBridgeProcessQuery.NativeMethods]::CloseHandle($handle)
+  }
+}
+
+function Get-ProcessOwnerIdentity {
+  param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+  try {
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction Stop
+    if ($null -eq $process) {
+      return $null
+    }
+
+    $owner = Invoke-CimMethod -InputObject $process -MethodName GetOwner -ErrorAction Stop
+    if ($null -eq $owner -or [int]$owner.ReturnValue -ne 0 -or
+        [string]::IsNullOrWhiteSpace([string]$owner.User)) {
+      return $null
+    }
+
+    if ([string]::IsNullOrWhiteSpace([string]$owner.Domain)) {
+      return [string]$owner.User
+    }
+
+    return "$([string]$owner.Domain)\$([string]$owner.User)"
+  } catch {
+    return $null
+  }
+}
+
+function Get-CurrentWindowsIdentity {
+  try {
+    return [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+  } catch {
+    return $null
+  }
+}
+
+function Test-CanIgnoreInaccessibleProcess {
+  param(
+    [Parameter(Mandatory = $true)][string]$ExecutablePath,
+    [string]$ProcessOwnerIdentity,
+    [string]$CurrentOwnerIdentity = (Get-CurrentWindowsIdentity)
+  )
+
+  if ([string]::IsNullOrWhiteSpace($ProcessOwnerIdentity) -or
+      [string]::IsNullOrWhiteSpace($CurrentOwnerIdentity) -or
+      [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+    return $false
+  }
+
+  if ($ProcessOwnerIdentity.Equals(
+      $CurrentOwnerIdentity,
+      [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    return $false
+  }
+
+  # Only a target inside this user's LOCALAPPDATA is per-user enough to exclude an
+  # unreadable same-named process owned by a different Windows user. Custom/shared
+  # locations stay fail-closed because that other process might use the target.
+  return Test-IsSameOrChildPath -Candidate $ExecutablePath -Parent $env:LOCALAPPDATA
+}
+
 function Get-ProcessPathState {
   param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+  try {
+    $probe = [System.Diagnostics.Process]::GetProcessById($ProcessId)
+    $probe.Dispose()
+  } catch [System.ArgumentException] {
+    return [pscustomobject]@{
+      exists = $false
+      accessible = $true
+      path = $null
+    }
+  }
+
+  $limitedPath = Get-LimitedProcessExecutablePath -ProcessId $ProcessId
+  if (-not [string]::IsNullOrWhiteSpace($limitedPath)) {
+    return [pscustomobject]@{
+      exists = $true
+      accessible = $true
+      path = $limitedPath
+    }
+  }
 
   try {
     $candidate = [System.Diagnostics.Process]::GetProcessById($ProcessId)
@@ -173,6 +329,29 @@ function Get-ProcessPathState {
   }
 }
 
+function Resolve-RunningProcessPath {
+  param(
+    [Parameter(Mandatory = $true)][int]$ProcessId,
+    [Parameter(Mandatory = $true)][string]$TargetExecutablePath
+  )
+
+  $pathState = Get-ProcessPathState -ProcessId $ProcessId
+  if (-not $pathState.exists) {
+    return $null
+  }
+
+  if ($pathState.accessible) {
+    return [string]$pathState.path
+  }
+
+  $ownerIdentity = Get-ProcessOwnerIdentity -ProcessId $ProcessId
+  if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $TargetExecutablePath -ProcessOwnerIdentity $ownerIdentity) {
+    return $null
+  }
+
+  throw 'A running Subtitle Bridge.exe process could not be inspected safely. Close all Subtitle Bridge processes for this Windows user and retry setup.'
+}
+
 function Test-InstalledAppRunning {
   param([Parameter(Mandatory = $true)][string]$ExecutablePath)
 
@@ -198,15 +377,11 @@ function Test-InstalledAppRunning {
       }
 
       if ([string]::IsNullOrWhiteSpace($runningPath)) {
-        $pathState = Get-ProcessPathState -ProcessId ([int]$process.ProcessId)
-        if (-not $pathState.exists) {
+        $runningPath = Resolve-RunningProcessPath -ProcessId ([int]$process.ProcessId) -TargetExecutablePath $targetPath
+
+        if ([string]::IsNullOrWhiteSpace($runningPath)) {
           continue
         }
-        if (-not $pathState.accessible) {
-          throw 'A running Subtitle Bridge.exe process could not be inspected. Close all Subtitle Bridge processes and retry setup.'
-        }
-
-        $runningPath = [string]$pathState.path
       } else {
         $runningPath = Get-NormalizedPath $runningPath
       }
@@ -221,16 +396,13 @@ function Test-InstalledAppRunning {
 
   $fallbackProcesses = Get-Process -Name 'Subtitle Bridge' -ErrorAction SilentlyContinue
   foreach ($process in $fallbackProcesses) {
-    $pathState = Get-ProcessPathState -ProcessId ([int]$process.Id)
-    if (-not $pathState.exists) {
+    $runningPath = Resolve-RunningProcessPath -ProcessId ([int]$process.Id) -TargetExecutablePath $targetPath
+
+    if ([string]::IsNullOrWhiteSpace($runningPath)) {
       continue
     }
-    if (-not $pathState.accessible) {
-      throw 'A running Subtitle Bridge.exe process could not be inspected. Close all Subtitle Bridge processes and retry setup.'
-    }
 
-    if ([string]$pathState.path -and
-        ([string]$pathState.path).Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if ($runningPath.Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
       return $true
     }
   }
