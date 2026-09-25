@@ -249,6 +249,37 @@ function Get-CurrentLocalAppDataPath {
   }
 }
 
+function Test-PathHasReparsePointAncestor {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  try {
+    $currentPath = [System.IO.Path]::GetFullPath($Path)
+
+    while (-not [string]::IsNullOrWhiteSpace($currentPath)) {
+      if (-not (Test-Path -LiteralPath $currentPath)) {
+        return $true
+      }
+
+      $item = Get-Item -LiteralPath $currentPath -Force -ErrorAction Stop
+      if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        return $true
+      }
+
+      $parent = [System.IO.Directory]::GetParent($currentPath)
+      if ($null -eq $parent) {
+        break
+      }
+
+      $currentPath = $parent.FullName
+    }
+
+    return $false
+  } catch {
+    # Any path we cannot inspect completely must keep the cross-user exemption fail-closed.
+    return $true
+  }
+}
+
 function Test-IsStandardPrivateInstallTarget {
   param(
     [Parameter(Mandatory = $true)][string]$ExecutablePath,
@@ -273,23 +304,12 @@ function Test-IsStandardPrivateInstallTarget {
       return $false
     }
 
-    # The cross-user exemption is only safe for the exact standard per-user path.
-    # Any junction/symlink/mount point in that path could redirect it to shared storage,
-    # so reparse points keep the process check fail-closed.
-    foreach ($path in @(
-      $localAppData,
-      $programsDir,
-      $standardInstallDir,
-      $standardExecutable
-    )) {
-      if (-not (Test-Path -LiteralPath $path)) {
-        return $false
-      }
-
-      $item = Get-Item -LiteralPath $path -Force -ErrorAction Stop
-      if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-        return $false
-      }
+    # The exemption is only safe when the exact standard path is physically reached
+    # without crossing a junction, symlink, mount point, or other reparse point. Check the
+    # executable itself and every ancestor to the volume root, including components above
+    # LocalApplicationData such as the user profile and AppData directories.
+    if (Test-PathHasReparsePointAncestor -Path $standardExecutable) {
+      return $false
     }
 
     return $true
