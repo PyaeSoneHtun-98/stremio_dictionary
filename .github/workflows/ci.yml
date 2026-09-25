@@ -283,6 +283,66 @@ jobs:
             throw 'Runtime provisioning did not create the cache ownership marker.'
           }
 
+          # In-app update regression: setup can be launched before the running app has
+          # fully exited. Wait for the updater parent, then tolerate a short-lived descendant/
+          # security-scanner style file lock before swapping the install directory.
+          $handoffParentSignal = Join-Path $env:RUNNER_TEMP 'subtitle-bridge-updater-parent.locked'
+          $transientLockSignal = Join-Path $env:RUNNER_TEMP 'subtitle-bridge-transient-lock.locked'
+          Remove-Item -LiteralPath $handoffParentSignal -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $transientLockSignal -Force -ErrorAction SilentlyContinue
+
+          $parentLockPath = (Join-Path $installDir 'resources\app\package.json').Replace("'", "''")
+          $parentSignalPath = $handoffParentSignal.Replace("'", "''")
+          $parentLockScript = @"
+          `$stream = [System.IO.File]::Open('$parentLockPath', [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
+          [System.IO.File]::WriteAllText('$parentSignalPath', 'locked')
+          try { Start-Sleep -Milliseconds 1200 } finally { `$stream.Dispose() }
+          "@
+          $parentLockEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($parentLockScript))
+          $updaterParent = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-EncodedCommand', $parentLockEncoded) -WindowStyle Hidden -PassThru
+
+          $transientLockPath = (Join-Path $installDir 'resources\app\out\main\index.js').Replace("'", "''")
+          $transientSignalPath = $transientLockSignal.Replace("'", "''")
+          $transientLockScript = @"
+          `$stream = [System.IO.File]::Open('$transientLockPath', [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
+          [System.IO.File]::WriteAllText('$transientSignalPath', 'locked')
+          try { Start-Sleep -Milliseconds 2800 } finally { `$stream.Dispose() }
+          "@
+          $transientLockEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($transientLockScript))
+          $transientLocker = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-EncodedCommand', $transientLockEncoded) -WindowStyle Hidden -PassThru
+
+          $lockDeadline = (Get-Date).AddSeconds(10)
+          while ((-not (Test-Path -LiteralPath $handoffParentSignal)) -or
+                 (-not (Test-Path -LiteralPath $transientLockSignal))) {
+            if ((Get-Date) -ge $lockDeadline) {
+              throw 'Could not establish updater shutdown-race fixtures.'
+            }
+            Start-Sleep -Milliseconds 100
+          }
+
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID = [string]$updaterParent.Id
+          try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+            $handoffUpgradeExitCode = $LASTEXITCODE
+          } finally {
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID -ErrorAction SilentlyContinue
+          }
+          $global:LASTEXITCODE = 0
+
+          $updaterParent.WaitForExit()
+          $transientLocker.WaitForExit()
+          $updaterParent.Dispose()
+          $transientLocker.Dispose()
+          Remove-Item -LiteralPath $handoffParentSignal -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $transientLockSignal -Force -ErrorAction SilentlyContinue
+
+          if ($handoffUpgradeExitCode -ne 0) {
+            throw 'Installer failed the updater parent-exit/transient-lock regression.'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $installDir 'Subtitle Bridge.exe') -PathType Leaf)) {
+            throw 'Updater shutdown-race regression did not leave a working installation.'
+          }
+
           # A tampered transaction marker must never turn the install parent into a recursive-delete target.
           $installParent = Split-Path -Parent $installDir
           $transactionParentSentinel = Join-Path $installParent 'subtitle-bridge-transaction-parent-sentinel.txt'
