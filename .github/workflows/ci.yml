@@ -283,9 +283,9 @@ jobs:
             throw 'Runtime provisioning did not create the cache ownership marker.'
           }
 
-          # Backward compatibility: v1.0.3 and earlier updater-enabled feature builds do
-          # not pass a parent PID. A newly published setup must still tolerate the old app
-          # launching setup and then shutting down a moment later.
+          # Backward compatibility: older updater builds do not pass process identity.
+          # Also force the CIM ExecutablePath to look unavailable so the per-process
+          # MainModule fallback is exercised instead of silently skipping the running app.
           $installedExe = Join-Path $installDir 'Subtitle Bridge.exe'
           $packagedExe = Join-Path $packageDir 'Subtitle Bridge.exe'
           $windowsPowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
@@ -296,28 +296,74 @@ jobs:
             'Start-Sleep -Milliseconds 1400'
           ) -WindowStyle Hidden -PassThru
 
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
-          $legacyHandoffExitCode = $LASTEXITCODE
+          $env:SUBTITLE_BRIDGE_TEST_FORCE_CIM_PATH_MISSING = '1'
+          try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+            $legacyHandoffExitCode = $LASTEXITCODE
+          } finally {
+            Remove-Item Env:SUBTITLE_BRIDGE_TEST_FORCE_CIM_PATH_MISSING -ErrorAction SilentlyContinue
+          }
           $global:LASTEXITCODE = 0
           $legacyUpdaterProcess.WaitForExit()
           $legacyUpdaterProcess.Dispose()
 
           if ($legacyHandoffExitCode -ne 0) {
-            throw 'Installer failed the backward-compatible no-parent-PID shutdown regression.'
+            throw 'Installer failed the backward-compatible no-parent-identity shutdown regression.'
           }
           if ((Get-FileHash -LiteralPath $installedExe -Algorithm SHA256).Hash -ne
               (Get-FileHash -LiteralPath $packagedExe -Algorithm SHA256).Hash) {
             throw 'Backward-compatible shutdown regression did not restore the packaged app executable.'
           }
 
-          # In-app update regression: setup can be launched before the running app has
-          # fully exited. Wait for the updater parent, then tolerate a short-lived descendant/
-          # security-scanner style file lock before swapping the install directory.
+          # PID reuse regression: if the old app exits before setup checks the handoff and
+          # Windows gives that PID to another executable, setup must not wait on the unrelated
+          # process. The expected executable remains Subtitle Bridge, but the live PID belongs
+          # to powershell.exe.
+          $recycledPidProcess = Start-Process powershell.exe -ArgumentList @(
+            '-NoProfile',
+            '-Command',
+            'Start-Sleep -Seconds 60'
+          ) -WindowStyle Hidden -PassThru
+          $recycledPidStartedAtMs = [System.DateTimeOffset]::new(
+            $recycledPidProcess.StartTime.ToUniversalTime()
+          ).ToUnixTimeMilliseconds()
+
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID = [string]$recycledPidProcess.Id
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_EXE = $installedExe
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS = [string]$recycledPidStartedAtMs
+          try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+            $recycledPidExitCode = $LASTEXITCODE
+          } finally {
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_EXE -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS -ErrorAction SilentlyContinue
+          }
+          $global:LASTEXITCODE = 0
+
+          if ($recycledPidExitCode -ne 0) {
+            Stop-Process -Id $recycledPidProcess.Id -Force -ErrorAction SilentlyContinue
+            $recycledPidProcess.Dispose()
+            throw 'Installer treated a recycled unrelated PID as the updater parent.'
+          }
+          if ($recycledPidProcess.HasExited) {
+            $recycledPidProcess.Dispose()
+            throw 'PID-reuse regression process exited before setup proved it was ignored.'
+          }
+          Stop-Process -Id $recycledPidProcess.Id -Force
+          $recycledPidProcess.WaitForExit()
+          $recycledPidProcess.Dispose()
+
+          # In-app update regression: setup starts while Subtitle Bridge is still alive.
+          # The full PID + executable path + creation-time identity must match before setup
+          # waits for it. A second short-lived process then keeps an install file locked to
+          # prove the atomic directory rename retries safely after the app has exited.
           $handoffParentSignal = Join-Path $env:RUNNER_TEMP 'subtitle-bridge-updater-parent.locked'
           $transientLockSignal = Join-Path $env:RUNNER_TEMP 'subtitle-bridge-transient-lock.locked'
           Remove-Item -LiteralPath $handoffParentSignal -Force -ErrorAction SilentlyContinue
           Remove-Item -LiteralPath $transientLockSignal -Force -ErrorAction SilentlyContinue
 
+          Copy-Item -LiteralPath $windowsPowerShell -Destination $installedExe -Force
           $parentLockPath = (Join-Path $installDir 'resources\app\package.json').Replace("'", "''")
           $parentSignalPath = $handoffParentSignal.Replace("'", "''")
           $parentLockScript = @"
@@ -326,7 +372,11 @@ jobs:
           try { Start-Sleep -Milliseconds 1200 } finally { `$stream.Dispose() }
           "@
           $parentLockEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($parentLockScript))
-          $updaterParent = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-EncodedCommand', $parentLockEncoded) -WindowStyle Hidden -PassThru
+          $updaterParent = Start-Process $installedExe -ArgumentList @(
+            '-NoProfile',
+            '-EncodedCommand',
+            $parentLockEncoded
+          ) -WindowStyle Hidden -PassThru
 
           $transientLockPath = (Join-Path $installDir 'resources\app\out\main\index.js').Replace("'", "''")
           $transientSignalPath = $transientLockSignal.Replace("'", "''")
@@ -336,7 +386,11 @@ jobs:
           try { Start-Sleep -Milliseconds 2800 } finally { `$stream.Dispose() }
           "@
           $transientLockEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($transientLockScript))
-          $transientLocker = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-EncodedCommand', $transientLockEncoded) -WindowStyle Hidden -PassThru
+          $transientLocker = Start-Process powershell.exe -ArgumentList @(
+            '-NoProfile',
+            '-EncodedCommand',
+            $transientLockEncoded
+          ) -WindowStyle Hidden -PassThru
 
           $lockDeadline = (Get-Date).AddSeconds(10)
           while ((-not (Test-Path -LiteralPath $handoffParentSignal)) -or
@@ -347,12 +401,19 @@ jobs:
             Start-Sleep -Milliseconds 100
           }
 
+          $updaterParentStartedAtMs = [System.DateTimeOffset]::new(
+            $updaterParent.StartTime.ToUniversalTime()
+          ).ToUnixTimeMilliseconds()
           $env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID = [string]$updaterParent.Id
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_EXE = $installedExe
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS = [string]$updaterParentStartedAtMs
           try {
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
             $handoffUpgradeExitCode = $LASTEXITCODE
           } finally {
             Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_EXE -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS -ErrorAction SilentlyContinue
           }
           $global:LASTEXITCODE = 0
 
@@ -364,7 +425,7 @@ jobs:
           Remove-Item -LiteralPath $transientLockSignal -Force -ErrorAction SilentlyContinue
 
           if ($handoffUpgradeExitCode -ne 0) {
-            throw 'Installer failed the updater parent-exit/transient-lock regression.'
+            throw 'Installer failed the verified-parent/transient-lock regression.'
           }
           if (-not (Test-Path -LiteralPath (Join-Path $installDir 'Subtitle Bridge.exe') -PathType Leaf)) {
             throw 'Updater shutdown-race regression did not leave a working installation.'
