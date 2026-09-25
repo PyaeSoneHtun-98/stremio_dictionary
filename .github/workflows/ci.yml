@@ -288,7 +288,8 @@ jobs:
           # launching setup and then shutting down a moment later.
           $installedExe = Join-Path $installDir 'Subtitle Bridge.exe'
           $packagedExe = Join-Path $packageDir 'Subtitle Bridge.exe'
-          Copy-Item -LiteralPath (Join-Path $PSHOME 'powershell.exe') -Destination $installedExe -Force
+          $windowsPowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
+          Copy-Item -LiteralPath $windowsPowerShell -Destination $installedExe -Force
           $legacyUpdaterProcess = Start-Process $installedExe -ArgumentList @(
             '-NoProfile',
             '-Command',
