@@ -30,8 +30,7 @@ export function registerUpdateIpc(options: RegisterUpdateIpcOptions): void {
     updatesRoot: join(app.getPath('userData'), 'updates'),
     client: new GithubUpdateClient(),
     isPlaybackActive: options.isPlaybackActive,
-    launchInstaller: (installerPath) =>
-      launchInstaller(installerPath, currentInstallDirectory(app.getPath('exe'))),
+    launchInstaller: (installerPath) => launchInstaller(installerPath, app.getPath('exe')),
     quitApp: () => app.quit(),
     onState: broadcastState
   })
@@ -67,13 +66,14 @@ export function disposeUpdateIpc(): void {
 
 async function launchInstaller(
   installerPath: string,
-  installDirectory: string
+  executablePath: string
 ): Promise<void> {
+  const installDirectory = currentInstallDirectory(executablePath)
   const child = spawn(installerPath, [], {
     detached: true,
     stdio: 'ignore',
     windowsHide: false,
-    env: createInstallerEnvironment(installDirectory)
+    env: createInstallerEnvironment(installDirectory, executablePath)
   })
 
   await new Promise<void>((resolve, reject) => {
