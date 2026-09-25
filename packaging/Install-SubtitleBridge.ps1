@@ -202,7 +202,7 @@ function Get-LimitedProcessExecutablePath {
   }
 }
 
-function Get-ProcessOwnerIdentity {
+function Get-ProcessOwnerSid {
   param([Parameter(Mandatory = $true)][int]$ProcessId)
 
   try {
@@ -211,56 +211,119 @@ function Get-ProcessOwnerIdentity {
       return $null
     }
 
-    $owner = Invoke-CimMethod -InputObject $process -MethodName GetOwner -ErrorAction Stop
-    if ($null -eq $owner -or [int]$owner.ReturnValue -ne 0 -or
-        [string]::IsNullOrWhiteSpace([string]$owner.User)) {
+    $ownerSid = Invoke-CimMethod -InputObject $process -MethodName GetOwnerSid -ErrorAction Stop
+    if ($null -eq $ownerSid -or [int]$ownerSid.ReturnValue -ne 0 -or
+        [string]::IsNullOrWhiteSpace([string]$ownerSid.Sid)) {
       return $null
     }
 
-    if ([string]::IsNullOrWhiteSpace([string]$owner.Domain)) {
-      return [string]$owner.User
-    }
-
-    return "$([string]$owner.Domain)\$([string]$owner.User)"
+    return [string]$ownerSid.Sid
   } catch {
     return $null
   }
 }
 
-function Get-CurrentWindowsIdentity {
+function Get-CurrentWindowsSid {
   try {
-    return [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    if ($null -eq $identity -or $null -eq $identity.User) {
+      return $null
+    }
+
+    return [string]$identity.User.Value
   } catch {
     return $null
+  }
+}
+
+function Get-CurrentLocalAppDataPath {
+  try {
+    $path = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    if ([string]::IsNullOrWhiteSpace($path)) {
+      return $null
+    }
+
+    return Get-NormalizedPath $path
+  } catch {
+    return $null
+  }
+}
+
+function Test-IsStandardPrivateInstallTarget {
+  param(
+    [Parameter(Mandatory = $true)][string]$ExecutablePath,
+    [string]$LocalAppDataPath = (Get-CurrentLocalAppDataPath)
+  )
+
+  if ([string]::IsNullOrWhiteSpace($LocalAppDataPath)) {
+    return $false
+  }
+
+  try {
+    $localAppData = Get-NormalizedPath $LocalAppDataPath
+    $programsDir = Join-Path $localAppData 'Programs'
+    $standardInstallDir = Join-Path $programsDir 'Subtitle Bridge'
+    $standardExecutable = Join-Path $standardInstallDir 'Subtitle Bridge.exe'
+    $targetExecutable = Get-NormalizedPath $ExecutablePath
+
+    if (-not $targetExecutable.Equals(
+        (Get-NormalizedPath $standardExecutable),
+        [System.StringComparison]::OrdinalIgnoreCase
+      )) {
+      return $false
+    }
+
+    # The cross-user exemption is only safe for the exact standard per-user path.
+    # Any junction/symlink/mount point in that path could redirect it to shared storage,
+    # so reparse points keep the process check fail-closed.
+    foreach ($path in @(
+      $localAppData,
+      $programsDir,
+      $standardInstallDir,
+      $standardExecutable
+    )) {
+      if (-not (Test-Path -LiteralPath $path)) {
+        return $false
+      }
+
+      $item = Get-Item -LiteralPath $path -Force -ErrorAction Stop
+      if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        return $false
+      }
+    }
+
+    return $true
+  } catch {
+    return $false
   }
 }
 
 function Test-CanIgnoreInaccessibleProcess {
   param(
     [Parameter(Mandatory = $true)][string]$ExecutablePath,
-    [string]$ProcessOwnerIdentity,
-    [string]$CurrentOwnerIdentity = (Get-CurrentWindowsIdentity)
+    [string]$ProcessOwnerSid,
+    [string]$CurrentOwnerSid = (Get-CurrentWindowsSid),
+    [string]$LocalAppDataPath = (Get-CurrentLocalAppDataPath)
   )
 
-  if ([string]::IsNullOrWhiteSpace($ProcessOwnerIdentity) -or
-      [string]::IsNullOrWhiteSpace($CurrentOwnerIdentity) -or
-      [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+  if ([string]::IsNullOrWhiteSpace($ProcessOwnerSid) -or
+      [string]::IsNullOrWhiteSpace($CurrentOwnerSid)) {
     return $false
   }
 
-  if ($ProcessOwnerIdentity.Equals(
-      $CurrentOwnerIdentity,
-      [System.StringComparison]::OrdinalIgnoreCase
-    )) {
+  try {
+    $processSid = [System.Security.Principal.SecurityIdentifier]::new($ProcessOwnerSid)
+    $currentSid = [System.Security.Principal.SecurityIdentifier]::new($CurrentOwnerSid)
+  } catch {
     return $false
   }
 
-  # Only a target inside this user's LOCALAPPDATA is per-user enough to exclude an
-  # unreadable same-named process owned by a different Windows user. Custom/shared
-  # locations stay fail-closed because that other process might use the target.
-  return Test-IsSameOrChildPath -Candidate $ExecutablePath -Parent $env:LOCALAPPDATA
+  if ($processSid.Equals($currentSid)) {
+    return $false
+  }
+
+  return Test-IsStandardPrivateInstallTarget -ExecutablePath $ExecutablePath -LocalAppDataPath $LocalAppDataPath
 }
-
 function Get-ProcessPathState {
   param([Parameter(Mandatory = $true)][int]$ProcessId)
 
@@ -344,8 +407,8 @@ function Resolve-RunningProcessPath {
     return [string]$pathState.path
   }
 
-  $ownerIdentity = Get-ProcessOwnerIdentity -ProcessId $ProcessId
-  if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $TargetExecutablePath -ProcessOwnerIdentity $ownerIdentity) {
+  $ownerSid = Get-ProcessOwnerSid -ProcessId $ProcessId
+  if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $TargetExecutablePath -ProcessOwnerSid $ownerSid) {
     return $null
   }
 
