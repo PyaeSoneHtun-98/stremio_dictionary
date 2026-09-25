@@ -59,6 +59,74 @@ jobs:
             }
           }
 
+      - name: Verify Windows process isolation policy
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installerPath = 'packaging\Install-SubtitleBridge.ps1'
+          $source = Get-Content -LiteralPath $installerPath -Raw
+          $tokens = $null
+          $parseErrors = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseInput(
+            $source,
+            [ref]$tokens,
+            [ref]$parseErrors
+          )
+          if ($parseErrors.Count -ne 0) {
+            throw 'Could not parse installer functions for process-isolation tests.'
+          }
+
+          $functionNames = @(
+            'Get-NormalizedPath',
+            'Test-IsSameOrChildPath',
+            'Initialize-LimitedProcessQuery',
+            'Get-LimitedProcessExecutablePath',
+            'Get-CurrentWindowsIdentity',
+            'Test-CanIgnoreInaccessibleProcess'
+          )
+
+          foreach ($name in $functionNames) {
+            $functionAst = $ast.Find(
+              {
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $node.Name -eq $name
+              },
+              $true
+            )
+            if ($null -eq $functionAst) {
+              throw "Missing installer function required by process-isolation tests: $name"
+            }
+
+            . ([scriptblock]::Create($functionAst.Extent.Text))
+          }
+
+          $limitedPath = Get-LimitedProcessExecutablePath -ProcessId $PID
+          if ([string]::IsNullOrWhiteSpace($limitedPath)) {
+            throw 'PROCESS_QUERY_LIMITED_INFORMATION could not resolve the current process path.'
+          }
+
+          $currentOwner = 'CONTOSO\CurrentUser'
+          $otherOwner = 'CONTOSO\OtherUser'
+          $perUserTarget = Join-Path $env:LOCALAPPDATA 'Programs\Subtitle Bridge\Subtitle Bridge.exe'
+          $sharedTarget = 'C:\Program Files\Subtitle Bridge\Subtitle Bridge.exe'
+
+          if (-not (Test-CanIgnoreInaccessibleProcess -ExecutablePath $perUserTarget -ProcessOwnerIdentity $otherOwner -CurrentOwnerIdentity $currentOwner)) {
+            throw 'A different user should be excludable for a current-user LOCALAPPDATA install.'
+          }
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $perUserTarget -ProcessOwnerIdentity $currentOwner -CurrentOwnerIdentity $currentOwner) {
+            throw 'The current user must never be excluded from the running-process check.'
+          }
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $sharedTarget -ProcessOwnerIdentity $otherOwner -CurrentOwnerIdentity $currentOwner) {
+            throw 'A different user must remain fail-closed for a shared/custom install location.'
+          }
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $perUserTarget -ProcessOwnerIdentity '' -CurrentOwnerIdentity $currentOwner) {
+            throw 'An unknown process owner must remain fail-closed.'
+          }
+
       - name: Verify live public runtime assets
         shell: pwsh
         run: |
