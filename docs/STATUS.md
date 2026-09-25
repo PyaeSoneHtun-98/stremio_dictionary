@@ -2,17 +2,17 @@
 
 ## Stable master
 
-Current `master` before the v1.0.3 release branch:
+Current stable `master`:
 
-`e138a55aee5859ace0749878c1f1db7bc42ccfad`
+`f875a3b5a52be294f27e5d6907c86c253f494714`
 
-PR #49 / Issue #48 added secure in-app Windows update support to `master`.
+PR #54 / Issue #52 added the Windows updater shutdown-race fix on top of the public v1.0.3 release source.
 
-Post-merge CI #393 passed on that exact commit, including `validate`, Windows packaging, live mpv/FFmpeg verification, packaged install/upgrade acceptance, custom-directory installer behavior, Stremio acceptance, and artifact upload.
+The reviewed PR #54 head `f536be8a6825b2715062a297406c97fff543911b` passed exact-head CI #410, including project validation, Windows packaging, process-isolation policy checks, packaged install/upgrade acceptance, runtime verification, Stremio acceptance, and artifact upload. Final Codex review reported no remaining P1/P2/P3/P4 findings.
 
-Release Windows #61 correctly detected that the package version was still 1.0.2 and did not republish or overwrite the existing v1.0.2 GitHub Release.
+Issue #52 remains open intentionally until the fixed installer is published and the real affected/test Windows PC completes an official in-app update successfully.
 
-Current stable capabilities on `master` include:
+Current stable capabilities include:
 
 - local MKV and supported HTTP/HTTPS/Stremio playback through mpv;
 - FFmpeg full-track text-subtitle extraction for local MKV files;
@@ -37,6 +37,13 @@ Current stable capabilities on `master` include:
 - custom install-directory preservation during in-app updates;
 - active-playback installation blocking;
 - non-fatal offline/retry update behavior;
+- verified updater-parent handoff using PID + executable path + process start time;
+- backward-compatible installer shutdown grace for older updater builds;
+- recycled-PID protection;
+- PID-specific fallback for missing CIM executable paths;
+- limited-access process-image lookup plus SID-based cross-user handling;
+- exact-standard-path and full-ancestor reparse-point checks before any cross-user exclusion;
+- bounded atomic same-volume install-directory move retry for transient locks;
 - structured/redacted diagnostics;
 - renderer Node integration disabled and context isolation enabled.
 
@@ -58,35 +65,45 @@ Published source:
 
 `dd61510c6a115417a25e8f4b369731f4c8c19c82`
 
-v1.0.2 includes the launcher redesign, stream buffering feedback, single-click play/pause, system-aware double-click fullscreen, native external subtitle picker, Phrase Dictionary v1.0.0, and the v1.0.1 runtime hotfix.
+Public v1.0.2 does not contain the in-app updater.
 
-Public v1.0.2 does **not** contain the in-app updater.
+### v1.0.3
 
-## Secure in-app updater
+Issue #50 / PR #51 published the secure in-app updater.
 
-Issue #48 / PR #49 are complete.
+Published source:
 
-Merged source:
+`34662c9fea0f68317df7e08f83f8e26402496abf`
 
-`e138a55aee5859ace0749878c1f1db7bc42ccfad`
+Official setup SHA-256:
 
-The updater:
+`11908f8a962f90811bb31bf095b9367cd4177601e6cf86c6e24e50250dceeead`
 
-- checks the fixed official repository for stable releases;
-- requires exact canonical `vX.Y.Z` tags;
-- rejects drafts, prereleases, malformed/noncanonical versions, older versions, and equal versions;
-- requires exact setup EXE + SHA-256 assets;
-- restricts update network traffic to approved HTTPS GitHub hosts with request/redirect/size bounds;
-- downloads to app-owned update storage;
-- verifies SHA-256 after download;
-- re-hashes immediately before installation;
-- exposes only narrow updater state/actions through preload/IPC;
-- never gives the renderer arbitrary URL/path/filesystem/process capability;
-- blocks installation while media is loading, playing, or paused;
-- derives the install target from the running executable and forwards it through `SUBTITLE_BRIDGE_INSTALL_DIR`;
-- keeps update failures non-fatal and retryable.
+Official ZIP SHA-256:
 
-Real Windows smoke testing confirmed the live official v1.0.2 up-to-date path, offline/retry behavior, and no playback/Stremio/dictionary regression.
+`5ff9449706b787ecf6d59bbc209ab04806d3a1f4324d19965a665e86d4b2eeaa`
+
+The real official updater flow to v1.0.3 succeeded twice on one Windows PC. A second PC reached installer launch but failed because the existing install directory was still in use; that failure became Issue #52 and is fixed on current master.
+
+## Updater shutdown-race fix
+
+Issue #52 / PR #54 are merged to master.
+
+The fix:
+
+- passes PID + executable path + process start time from newer updater builds;
+- verifies process identity before waiting so recycled PIDs are ignored;
+- remains compatible with older updater builds that pass no parent identity;
+- gives the installed app a bounded shutdown grace period;
+- falls back per-process when CIM omits `ExecutablePath`;
+- uses `PROCESS_QUERY_LIMITED_INFORMATION` / `QueryFullProcessImageName` when possible;
+- compares Windows owners by SID;
+- permits cross-user exclusion only for the exact standard per-user executable path;
+- walks every path ancestor through the volume root and fails closed on reparse points;
+- uses bounded `System.IO.Directory.Move` retries for transient locks without partial PowerShell `Move-Item` backups;
+- preserves rollback/recovery, ownership, custom-directory, updater trust, runtime, and Stremio invariants.
+
+The remaining acceptance gate is a real official in-app update using the published fixed installer.
 
 ## Dictionary v1.0
 
@@ -105,31 +122,31 @@ Production artifact: `src/main/translation/data/phrases.json`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
-## Active work — Windows v1.0.3
+## Active work — Windows v1.0.4
 
-Issue #50 is the active release task on:
+Issue #55 is the active release task on:
 
-`release/issue-50-v1.0.3`
+`release/issue-55-v1.0.4`
 
-v1.0.3 is intended to be a release-only change that publishes the already-reviewed updater and current stable `master` behavior.
+v1.0.4 is a focused release of the already-reviewed Issue #52 updater/installer reliability fix.
 
 Release-branch scope:
 
-- bump package/app metadata from 1.0.2 to 1.0.3;
-- add `docs/releases/v1.0.3.md`;
+- bump package/app metadata from 1.0.3 to 1.0.4;
+- add `docs/releases/v1.0.4.md`;
 - update README and STATUS;
-- keep updater/playback/subtitle/dictionary/runtime/Stremio behavior unchanged unless a release-blocking defect is found.
+- keep playback, subtitle, dictionary, runtime, updater trust policy, and Stremio behavior unchanged.
 
 Pending release gates:
 
 - exact-head PR CI;
-- real Windows public-v1.0.2 → v1.0.3 manual installer upgrade smoke test;
 - final Codex review with no remaining P1/P2/P3 findings;
 - squash merge;
 - successful exact-`master` push CI;
-- successful Release Windows publication of v1.0.3;
+- successful Release Windows publication of v1.0.4;
 - verification of published installer/ZIP/checksum assets;
-- first real official end-to-end in-app update from an updater-enabled v1.0.2 feature build to published v1.0.3.
+- real official in-app update to v1.0.4 on the affected/test Windows PC without manually closing Subtitle Bridge;
+- close Issue #52 only after that real updater retest succeeds.
 
 ## Later work
 
