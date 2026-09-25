@@ -125,6 +125,54 @@ function Assert-OwnedInstallDirectory {
   throw "Refusing to replace a non-empty directory without a Subtitle Bridge ownership marker: $Directory"
 }
 
+function Get-ProcessPathState {
+  param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+  try {
+    $candidate = [System.Diagnostics.Process]::GetProcessById($ProcessId)
+  } catch [System.ArgumentException] {
+    return [pscustomobject]@{
+      exists = $false
+      accessible = $true
+      path = $null
+    }
+  }
+
+  try {
+    try {
+      $fileName = $candidate.MainModule.FileName
+    } catch [System.ComponentModel.Win32Exception] {
+      return [pscustomobject]@{
+        exists = $true
+        accessible = $false
+        path = $null
+      }
+    } catch [System.InvalidOperationException] {
+      return [pscustomobject]@{
+        exists = $false
+        accessible = $true
+        path = $null
+      }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($fileName)) {
+      return [pscustomobject]@{
+        exists = $true
+        accessible = $false
+        path = $null
+      }
+    }
+
+    return [pscustomobject]@{
+      exists = $true
+      accessible = $true
+      path = (Get-NormalizedPath $fileName)
+    }
+  } finally {
+    $candidate.Dispose()
+  }
+}
+
 function Test-InstalledAppRunning {
   param([Parameter(Mandatory = $true)][string]$ExecutablePath)
 
@@ -133,43 +181,68 @@ function Test-InstalledAppRunning {
   }
 
   $targetPath = Get-NormalizedPath $ExecutablePath
+  $cimFailed = $false
 
   try {
     $processes = Get-CimInstance Win32_Process -Filter "Name = 'Subtitle Bridge.exe'" -ErrorAction Stop
+  } catch {
+    $cimFailed = $true
+    $processes = @()
+  }
+
+  if (-not $cimFailed) {
     foreach ($process in $processes) {
-      if (-not $process.ExecutablePath) {
-        continue
+      $runningPath = [string]$process.ExecutablePath
+      if ($env:SUBTITLE_BRIDGE_TEST_FORCE_CIM_PATH_MISSING -eq '1') {
+        $runningPath = $null
       }
 
-      $runningPath = Get-NormalizedPath $process.ExecutablePath
+      if ([string]::IsNullOrWhiteSpace($runningPath)) {
+        $pathState = Get-ProcessPathState -ProcessId ([int]$process.ProcessId)
+        if (-not $pathState.exists) {
+          continue
+        }
+        if (-not $pathState.accessible) {
+          throw 'A running Subtitle Bridge.exe process could not be inspected. Close all Subtitle Bridge processes and retry setup.'
+        }
+
+        $runningPath = [string]$pathState.path
+      } else {
+        $runningPath = Get-NormalizedPath $runningPath
+      }
+
       if ($runningPath.Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
         return $true
       }
     }
-  } catch {
-    try {
-      $processes = Get-Process -Name 'Subtitle Bridge' -ErrorAction SilentlyContinue
-      foreach ($process in $processes) {
-        if (-not $process.MainModule -or -not $process.MainModule.FileName) {
-          continue
-        }
 
-        $runningPath = Get-NormalizedPath $process.MainModule.FileName
-        if ($runningPath.Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
-          return $true
-        }
-      }
-    } catch {
-      # The same-volume directory swap below still fails safely if Windows keeps a runtime file locked.
+    return $false
+  }
+
+  $fallbackProcesses = Get-Process -Name 'Subtitle Bridge' -ErrorAction SilentlyContinue
+  foreach ($process in $fallbackProcesses) {
+    $pathState = Get-ProcessPathState -ProcessId ([int]$process.Id)
+    if (-not $pathState.exists) {
+      continue
+    }
+    if (-not $pathState.accessible) {
+      throw 'A running Subtitle Bridge.exe process could not be inspected. Close all Subtitle Bridge processes and retry setup.'
+    }
+
+    if ([string]$pathState.path -and
+        ([string]$pathState.path).Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+      return $true
     }
   }
 
   return $false
 }
 
-function Wait-ForProcessExit {
+function Wait-ForMatchingProcessExit {
   param(
     [Parameter(Mandatory = $true)][int]$ProcessId,
+    [Parameter(Mandatory = $true)][string]$ExpectedExecutablePath,
+    [Parameter(Mandatory = $true)][long]$ExpectedStartedAtUnixMs,
     [int]$TimeoutMilliseconds = 30000
   )
 
@@ -184,6 +257,36 @@ function Wait-ForProcessExit {
   }
 
   try {
+    try {
+      $actualExecutablePath = Get-NormalizedPath $process.MainModule.FileName
+      $actualStartedAtUnixMs = [System.DateTimeOffset]::new(
+        $process.StartTime.ToUniversalTime()
+      ).ToUnixTimeMilliseconds()
+    } catch [System.ComponentModel.Win32Exception] {
+      # The PID exists, but its identity cannot be verified. Do not wait on an arbitrary
+      # recycled/inaccessible process; the installed-app check below remains authoritative.
+      return
+    } catch [System.InvalidOperationException] {
+      # The original process exited while setup was checking its identity.
+      return
+    }
+
+    $expectedPath = Get-NormalizedPath $ExpectedExecutablePath
+    if (-not $actualExecutablePath.Equals(
+        $expectedPath,
+        [System.StringComparison]::OrdinalIgnoreCase
+      )) {
+      return
+    }
+
+    # Node's performance.timeOrigin is captured during startup and can be slightly later than
+    # the Win32 process creation timestamp. Five seconds safely covers that initialization
+    # skew while still distinguishing a recycled process. If the same executable is relaunched
+    # inside that tiny window, waiting for it is also safe because it would lock this install.
+    if ([Math]::Abs($actualStartedAtUnixMs - $ExpectedStartedAtUnixMs) -gt 5000) {
+      return
+    }
+
     if (-not $process.WaitForExit($TimeoutMilliseconds)) {
       throw 'Timed out waiting for the running Subtitle Bridge process to exit before upgrading.'
     }
@@ -712,17 +815,49 @@ New-Item -ItemType Directory -Path $InstallParent -Force | Out-Null
 
 $ExistingExePath = Join-Path $InstallDir 'Subtitle Bridge.exe'
 $UpdateParentPidRaw = $env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID
-if (-not [string]::IsNullOrWhiteSpace($UpdateParentPidRaw)) {
+$UpdateParentExeRaw = $env:SUBTITLE_BRIDGE_UPDATE_PARENT_EXE
+$UpdateParentStartedAtRaw = $env:SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS
+$hasUpdateParentIdentity = (
+  -not [string]::IsNullOrWhiteSpace($UpdateParentPidRaw) -or
+  -not [string]::IsNullOrWhiteSpace($UpdateParentExeRaw) -or
+  -not [string]::IsNullOrWhiteSpace($UpdateParentStartedAtRaw)
+)
+
+if ($hasUpdateParentIdentity) {
+  if ([string]::IsNullOrWhiteSpace($UpdateParentPidRaw) -or
+      [string]::IsNullOrWhiteSpace($UpdateParentExeRaw) -or
+      [string]::IsNullOrWhiteSpace($UpdateParentStartedAtRaw)) {
+    throw 'The updater parent process identity is incomplete.'
+  }
+
   $updateParentPid = 0
   if (-not [int]::TryParse($UpdateParentPidRaw, [ref]$updateParentPid) -or $updateParentPid -le 0) {
     throw 'SUBTITLE_BRIDGE_UPDATE_PARENT_PID must contain a valid process ID.'
   }
 
-  Wait-ForProcessExit -ProcessId $updateParentPid
+  $updateParentStartedAtMs = [long]0
+  if (-not [long]::TryParse($UpdateParentStartedAtRaw, [ref]$updateParentStartedAtMs) -or
+      $updateParentStartedAtMs -le 0) {
+    throw 'SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS must contain a valid process start time.'
+  }
+
+  $updateParentExecutablePath = Get-NormalizedPath $UpdateParentExeRaw
+  $normalizedExistingExePath = Get-NormalizedPath $ExistingExePath
+  if (-not $updateParentExecutablePath.Equals(
+      $normalizedExistingExePath,
+      [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'The updater parent executable does not match the Subtitle Bridge install target.'
+  }
+
+  Wait-ForMatchingProcessExit `
+    -ProcessId $updateParentPid `
+    -ExpectedExecutablePath $updateParentExecutablePath `
+    -ExpectedStartedAtUnixMs $updateParentStartedAtMs
 }
 
-# Older updater builds do not pass SUBTITLE_BRIDGE_UPDATE_PARENT_PID. Give any running
-# installed process a bounded grace period to finish the shutdown that follows installer launch.
+# Older updater builds do not pass the full parent identity. Give any running installed
+# process a bounded grace period to finish the shutdown that follows installer launch.
 if (Test-InstalledAppRunning -ExecutablePath $ExistingExePath) {
   Wait-ForInstalledAppShutdown -ExecutablePath $ExistingExePath
 }
