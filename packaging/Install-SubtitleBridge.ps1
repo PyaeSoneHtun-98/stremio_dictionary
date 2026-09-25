@@ -167,6 +167,69 @@ function Test-InstalledAppRunning {
   return $false
 }
 
+function Wait-ForProcessExit {
+  param(
+    [Parameter(Mandatory = $true)][int]$ProcessId,
+    [int]$TimeoutMilliseconds = 30000
+  )
+
+  if ($ProcessId -le 0 -or $ProcessId -eq $PID) {
+    throw 'The updater parent process ID is invalid.'
+  }
+
+  try {
+    $process = [System.Diagnostics.Process]::GetProcessById($ProcessId)
+  } catch [System.ArgumentException] {
+    return
+  }
+
+  try {
+    if (-not $process.WaitForExit($TimeoutMilliseconds)) {
+      throw 'Timed out waiting for the running Subtitle Bridge process to exit before upgrading.'
+    }
+  } finally {
+    $process.Dispose()
+  }
+}
+
+function Wait-ForInstalledAppShutdown {
+  param(
+    [Parameter(Mandatory = $true)][string]$ExecutablePath,
+    [int]$TimeoutMilliseconds = 10000
+  )
+
+  $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+  while (Test-InstalledAppRunning -ExecutablePath $ExecutablePath) {
+    if ($stopwatch.ElapsedMilliseconds -ge $TimeoutMilliseconds) {
+      throw 'Subtitle Bridge did not finish shutting down before the upgrade timeout.'
+    }
+
+    Start-Sleep -Milliseconds 100
+  }
+}
+
+function Move-ItemWithRetry {
+  param(
+    [Parameter(Mandatory = $true)][string]$Source,
+    [Parameter(Mandatory = $true)][string]$Destination,
+    [int]$MaxAttempts = 24,
+    [int]$DelayMilliseconds = 250
+  )
+
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt += 1) {
+    try {
+      Move-Item -LiteralPath $Source -Destination $Destination -ErrorAction Stop
+      return
+    } catch {
+      if ($attempt -ge $MaxAttempts) {
+        throw
+      }
+
+      Start-Sleep -Milliseconds $DelayMilliseconds
+    }
+  }
+}
+
 function Get-PathToken {
   param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -639,6 +702,17 @@ if ([string]::IsNullOrWhiteSpace($InstallParent)) {
 New-Item -ItemType Directory -Path $InstallParent -Force | Out-Null
 
 $ExistingExePath = Join-Path $InstallDir 'Subtitle Bridge.exe'
+$UpdateParentPidRaw = $env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID
+if (-not [string]::IsNullOrWhiteSpace($UpdateParentPidRaw)) {
+  $updateParentPid = 0
+  if (-not [int]::TryParse($UpdateParentPidRaw, [ref]$updateParentPid) -or $updateParentPid -le 0) {
+    throw 'SUBTITLE_BRIDGE_UPDATE_PARENT_PID must contain a valid process ID.'
+  }
+
+  Wait-ForProcessExit -ProcessId $updateParentPid
+  Wait-ForInstalledAppShutdown -ExecutablePath $ExistingExePath
+}
+
 if (Test-InstalledAppRunning -ExecutablePath $ExistingExePath) {
   throw 'Subtitle Bridge is currently running from the install directory. Close it before upgrading.'
 }
@@ -751,7 +825,7 @@ try {
 
   try {
     if ($hadPreviousInstall) {
-      Move-Item -LiteralPath $InstallDir -Destination $BackupDir -ErrorAction Stop
+      Move-ItemWithRetry -Source $InstallDir -Destination $BackupDir
       Set-TransactionPhase -MarkerPath $TransactionMarkerPath -Phase 'backup-moved'
 
       if ($env:SUBTITLE_BRIDGE_TEST_FORCE_SWAP_TERMINATION -eq '1') {
