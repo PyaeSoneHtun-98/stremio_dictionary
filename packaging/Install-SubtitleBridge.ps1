@@ -208,7 +208,7 @@ function Wait-ForInstalledAppShutdown {
   }
 }
 
-function Move-ItemWithRetry {
+function Move-DirectoryWithRetry {
   param(
     [Parameter(Mandatory = $true)][string]$Source,
     [Parameter(Mandatory = $true)][string]$Destination,
@@ -218,11 +218,20 @@ function Move-ItemWithRetry {
 
   for ($attempt = 1; $attempt -le $MaxAttempts; $attempt += 1) {
     try {
-      Move-Item -LiteralPath $Source -Destination $Destination -ErrorAction Stop
+      # Source and destination are sibling paths under the same install parent.
+      # Directory.Move performs a rename rather than PowerShell's potentially
+      # recursive Move-Item behavior, so a lock failure cannot leave a partial backup.
+      [System.IO.Directory]::Move($Source, $Destination)
       return
     } catch {
-      if ($attempt -ge $MaxAttempts) {
-        throw
+      $moveError = $_
+
+      # A transient lock must leave the source intact and destination absent. If either
+      # invariant is false, do not retry because transaction state may have changed.
+      if ((Test-Path -LiteralPath $Destination) -or
+          -not (Test-Path -LiteralPath $Source -PathType Container) -or
+          $attempt -ge $MaxAttempts) {
+        throw $moveError
       }
 
       Start-Sleep -Milliseconds $DelayMilliseconds
@@ -830,7 +839,7 @@ try {
 
   try {
     if ($hadPreviousInstall) {
-      Move-ItemWithRetry -Source $InstallDir -Destination $BackupDir
+      Move-DirectoryWithRetry -Source $InstallDir -Destination $BackupDir
       Set-TransactionPhase -MarkerPath $TransactionMarkerPath -Phase 'backup-moved'
 
       if ($env:SUBTITLE_BRIDGE_TEST_FORCE_SWAP_TERMINATION -eq '1') {
