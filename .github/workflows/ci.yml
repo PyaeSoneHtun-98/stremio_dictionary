@@ -59,6 +59,135 @@ jobs:
             }
           }
 
+      - name: Verify Windows process isolation policy
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installerPath = 'packaging\Install-SubtitleBridge.ps1'
+          $source = Get-Content -LiteralPath $installerPath -Raw
+          $tokens = $null
+          $parseErrors = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseInput(
+            $source,
+            [ref]$tokens,
+            [ref]$parseErrors
+          )
+          if ($parseErrors.Count -ne 0) {
+            throw 'Could not parse installer functions for process-isolation tests.'
+          }
+
+          $functionNames = @(
+            'Get-NormalizedPath',
+            'Initialize-LimitedProcessQuery',
+            'Get-LimitedProcessExecutablePath',
+            'Get-ProcessOwnerSid',
+            'Get-CurrentWindowsSid',
+            'Get-CurrentLocalAppDataPath',
+            'Test-PathHasReparsePointAncestor',
+            'Test-IsStandardPrivateInstallTarget',
+            'Test-CanIgnoreInaccessibleProcess'
+          )
+
+          foreach ($name in $functionNames) {
+            $functionAst = $ast.Find(
+              {
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $node.Name -eq $name
+              },
+              $true
+            )
+            if ($null -eq $functionAst) {
+              throw "Missing installer function required by process-isolation tests: $name"
+            }
+
+            . ([scriptblock]::Create($functionAst.Extent.Text))
+          }
+
+          $limitedPath = Get-LimitedProcessExecutablePath -ProcessId $PID
+          if ([string]::IsNullOrWhiteSpace($limitedPath)) {
+            throw 'PROCESS_QUERY_LIMITED_INFORMATION could not resolve the current process path.'
+          }
+
+          $currentSid = Get-CurrentWindowsSid
+          $processSid = Get-ProcessOwnerSid -ProcessId $PID
+          if ([string]::IsNullOrWhiteSpace($currentSid) -or
+              [string]::IsNullOrWhiteSpace($processSid) -or
+              $currentSid -ne $processSid) {
+            throw 'GetOwnerSid did not resolve the current process to the current Windows SID.'
+          }
+
+          $otherSid = if ($currentSid -eq 'S-1-5-18') { 'S-1-5-19' } else { 'S-1-5-18' }
+          $policyRoot = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeProcessPolicy'
+          $privateRoot = Join-Path $policyRoot 'LocalAppData'
+          $programsDir = Join-Path $privateRoot 'Programs'
+          $standardInstallDir = Join-Path $programsDir 'Subtitle Bridge'
+          $standardTarget = Join-Path $standardInstallDir 'Subtitle Bridge.exe'
+          $customTarget = Join-Path $privateRoot 'Custom\Subtitle Bridge.exe'
+          $sharedTarget = Join-Path $policyRoot 'Shared\Subtitle Bridge.exe'
+
+          Remove-Item -LiteralPath $policyRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $standardInstallDir -Force | Out-Null
+          New-Item -ItemType Directory -Path (Split-Path -Parent $customTarget) -Force | Out-Null
+          New-Item -ItemType Directory -Path (Split-Path -Parent $sharedTarget) -Force | Out-Null
+          Set-Content -LiteralPath $standardTarget -Value 'fixture' -Encoding ASCII
+          Set-Content -LiteralPath $customTarget -Value 'fixture' -Encoding ASCII
+          Set-Content -LiteralPath $sharedTarget -Value 'fixture' -Encoding ASCII
+
+          if (-not (Test-CanIgnoreInaccessibleProcess -ExecutablePath $standardTarget -ProcessOwnerSid $otherSid -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot)) {
+            throw 'A different SID should be excludable only for the exact standard private install target.'
+          }
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $standardTarget -ProcessOwnerSid $currentSid -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'The current SID must never be excluded from the running-process check.'
+          }
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $standardTarget -ProcessOwnerSid '' -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'An unknown process SID must remain fail-closed.'
+          }
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $standardTarget -ProcessOwnerSid 'not-a-sid' -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'An invalid process SID must remain fail-closed.'
+          }
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $customTarget -ProcessOwnerSid $otherSid -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'A custom descendant of LOCALAPPDATA must remain fail-closed.'
+          }
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $sharedTarget -ProcessOwnerSid $otherSid -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'A shared/custom target must remain fail-closed.'
+          }
+
+          Remove-Item -LiteralPath $standardInstallDir -Recurse -Force
+          $junctionTarget = Join-Path $policyRoot 'JunctionSharedTarget'
+          New-Item -ItemType Directory -Path $junctionTarget -Force | Out-Null
+          Set-Content -LiteralPath (Join-Path $junctionTarget 'Subtitle Bridge.exe') -Value 'fixture' -Encoding ASCII
+          New-Item -ItemType Junction -Path $standardInstallDir -Target $junctionTarget | Out-Null
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $standardTarget -ProcessOwnerSid $otherSid -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'A junction at the standard install path must remain fail-closed.'
+          }
+
+          # A reparse point above LocalApplicationData must also block the exemption.
+          # Descendants reached through a junction do not themselves carry the reparse bit.
+          Remove-Item -LiteralPath $policyRoot -Recurse -Force -ErrorAction SilentlyContinue
+          $realProfileRoot = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeProcessPolicyRealProfile'
+          Remove-Item -LiteralPath $realProfileRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path (Join-Path $realProfileRoot 'AppData\Local\Programs\Subtitle Bridge') -Force | Out-Null
+          Set-Content -LiteralPath (Join-Path $realProfileRoot 'AppData\Local\Programs\Subtitle Bridge\Subtitle Bridge.exe') -Value 'fixture' -Encoding ASCII
+
+          New-Item -ItemType Directory -Path $policyRoot -Force | Out-Null
+          $linkedProfileRoot = Join-Path $policyRoot 'ProfileLink'
+          New-Item -ItemType Junction -Path $linkedProfileRoot -Target $realProfileRoot | Out-Null
+          $linkedLocalAppData = Join-Path $linkedProfileRoot 'AppData\Local'
+          $linkedStandardTarget = Join-Path $linkedLocalAppData 'Programs\Subtitle Bridge\Subtitle Bridge.exe'
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $linkedStandardTarget -ProcessOwnerSid $otherSid -CurrentOwnerSid $currentSid -LocalAppDataPath $linkedLocalAppData) {
+            throw 'A junction above LocalApplicationData must remain fail-closed.'
+          }
+
+          Remove-Item -LiteralPath $policyRoot -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $realProfileRoot -Recurse -Force -ErrorAction SilentlyContinue
       - name: Verify live public runtime assets
         shell: pwsh
         run: |
@@ -281,6 +410,154 @@ jobs:
           }
           if (-not (Test-Path -LiteralPath (Join-Path $runtimeCacheDir '.subtitle-bridge-runtime-cache.json') -PathType Leaf)) {
             throw 'Runtime provisioning did not create the cache ownership marker.'
+          }
+
+          # Backward compatibility: older updater builds do not pass process identity.
+          # Also force the CIM ExecutablePath to look unavailable so the per-process
+          # MainModule fallback is exercised instead of silently skipping the running app.
+          $installedExe = Join-Path $installDir 'Subtitle Bridge.exe'
+          $packagedExe = Join-Path $packageDir 'Subtitle Bridge.exe'
+          $windowsPowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
+          Copy-Item -LiteralPath $windowsPowerShell -Destination $installedExe -Force
+          $legacyUpdaterProcess = Start-Process $installedExe -ArgumentList @(
+            '-NoProfile',
+            '-Command',
+            'Start-Sleep -Milliseconds 1400'
+          ) -WindowStyle Hidden -PassThru
+
+          $env:SUBTITLE_BRIDGE_TEST_FORCE_CIM_PATH_MISSING = '1'
+          try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+            $legacyHandoffExitCode = $LASTEXITCODE
+          } finally {
+            Remove-Item Env:SUBTITLE_BRIDGE_TEST_FORCE_CIM_PATH_MISSING -ErrorAction SilentlyContinue
+          }
+          $global:LASTEXITCODE = 0
+          $legacyUpdaterProcess.WaitForExit()
+          $legacyUpdaterProcess.Dispose()
+
+          if ($legacyHandoffExitCode -ne 0) {
+            throw 'Installer failed the backward-compatible no-parent-identity shutdown regression.'
+          }
+          if ((Get-FileHash -LiteralPath $installedExe -Algorithm SHA256).Hash -ne
+              (Get-FileHash -LiteralPath $packagedExe -Algorithm SHA256).Hash) {
+            throw 'Backward-compatible shutdown regression did not restore the packaged app executable.'
+          }
+
+          # PID reuse regression: if the old app exits before setup checks the handoff and
+          # Windows gives that PID to another executable, setup must not wait on the unrelated
+          # process. The expected executable remains Subtitle Bridge, but the live PID belongs
+          # to powershell.exe.
+          $recycledPidProcess = Start-Process powershell.exe -ArgumentList @(
+            '-NoProfile',
+            '-Command',
+            'Start-Sleep -Seconds 60'
+          ) -WindowStyle Hidden -PassThru
+          $recycledPidStartedAtMs = [System.DateTimeOffset]::new(
+            $recycledPidProcess.StartTime.ToUniversalTime()
+          ).ToUnixTimeMilliseconds()
+
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID = [string]$recycledPidProcess.Id
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_EXE = $installedExe
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS = [string]$recycledPidStartedAtMs
+          try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+            $recycledPidExitCode = $LASTEXITCODE
+          } finally {
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_EXE -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS -ErrorAction SilentlyContinue
+          }
+          $global:LASTEXITCODE = 0
+
+          if ($recycledPidExitCode -ne 0) {
+            Stop-Process -Id $recycledPidProcess.Id -Force -ErrorAction SilentlyContinue
+            $recycledPidProcess.Dispose()
+            throw 'Installer treated a recycled unrelated PID as the updater parent.'
+          }
+          if ($recycledPidProcess.HasExited) {
+            $recycledPidProcess.Dispose()
+            throw 'PID-reuse regression process exited before setup proved it was ignored.'
+          }
+          Stop-Process -Id $recycledPidProcess.Id -Force
+          $recycledPidProcess.WaitForExit()
+          $recycledPidProcess.Dispose()
+
+          # In-app update regression: setup starts while Subtitle Bridge is still alive.
+          # The full PID + executable path + creation-time identity must match before setup
+          # waits for it. A second short-lived process then keeps an install file locked to
+          # prove the atomic directory rename retries safely after the app has exited.
+          $handoffParentSignal = Join-Path $env:RUNNER_TEMP 'subtitle-bridge-updater-parent.locked'
+          $transientLockSignal = Join-Path $env:RUNNER_TEMP 'subtitle-bridge-transient-lock.locked'
+          Remove-Item -LiteralPath $handoffParentSignal -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $transientLockSignal -Force -ErrorAction SilentlyContinue
+
+          Copy-Item -LiteralPath $windowsPowerShell -Destination $installedExe -Force
+          $parentLockPath = (Join-Path $installDir 'resources\app\package.json').Replace("'", "''")
+          $parentSignalPath = $handoffParentSignal.Replace("'", "''")
+          $parentLockScript = @"
+          `$stream = [System.IO.File]::Open('$parentLockPath', [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
+          [System.IO.File]::WriteAllText('$parentSignalPath', 'locked')
+          try { Start-Sleep -Milliseconds 1200 } finally { `$stream.Dispose() }
+          "@
+          $parentLockEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($parentLockScript))
+          $updaterParent = Start-Process $installedExe -ArgumentList @(
+            '-NoProfile',
+            '-EncodedCommand',
+            $parentLockEncoded
+          ) -WindowStyle Hidden -PassThru
+
+          $transientLockPath = (Join-Path $installDir 'resources\app\out\main\index.js').Replace("'", "''")
+          $transientSignalPath = $transientLockSignal.Replace("'", "''")
+          $transientLockScript = @"
+          `$stream = [System.IO.File]::Open('$transientLockPath', [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None)
+          [System.IO.File]::WriteAllText('$transientSignalPath', 'locked')
+          try { Start-Sleep -Milliseconds 2800 } finally { `$stream.Dispose() }
+          "@
+          $transientLockEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($transientLockScript))
+          $transientLocker = Start-Process powershell.exe -ArgumentList @(
+            '-NoProfile',
+            '-EncodedCommand',
+            $transientLockEncoded
+          ) -WindowStyle Hidden -PassThru
+
+          $lockDeadline = (Get-Date).AddSeconds(10)
+          while ((-not (Test-Path -LiteralPath $handoffParentSignal)) -or
+                 (-not (Test-Path -LiteralPath $transientLockSignal))) {
+            if ((Get-Date) -ge $lockDeadline) {
+              throw 'Could not establish updater shutdown-race fixtures.'
+            }
+            Start-Sleep -Milliseconds 100
+          }
+
+          $updaterParentStartedAtMs = [System.DateTimeOffset]::new(
+            $updaterParent.StartTime.ToUniversalTime()
+          ).ToUnixTimeMilliseconds()
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID = [string]$updaterParent.Id
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_EXE = $installedExe
+          $env:SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS = [string]$updaterParentStartedAtMs
+          try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+            $handoffUpgradeExitCode = $LASTEXITCODE
+          } finally {
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_EXE -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS -ErrorAction SilentlyContinue
+          }
+          $global:LASTEXITCODE = 0
+
+          $updaterParent.WaitForExit()
+          $transientLocker.WaitForExit()
+          $updaterParent.Dispose()
+          $transientLocker.Dispose()
+          Remove-Item -LiteralPath $handoffParentSignal -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $transientLockSignal -Force -ErrorAction SilentlyContinue
+
+          if ($handoffUpgradeExitCode -ne 0) {
+            throw 'Installer failed the verified-parent/transient-lock regression.'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $installDir 'Subtitle Bridge.exe') -PathType Leaf)) {
+            throw 'Updater shutdown-race regression did not leave a working installation.'
           }
 
           # A tampered transaction marker must never turn the install parent into a recursive-delete target.

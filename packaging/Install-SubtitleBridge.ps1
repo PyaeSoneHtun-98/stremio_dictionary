@@ -125,6 +125,316 @@ function Assert-OwnedInstallDirectory {
   throw "Refusing to replace a non-empty directory without a Subtitle Bridge ownership marker: $Directory"
 }
 
+function Initialize-LimitedProcessQuery {
+  if ('SubtitleBridgeProcessQuery.NativeMethods' -as [type]) {
+    return
+  }
+
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+namespace SubtitleBridgeProcessQuery
+{
+    public static class NativeMethods
+    {
+        public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern IntPtr OpenProcess(
+            uint dwDesiredAccess,
+            bool bInheritHandle,
+            int dwProcessId
+        );
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool QueryFullProcessImageName(
+            IntPtr hProcess,
+            int dwFlags,
+            StringBuilder lpExeName,
+            ref int lpdwSize
+        );
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool CloseHandle(IntPtr hObject);
+    }
+}
+'@
+}
+
+function Get-LimitedProcessExecutablePath {
+  param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+  Initialize-LimitedProcessQuery
+
+  $handle = [SubtitleBridgeProcessQuery.NativeMethods]::OpenProcess(
+    [SubtitleBridgeProcessQuery.NativeMethods]::PROCESS_QUERY_LIMITED_INFORMATION,
+    $false,
+    $ProcessId
+  )
+
+  if ($handle -eq [IntPtr]::Zero) {
+    return $null
+  }
+
+  try {
+    $capacity = 32768
+    $buffer = New-Object System.Text.StringBuilder $capacity
+    if (-not [SubtitleBridgeProcessQuery.NativeMethods]::QueryFullProcessImageName(
+        $handle,
+        0,
+        $buffer,
+        [ref]$capacity
+      )) {
+      return $null
+    }
+
+    if ($buffer.Length -eq 0) {
+      return $null
+    }
+
+    return Get-NormalizedPath $buffer.ToString()
+  } finally {
+    [void][SubtitleBridgeProcessQuery.NativeMethods]::CloseHandle($handle)
+  }
+}
+
+function Get-ProcessOwnerSid {
+  param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+  try {
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction Stop
+    if ($null -eq $process) {
+      return $null
+    }
+
+    $ownerSid = Invoke-CimMethod -InputObject $process -MethodName GetOwnerSid -ErrorAction Stop
+    if ($null -eq $ownerSid -or [int]$ownerSid.ReturnValue -ne 0 -or
+        [string]::IsNullOrWhiteSpace([string]$ownerSid.Sid)) {
+      return $null
+    }
+
+    return [string]$ownerSid.Sid
+  } catch {
+    return $null
+  }
+}
+
+function Get-CurrentWindowsSid {
+  try {
+    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    if ($null -eq $identity -or $null -eq $identity.User) {
+      return $null
+    }
+
+    return [string]$identity.User.Value
+  } catch {
+    return $null
+  }
+}
+
+function Get-CurrentLocalAppDataPath {
+  try {
+    $path = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    if ([string]::IsNullOrWhiteSpace($path)) {
+      return $null
+    }
+
+    return Get-NormalizedPath $path
+  } catch {
+    return $null
+  }
+}
+
+function Test-PathHasReparsePointAncestor {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  try {
+    $currentPath = [System.IO.Path]::GetFullPath($Path)
+
+    while (-not [string]::IsNullOrWhiteSpace($currentPath)) {
+      if (-not (Test-Path -LiteralPath $currentPath)) {
+        return $true
+      }
+
+      $item = Get-Item -LiteralPath $currentPath -Force -ErrorAction Stop
+      if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        return $true
+      }
+
+      $parent = [System.IO.Directory]::GetParent($currentPath)
+      if ($null -eq $parent) {
+        break
+      }
+
+      $currentPath = $parent.FullName
+    }
+
+    return $false
+  } catch {
+    # Any path we cannot inspect completely must keep the cross-user exemption fail-closed.
+    return $true
+  }
+}
+
+function Test-IsStandardPrivateInstallTarget {
+  param(
+    [Parameter(Mandatory = $true)][string]$ExecutablePath,
+    [string]$LocalAppDataPath = (Get-CurrentLocalAppDataPath)
+  )
+
+  if ([string]::IsNullOrWhiteSpace($LocalAppDataPath)) {
+    return $false
+  }
+
+  try {
+    $localAppData = Get-NormalizedPath $LocalAppDataPath
+    $programsDir = Join-Path $localAppData 'Programs'
+    $standardInstallDir = Join-Path $programsDir 'Subtitle Bridge'
+    $standardExecutable = Join-Path $standardInstallDir 'Subtitle Bridge.exe'
+    $targetExecutable = Get-NormalizedPath $ExecutablePath
+
+    if (-not $targetExecutable.Equals(
+        (Get-NormalizedPath $standardExecutable),
+        [System.StringComparison]::OrdinalIgnoreCase
+      )) {
+      return $false
+    }
+
+    # The exemption is only safe when the exact standard path is physically reached
+    # without crossing a junction, symlink, mount point, or other reparse point. Check the
+    # executable itself and every ancestor to the volume root, including components above
+    # LocalApplicationData such as the user profile and AppData directories.
+    if (Test-PathHasReparsePointAncestor -Path $standardExecutable) {
+      return $false
+    }
+
+    return $true
+  } catch {
+    return $false
+  }
+}
+
+function Test-CanIgnoreInaccessibleProcess {
+  param(
+    [Parameter(Mandatory = $true)][string]$ExecutablePath,
+    [string]$ProcessOwnerSid,
+    [string]$CurrentOwnerSid = (Get-CurrentWindowsSid),
+    [string]$LocalAppDataPath = (Get-CurrentLocalAppDataPath)
+  )
+
+  if ([string]::IsNullOrWhiteSpace($ProcessOwnerSid) -or
+      [string]::IsNullOrWhiteSpace($CurrentOwnerSid)) {
+    return $false
+  }
+
+  try {
+    $processSid = [System.Security.Principal.SecurityIdentifier]::new($ProcessOwnerSid)
+    $currentSid = [System.Security.Principal.SecurityIdentifier]::new($CurrentOwnerSid)
+  } catch {
+    return $false
+  }
+
+  if ($processSid.Equals($currentSid)) {
+    return $false
+  }
+
+  return Test-IsStandardPrivateInstallTarget -ExecutablePath $ExecutablePath -LocalAppDataPath $LocalAppDataPath
+}
+function Get-ProcessPathState {
+  param([Parameter(Mandatory = $true)][int]$ProcessId)
+
+  try {
+    $probe = [System.Diagnostics.Process]::GetProcessById($ProcessId)
+    $probe.Dispose()
+  } catch [System.ArgumentException] {
+    return [pscustomobject]@{
+      exists = $false
+      accessible = $true
+      path = $null
+    }
+  }
+
+  $limitedPath = Get-LimitedProcessExecutablePath -ProcessId $ProcessId
+  if (-not [string]::IsNullOrWhiteSpace($limitedPath)) {
+    return [pscustomobject]@{
+      exists = $true
+      accessible = $true
+      path = $limitedPath
+    }
+  }
+
+  try {
+    $candidate = [System.Diagnostics.Process]::GetProcessById($ProcessId)
+  } catch [System.ArgumentException] {
+    return [pscustomobject]@{
+      exists = $false
+      accessible = $true
+      path = $null
+    }
+  }
+
+  try {
+    try {
+      $fileName = $candidate.MainModule.FileName
+    } catch [System.ComponentModel.Win32Exception] {
+      return [pscustomobject]@{
+        exists = $true
+        accessible = $false
+        path = $null
+      }
+    } catch [System.InvalidOperationException] {
+      return [pscustomobject]@{
+        exists = $false
+        accessible = $true
+        path = $null
+      }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($fileName)) {
+      return [pscustomobject]@{
+        exists = $true
+        accessible = $false
+        path = $null
+      }
+    }
+
+    return [pscustomobject]@{
+      exists = $true
+      accessible = $true
+      path = (Get-NormalizedPath $fileName)
+    }
+  } finally {
+    $candidate.Dispose()
+  }
+}
+
+function Resolve-RunningProcessPath {
+  param(
+    [Parameter(Mandatory = $true)][int]$ProcessId,
+    [Parameter(Mandatory = $true)][string]$TargetExecutablePath
+  )
+
+  $pathState = Get-ProcessPathState -ProcessId $ProcessId
+  if (-not $pathState.exists) {
+    return $null
+  }
+
+  if ($pathState.accessible) {
+    return [string]$pathState.path
+  }
+
+  $ownerSid = Get-ProcessOwnerSid -ProcessId $ProcessId
+  if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $TargetExecutablePath -ProcessOwnerSid $ownerSid) {
+    return $null
+  }
+
+  throw 'A running Subtitle Bridge.exe process could not be inspected safely. Close all Subtitle Bridge processes for this Windows user and retry setup.'
+}
+
 function Test-InstalledAppRunning {
   param([Parameter(Mandatory = $true)][string]$ExecutablePath)
 
@@ -133,38 +443,158 @@ function Test-InstalledAppRunning {
   }
 
   $targetPath = Get-NormalizedPath $ExecutablePath
+  $cimFailed = $false
 
   try {
     $processes = Get-CimInstance Win32_Process -Filter "Name = 'Subtitle Bridge.exe'" -ErrorAction Stop
+  } catch {
+    $cimFailed = $true
+    $processes = @()
+  }
+
+  if (-not $cimFailed) {
     foreach ($process in $processes) {
-      if (-not $process.ExecutablePath) {
-        continue
+      $runningPath = [string]$process.ExecutablePath
+      if ($env:SUBTITLE_BRIDGE_TEST_FORCE_CIM_PATH_MISSING -eq '1') {
+        $runningPath = $null
       }
 
-      $runningPath = Get-NormalizedPath $process.ExecutablePath
+      if ([string]::IsNullOrWhiteSpace($runningPath)) {
+        $runningPath = Resolve-RunningProcessPath -ProcessId ([int]$process.ProcessId) -TargetExecutablePath $targetPath
+
+        if ([string]::IsNullOrWhiteSpace($runningPath)) {
+          continue
+        }
+      } else {
+        $runningPath = Get-NormalizedPath $runningPath
+      }
+
       if ($runningPath.Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
         return $true
       }
     }
-  } catch {
-    try {
-      $processes = Get-Process -Name 'Subtitle Bridge' -ErrorAction SilentlyContinue
-      foreach ($process in $processes) {
-        if (-not $process.MainModule -or -not $process.MainModule.FileName) {
-          continue
-        }
 
-        $runningPath = Get-NormalizedPath $process.MainModule.FileName
-        if ($runningPath.Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
-          return $true
-        }
-      }
-    } catch {
-      # The same-volume directory swap below still fails safely if Windows keeps a runtime file locked.
+    return $false
+  }
+
+  $fallbackProcesses = Get-Process -Name 'Subtitle Bridge' -ErrorAction SilentlyContinue
+  foreach ($process in $fallbackProcesses) {
+    $runningPath = Resolve-RunningProcessPath -ProcessId ([int]$process.Id) -TargetExecutablePath $targetPath
+
+    if ([string]::IsNullOrWhiteSpace($runningPath)) {
+      continue
+    }
+
+    if ($runningPath.Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+      return $true
     }
   }
 
   return $false
+}
+
+function Wait-ForMatchingProcessExit {
+  param(
+    [Parameter(Mandatory = $true)][int]$ProcessId,
+    [Parameter(Mandatory = $true)][string]$ExpectedExecutablePath,
+    [Parameter(Mandatory = $true)][long]$ExpectedStartedAtUnixMs,
+    [int]$TimeoutMilliseconds = 30000
+  )
+
+  if ($ProcessId -le 0 -or $ProcessId -eq $PID) {
+    throw 'The updater parent process ID is invalid.'
+  }
+
+  try {
+    $process = [System.Diagnostics.Process]::GetProcessById($ProcessId)
+  } catch [System.ArgumentException] {
+    return
+  }
+
+  try {
+    try {
+      $actualExecutablePath = Get-NormalizedPath $process.MainModule.FileName
+      $actualStartedAtUnixMs = [System.DateTimeOffset]::new(
+        $process.StartTime.ToUniversalTime()
+      ).ToUnixTimeMilliseconds()
+    } catch [System.ComponentModel.Win32Exception] {
+      # The PID exists, but its identity cannot be verified. Do not wait on an arbitrary
+      # recycled/inaccessible process; the installed-app check below remains authoritative.
+      return
+    } catch [System.InvalidOperationException] {
+      # The original process exited while setup was checking its identity.
+      return
+    }
+
+    $expectedPath = Get-NormalizedPath $ExpectedExecutablePath
+    if (-not $actualExecutablePath.Equals(
+        $expectedPath,
+        [System.StringComparison]::OrdinalIgnoreCase
+      )) {
+      return
+    }
+
+    # Node's performance.timeOrigin is captured during startup and can be slightly later than
+    # the Win32 process creation timestamp. Five seconds safely covers that initialization
+    # skew while still distinguishing a recycled process. If the same executable is relaunched
+    # inside that tiny window, waiting for it is also safe because it would lock this install.
+    if ([Math]::Abs($actualStartedAtUnixMs - $ExpectedStartedAtUnixMs) -gt 5000) {
+      return
+    }
+
+    if (-not $process.WaitForExit($TimeoutMilliseconds)) {
+      throw 'Timed out waiting for the running Subtitle Bridge process to exit before upgrading.'
+    }
+  } finally {
+    $process.Dispose()
+  }
+}
+
+function Wait-ForInstalledAppShutdown {
+  param(
+    [Parameter(Mandatory = $true)][string]$ExecutablePath,
+    [int]$TimeoutMilliseconds = 10000
+  )
+
+  $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+  while (Test-InstalledAppRunning -ExecutablePath $ExecutablePath) {
+    if ($stopwatch.ElapsedMilliseconds -ge $TimeoutMilliseconds) {
+      throw 'Subtitle Bridge did not finish shutting down before the upgrade timeout.'
+    }
+
+    Start-Sleep -Milliseconds 100
+  }
+}
+
+function Move-DirectoryWithRetry {
+  param(
+    [Parameter(Mandatory = $true)][string]$Source,
+    [Parameter(Mandatory = $true)][string]$Destination,
+    [int]$MaxAttempts = 24,
+    [int]$DelayMilliseconds = 250
+  )
+
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt += 1) {
+    try {
+      # Source and destination are sibling paths under the same install parent.
+      # Directory.Move performs a rename rather than PowerShell's potentially
+      # recursive Move-Item behavior, so a lock failure cannot leave a partial backup.
+      [System.IO.Directory]::Move($Source, $Destination)
+      return
+    } catch {
+      $moveError = $_
+
+      # A transient lock must leave the source intact and destination absent. If either
+      # invariant is false, do not retry because transaction state may have changed.
+      if ((Test-Path -LiteralPath $Destination) -or
+          -not (Test-Path -LiteralPath $Source -PathType Container) -or
+          $attempt -ge $MaxAttempts) {
+        throw $moveError
+      }
+
+      Start-Sleep -Milliseconds $DelayMilliseconds
+    }
+  }
 }
 
 function Get-PathToken {
@@ -639,8 +1069,56 @@ if ([string]::IsNullOrWhiteSpace($InstallParent)) {
 New-Item -ItemType Directory -Path $InstallParent -Force | Out-Null
 
 $ExistingExePath = Join-Path $InstallDir 'Subtitle Bridge.exe'
+$UpdateParentPidRaw = $env:SUBTITLE_BRIDGE_UPDATE_PARENT_PID
+$UpdateParentExeRaw = $env:SUBTITLE_BRIDGE_UPDATE_PARENT_EXE
+$UpdateParentStartedAtRaw = $env:SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS
+$hasUpdateParentIdentity = (
+  -not [string]::IsNullOrWhiteSpace($UpdateParentPidRaw) -or
+  -not [string]::IsNullOrWhiteSpace($UpdateParentExeRaw) -or
+  -not [string]::IsNullOrWhiteSpace($UpdateParentStartedAtRaw)
+)
+
+if ($hasUpdateParentIdentity) {
+  if ([string]::IsNullOrWhiteSpace($UpdateParentPidRaw) -or
+      [string]::IsNullOrWhiteSpace($UpdateParentExeRaw) -or
+      [string]::IsNullOrWhiteSpace($UpdateParentStartedAtRaw)) {
+    throw 'The updater parent process identity is incomplete.'
+  }
+
+  $updateParentPid = 0
+  if (-not [int]::TryParse($UpdateParentPidRaw, [ref]$updateParentPid) -or $updateParentPid -le 0) {
+    throw 'SUBTITLE_BRIDGE_UPDATE_PARENT_PID must contain a valid process ID.'
+  }
+
+  $updateParentStartedAtMs = [long]0
+  if (-not [long]::TryParse($UpdateParentStartedAtRaw, [ref]$updateParentStartedAtMs) -or
+      $updateParentStartedAtMs -le 0) {
+    throw 'SUBTITLE_BRIDGE_UPDATE_PARENT_STARTED_AT_MS must contain a valid process start time.'
+  }
+
+  $updateParentExecutablePath = Get-NormalizedPath $UpdateParentExeRaw
+  $normalizedExistingExePath = Get-NormalizedPath $ExistingExePath
+  if (-not $updateParentExecutablePath.Equals(
+      $normalizedExistingExePath,
+      [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'The updater parent executable does not match the Subtitle Bridge install target.'
+  }
+
+  Wait-ForMatchingProcessExit `
+    -ProcessId $updateParentPid `
+    -ExpectedExecutablePath $updateParentExecutablePath `
+    -ExpectedStartedAtUnixMs $updateParentStartedAtMs
+}
+
+# Older updater builds do not pass the full parent identity. Give any running installed
+# process a bounded grace period to finish the shutdown that follows installer launch.
 if (Test-InstalledAppRunning -ExecutablePath $ExistingExePath) {
-  throw 'Subtitle Bridge is currently running from the install directory. Close it before upgrading.'
+  Wait-ForInstalledAppShutdown -ExecutablePath $ExistingExePath
+}
+
+if (Test-InstalledAppRunning -ExecutablePath $ExistingExePath) {
+  throw 'Subtitle Bridge is still running from the install directory after the upgrade wait. Close it and retry.'
 }
 
 $StartMenuDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
@@ -751,7 +1229,7 @@ try {
 
   try {
     if ($hadPreviousInstall) {
-      Move-Item -LiteralPath $InstallDir -Destination $BackupDir -ErrorAction Stop
+      Move-DirectoryWithRetry -Source $InstallDir -Destination $BackupDir
       Set-TransactionPhase -MarkerPath $TransactionMarkerPath -Phase 'backup-moved'
 
       if ($env:SUBTITLE_BRIDGE_TEST_FORCE_SWAP_TERMINATION -eq '1') {
