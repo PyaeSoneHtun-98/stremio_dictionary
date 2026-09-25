@@ -283,6 +283,32 @@ jobs:
             throw 'Runtime provisioning did not create the cache ownership marker.'
           }
 
+          # Backward compatibility: v1.0.3 and earlier updater-enabled feature builds do
+          # not pass a parent PID. A newly published setup must still tolerate the old app
+          # launching setup and then shutting down a moment later.
+          $installedExe = Join-Path $installDir 'Subtitle Bridge.exe'
+          $packagedExe = Join-Path $packageDir 'Subtitle Bridge.exe'
+          Copy-Item -LiteralPath (Join-Path $PSHOME 'powershell.exe') -Destination $installedExe -Force
+          $legacyUpdaterProcess = Start-Process $installedExe -ArgumentList @(
+            '-NoProfile',
+            '-Command',
+            'Start-Sleep -Milliseconds 1400'
+          ) -WindowStyle Hidden -PassThru
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+          $legacyHandoffExitCode = $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+          $legacyUpdaterProcess.WaitForExit()
+          $legacyUpdaterProcess.Dispose()
+
+          if ($legacyHandoffExitCode -ne 0) {
+            throw 'Installer failed the backward-compatible no-parent-PID shutdown regression.'
+          }
+          if ((Get-FileHash -LiteralPath $installedExe -Algorithm SHA256).Hash -ne
+              (Get-FileHash -LiteralPath $packagedExe -Algorithm SHA256).Hash) {
+            throw 'Backward-compatible shutdown regression did not restore the packaged app executable.'
+          }
+
           # In-app update regression: setup can be launched before the running app has
           # fully exited. Wait for the updater parent, then tolerate a short-lived descendant/
           # security-scanner style file lock before swapping the install directory.
