@@ -78,10 +78,12 @@ jobs:
 
           $functionNames = @(
             'Get-NormalizedPath',
-            'Test-IsSameOrChildPath',
             'Initialize-LimitedProcessQuery',
             'Get-LimitedProcessExecutablePath',
-            'Get-CurrentWindowsIdentity',
+            'Get-ProcessOwnerSid',
+            'Get-CurrentWindowsSid',
+            'Get-CurrentLocalAppDataPath',
+            'Test-IsStandardPrivateInstallTarget',
             'Test-CanIgnoreInaccessibleProcess'
           )
 
@@ -106,27 +108,66 @@ jobs:
             throw 'PROCESS_QUERY_LIMITED_INFORMATION could not resolve the current process path.'
           }
 
-          $currentOwner = 'CONTOSO\CurrentUser'
-          $otherOwner = 'CONTOSO\OtherUser'
-          $perUserTarget = Join-Path $env:LOCALAPPDATA 'Programs\Subtitle Bridge\Subtitle Bridge.exe'
-          $sharedTarget = 'C:\Program Files\Subtitle Bridge\Subtitle Bridge.exe'
-
-          if (-not (Test-CanIgnoreInaccessibleProcess -ExecutablePath $perUserTarget -ProcessOwnerIdentity $otherOwner -CurrentOwnerIdentity $currentOwner)) {
-            throw 'A different user should be excludable for a current-user LOCALAPPDATA install.'
+          $currentSid = Get-CurrentWindowsSid
+          $processSid = Get-ProcessOwnerSid -ProcessId $PID
+          if ([string]::IsNullOrWhiteSpace($currentSid) -or
+              [string]::IsNullOrWhiteSpace($processSid) -or
+              $currentSid -ne $processSid) {
+            throw 'GetOwnerSid did not resolve the current process to the current Windows SID.'
           }
 
-          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $perUserTarget -ProcessOwnerIdentity $currentOwner -CurrentOwnerIdentity $currentOwner) {
-            throw 'The current user must never be excluded from the running-process check.'
+          $otherSid = if ($currentSid -eq 'S-1-5-18') { 'S-1-5-19' } else { 'S-1-5-18' }
+          $policyRoot = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeProcessPolicy'
+          $privateRoot = Join-Path $policyRoot 'LocalAppData'
+          $programsDir = Join-Path $privateRoot 'Programs'
+          $standardInstallDir = Join-Path $programsDir 'Subtitle Bridge'
+          $standardTarget = Join-Path $standardInstallDir 'Subtitle Bridge.exe'
+          $customTarget = Join-Path $privateRoot 'Custom\Subtitle Bridge.exe'
+          $sharedTarget = Join-Path $policyRoot 'Shared\Subtitle Bridge.exe'
+
+          Remove-Item -LiteralPath $policyRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $standardInstallDir -Force | Out-Null
+          New-Item -ItemType Directory -Path (Split-Path -Parent $customTarget) -Force | Out-Null
+          New-Item -ItemType Directory -Path (Split-Path -Parent $sharedTarget) -Force | Out-Null
+          Set-Content -LiteralPath $standardTarget -Value 'fixture' -Encoding ASCII
+          Set-Content -LiteralPath $customTarget -Value 'fixture' -Encoding ASCII
+          Set-Content -LiteralPath $sharedTarget -Value 'fixture' -Encoding ASCII
+
+          if (-not (Test-CanIgnoreInaccessibleProcess -ExecutablePath $standardTarget -ProcessOwnerSid $otherSid -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot)) {
+            throw 'A different SID should be excludable only for the exact standard private install target.'
           }
 
-          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $sharedTarget -ProcessOwnerIdentity $otherOwner -CurrentOwnerIdentity $currentOwner) {
-            throw 'A different user must remain fail-closed for a shared/custom install location.'
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $standardTarget -ProcessOwnerSid $currentSid -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'The current SID must never be excluded from the running-process check.'
           }
 
-          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $perUserTarget -ProcessOwnerIdentity '' -CurrentOwnerIdentity $currentOwner) {
-            throw 'An unknown process owner must remain fail-closed.'
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $standardTarget -ProcessOwnerSid '' -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'An unknown process SID must remain fail-closed.'
           }
 
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $standardTarget -ProcessOwnerSid 'not-a-sid' -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'An invalid process SID must remain fail-closed.'
+          }
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $customTarget -ProcessOwnerSid $otherSid -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'A custom descendant of LOCALAPPDATA must remain fail-closed.'
+          }
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $sharedTarget -ProcessOwnerSid $otherSid -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'A shared/custom target must remain fail-closed.'
+          }
+
+          Remove-Item -LiteralPath $standardInstallDir -Recurse -Force
+          $junctionTarget = Join-Path $policyRoot 'JunctionSharedTarget'
+          New-Item -ItemType Directory -Path $junctionTarget -Force | Out-Null
+          Set-Content -LiteralPath (Join-Path $junctionTarget 'Subtitle Bridge.exe') -Value 'fixture' -Encoding ASCII
+          New-Item -ItemType Junction -Path $standardInstallDir -Target $junctionTarget | Out-Null
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $standardTarget -ProcessOwnerSid $otherSid -CurrentOwnerSid $currentSid -LocalAppDataPath $privateRoot) {
+            throw 'A junction at the standard install path must remain fail-closed.'
+          }
+
+          Remove-Item -LiteralPath $policyRoot -Recurse -Force -ErrorAction SilentlyContinue
       - name: Verify live public runtime assets
         shell: pwsh
         run: |
