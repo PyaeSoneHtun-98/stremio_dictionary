@@ -710,11 +710,16 @@ if (-not [string]::IsNullOrWhiteSpace($UpdateParentPidRaw)) {
   }
 
   Wait-ForProcessExit -ProcessId $updateParentPid
+}
+
+# Older updater builds do not pass SUBTITLE_BRIDGE_UPDATE_PARENT_PID. Give any running
+# installed process a bounded grace period to finish the shutdown that follows installer launch.
+if (Test-InstalledAppRunning -ExecutablePath $ExistingExePath) {
   Wait-ForInstalledAppShutdown -ExecutablePath $ExistingExePath
 }
 
 if (Test-InstalledAppRunning -ExecutablePath $ExistingExePath) {
-  throw 'Subtitle Bridge is currently running from the install directory. Close it before upgrading.'
+  throw 'Subtitle Bridge is still running from the install directory after the upgrade wait. Close it and retry.'
 }
 
 $StartMenuDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
