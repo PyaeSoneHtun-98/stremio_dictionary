@@ -83,6 +83,7 @@ jobs:
             'Get-ProcessOwnerSid',
             'Get-CurrentWindowsSid',
             'Get-CurrentLocalAppDataPath',
+            'Test-PathHasReparsePointAncestor',
             'Test-IsStandardPrivateInstallTarget',
             'Test-CanIgnoreInaccessibleProcess'
           )
@@ -167,7 +168,26 @@ jobs:
             throw 'A junction at the standard install path must remain fail-closed.'
           }
 
+          # A reparse point above LocalApplicationData must also block the exemption.
+          # Descendants reached through a junction do not themselves carry the reparse bit.
           Remove-Item -LiteralPath $policyRoot -Recurse -Force -ErrorAction SilentlyContinue
+          $realProfileRoot = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeProcessPolicyRealProfile'
+          Remove-Item -LiteralPath $realProfileRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path (Join-Path $realProfileRoot 'AppData\Local\Programs\Subtitle Bridge') -Force | Out-Null
+          Set-Content -LiteralPath (Join-Path $realProfileRoot 'AppData\Local\Programs\Subtitle Bridge\Subtitle Bridge.exe') -Value 'fixture' -Encoding ASCII
+
+          New-Item -ItemType Directory -Path $policyRoot -Force | Out-Null
+          $linkedProfileRoot = Join-Path $policyRoot 'ProfileLink'
+          New-Item -ItemType Junction -Path $linkedProfileRoot -Target $realProfileRoot | Out-Null
+          $linkedLocalAppData = Join-Path $linkedProfileRoot 'AppData\Local'
+          $linkedStandardTarget = Join-Path $linkedLocalAppData 'Programs\Subtitle Bridge\Subtitle Bridge.exe'
+
+          if (Test-CanIgnoreInaccessibleProcess -ExecutablePath $linkedStandardTarget -ProcessOwnerSid $otherSid -CurrentOwnerSid $currentSid -LocalAppDataPath $linkedLocalAppData) {
+            throw 'A junction above LocalApplicationData must remain fail-closed.'
+          }
+
+          Remove-Item -LiteralPath $policyRoot -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $realProfileRoot -Recurse -Force -ErrorAction SilentlyContinue
       - name: Verify live public runtime assets
         shell: pwsh
         run: |
