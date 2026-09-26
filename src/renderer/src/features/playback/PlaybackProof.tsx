@@ -285,89 +285,91 @@ export function PlaybackProof(): React.JSX.Element {
         <div className="media-error">{localError ?? state.error}</div>
       ) : null}
 
-      <details className="media-details">
-        <summary>Technical playback details{state.fileName ? ` · ${state.fileName}` : ''}</summary>
+      {state.filePath || state.error ? (
+        <details className="media-details">
+          <summary>Technical playback details{state.fileName ? ` · ${state.fileName}` : ''}</summary>
 
-        <div className="playback-metrics">
-          <Metric label="File" value={state.fileName ?? 'No video loaded'} />
-          <Metric label="Position" value={formatTime(state.currentTime)} />
-          <Metric label="Duration" value={formatTime(state.duration)} />
-          <Metric label="Tracks" value={String(state.tracks.length)} />
-          <Metric label="Subtitle cues" value={String(state.subtitle.cueCount)} />
-          <Metric label="Subtitle state" value={state.subtitle.status} />
-        </div>
-
-        <div className="subtitle-diagnostic" aria-live="polite">
-          <div className="subtitle-diagnostic-header">
-            <div>
-              <span className="eyebrow">Selected subtitle model</span>
-              <strong>{subtitleTrackLabel(state)}</strong>
-            </div>
-            <span className={`status-pill subtitle-status-${state.subtitle.status}`}>
-              {state.subtitle.status}
-            </span>
+          <div className="playback-metrics">
+            <Metric label="File" value={state.fileName ?? 'No video loaded'} />
+            <Metric label="Position" value={formatTime(state.currentTime)} />
+            <Metric label="Duration" value={formatTime(state.duration)} />
+            <Metric label="Tracks" value={String(state.tracks.length)} />
+            <Metric label="Subtitle cues" value={String(state.subtitle.cueCount)} />
+            <Metric label="Subtitle state" value={state.subtitle.status} />
           </div>
 
-          {state.subtitle.error ? <div className="media-error">{state.subtitle.error}</div> : null}
-
-          {state.subtitle.activeCue ? (
-            <div className="active-cue-card">
-              <div className="active-cue-time">
-                {formatTime(state.subtitle.activeCue.startTime)} →{' '}
-                {formatTime(state.subtitle.activeCue.endTime)}
+          <div className="subtitle-diagnostic" aria-live="polite">
+            <div className="subtitle-diagnostic-header">
+              <div>
+                <span className="eyebrow">Selected subtitle model</span>
+                <strong>{subtitleTrackLabel(state)}</strong>
               </div>
-              <div className="active-cue-text">{state.subtitle.activeCue.text}</div>
+              <span className={`status-pill subtitle-status-${state.subtitle.status}`}>
+                {state.subtitle.status}
+              </span>
             </div>
-          ) : (
-            <div className="empty-subtitle-state">
-              {state.subtitle.status === 'ready'
-                ? 'No subtitle cue is active at the current playback position.'
-                : (state.subtitle.error ?? 'Open a video with an embedded text subtitle track.')}
-            </div>
-          )}
-        </div>
 
-        <div className="track-table-wrap">
-          <table className="track-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Type</th>
-                <th>Language</th>
-                <th>Title</th>
-                <th>Codec</th>
-                <th>Subtitle mode</th>
-                <th>App selected</th>
-                <th>FFmpeg index</th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.tracks.length > 0 ? (
-                state.tracks.map((track) => (
-                  <tr key={`${track.type}-${track.id}`}>
-                    <td>{track.id}</td>
-                    <td>{track.type}</td>
-                    <td>{track.language ?? '—'}</td>
-                    <td>{track.title ?? '—'}</td>
-                    <td>{track.codec ?? 'unknown'}</td>
-                    <td>{track.subtitleKind ?? '—'}</td>
-                    <td>
-                      {track.type === 'subtitle' && state.subtitle.trackId === track.id ? 'yes' : '—'}
-                    </td>
-                    <td>{track.ffIndex ?? '—'}</td>
-                  </tr>
-                ))
-              ) : (
+            {state.subtitle.error ? <div className="media-error">{state.subtitle.error}</div> : null}
+
+            {state.subtitle.activeCue ? (
+              <div className="active-cue-card">
+                <div className="active-cue-time">
+                  {formatTime(state.subtitle.activeCue.startTime)} →{' '}
+                  {formatTime(state.subtitle.activeCue.endTime)}
+                </div>
+                <div className="active-cue-text">{state.subtitle.activeCue.text}</div>
+              </div>
+            ) : (
+              <div className="empty-subtitle-state">
+                {state.subtitle.status === 'ready'
+                  ? 'No subtitle cue is active at the current playback position.'
+                  : (state.subtitle.error ?? 'Open a video with an embedded text subtitle track.')}
+              </div>
+            )}
+          </div>
+
+          <div className="track-table-wrap">
+            <table className="track-table">
+              <thead>
                 <tr>
-                  <td colSpan={8} className="empty-table-cell">
-                    Open a video to inspect its tracks.
-                  </td>
+                  <th>ID</th>
+                  <th>Type</th>
+                  <th>Language</th>
+                  <th>Title</th>
+                  <th>Codec</th>
+                  <th>Subtitle mode</th>
+                  <th>App selected</th>
+                  <th>FFmpeg index</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </details>
+              </thead>
+              <tbody>
+                {state.tracks.length > 0 ? (
+                  state.tracks.map((track) => (
+                    <tr key={`${track.type}-${track.id}`}>
+                      <td>{track.id}</td>
+                      <td>{track.type}</td>
+                      <td>{track.language ?? '—'}</td>
+                      <td>{track.title ?? '—'}</td>
+                      <td>{track.codec ?? 'unknown'}</td>
+                      <td>{track.subtitleKind ?? '—'}</td>
+                      <td>
+                        {track.type === 'subtitle' && state.subtitle.trackId === track.id ? 'yes' : '—'}
+                      </td>
+                      <td>{track.ffIndex ?? '—'}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="empty-table-cell">
+                      Open a video to inspect its tracks.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
     </section>
   )
 }
