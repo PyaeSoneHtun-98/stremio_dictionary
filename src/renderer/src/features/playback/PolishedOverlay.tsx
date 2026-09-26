@@ -11,6 +11,7 @@ import './Player.css'
 import { PlayerIcon } from './PlayerIcon'
 import { usePlayerChrome } from './usePlayerChrome'
 import {
+  adjustSubtitleDelay,
   clampPlayerValue,
   isInteractiveKeyboardTarget,
   isInteractiveSurfaceTarget,
@@ -35,9 +36,6 @@ const EMPTY_STATE: PlaybackSnapshot = {
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
-const SUBTITLE_DELAY_MIN = -10
-const SUBTITLE_DELAY_MAX = 10
-const SUBTITLE_DELAY_STEP = 0.1
 const SUBTITLE_DELAY_NOTICE_MS = 1600
 const TARGET_LANGUAGE_OPTIONS = [
   { code: 'my', label: 'Burmese' },
@@ -411,14 +409,7 @@ export function PolishedOverlay(): React.JSX.Element {
 
       if (action.kind === 'subtitle-delay') {
         const currentDelay = state.subtitleDelay ?? 0
-        const nextDelay =
-          Math.round(
-            clampPlayerValue(
-              currentDelay + action.deltaSeconds,
-              SUBTITLE_DELAY_MIN,
-              SUBTITLE_DELAY_MAX,
-            ) * 10,
-          ) / 10
+        const nextDelay = adjustSubtitleDelay(currentDelay, action.deltaSeconds)
 
         void runControl(async () => {
           await window.desktop.media.setSubtitleDelay(nextDelay)
