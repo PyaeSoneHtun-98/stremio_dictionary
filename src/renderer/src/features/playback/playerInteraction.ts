@@ -165,6 +165,14 @@ export function clampPlayerValue(value: number, minimum: number, maximum: number
   return Math.min(maximum, Math.max(minimum, value))
 }
 
+export const SUBTITLE_RECOVERY_NOTICE_MS = 4000
+
+export function subtitleRecoveryNoticeDuration(status: SubtitleModelStatus): number | null {
+  return ['missing', 'unsupported', 'error'].includes(status)
+    ? SUBTITLE_RECOVERY_NOTICE_MS
+    : null
+}
+
 export function subtitleRecoveryMessage(
   status: SubtitleModelStatus,
   error: string | null
