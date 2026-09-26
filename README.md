@@ -2,9 +2,9 @@
 
 Subtitle Bridge is a Windows desktop video player for English learners. It plays local MKV files and supported HTTP/HTTPS media streams, shows supported English text subtitles as clickable words, and provides offline English → Burmese word and phrase lookup without leaving the player.
 
-## Windows v1.0.5
+## Windows v1.0.6
 
-Subtitle Bridge v1.0.5 adds local MP4 playback, faster subtitle timing adjustment with G/H shortcuts, launcher/player polish, and safer Stremio integration status and recovery while preserving the updater reliability fixes from v1.0.4.
+Subtitle Bridge v1.0.6 is a focused updater hotfix. It keeps all v1.0.5 playback, subtitle, dictionary, launcher, and Stremio features while fixing an in-app upgrade failure caused by the setup process inheriting the installed application's working directory.
 
 ### Normal installation
 
@@ -50,7 +50,7 @@ The one-click setup EXE is the recommended download for normal users.
 
 ## In-app update support
 
-Subtitle Bridge v1.0.5 keeps the user-approved Windows updater and the hardened updater-to-installer shutdown handoff from v1.0.4.
+Subtitle Bridge v1.0.6 keeps the user-approved Windows updater and adds working-directory isolation so setup does not keep the install directory locked during an in-app upgrade.
 
 - Subtitle Bridge checks the official stable GitHub Release shortly after startup and periodically.
 - Up-to-date checks stay unobtrusive.
@@ -62,9 +62,9 @@ Subtitle Bridge v1.0.5 keeps the user-approved Windows updater and the hardened 
 - Installation is blocked while video playback is loading, playing, or paused.
 - Offline/update-server failures do not block normal playback or dictionary use.
 
-The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository. v1.0.5 retains the v1.0.4 shutdown protections: verified updater-parent identity, safe exit waiting, bounded transient install-directory lock handling, and compatibility with older updater-enabled builds.
+The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository. v1.0.6 retains the existing process-identity, checksum, rollback, custom-install-directory, and transient-lock protections while explicitly relocating updater/setup working directories outside the installed application tree.
 
-## What v1.0.5 includes
+## What v1.0.6 includes
 
 - local MKV and MP4 playback;
 - HTTP/HTTPS and Stremio stream playback;
