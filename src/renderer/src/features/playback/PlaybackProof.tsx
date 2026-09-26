@@ -73,8 +73,8 @@ export function PlaybackProof(): React.JSX.Element {
     setOpening(true)
     setLocalError(null)
     try {
-      if (!file.name.toLowerCase().endsWith('.mkv')) {
-        setLocalError('Subtitle Bridge currently supports MKV files only.')
+      if (!isSupportedLocalVideo(file.name)) {
+        setLocalError('Subtitle Bridge currently supports MKV and MP4 files.')
         return
       }
 
@@ -156,13 +156,13 @@ export function PlaybackProof(): React.JSX.Element {
           </div>
           <div className="launch-card-copy">
             <span className="launch-card-kicker">Local video</span>
-            <h3>{dragActive ? 'Drop your MKV here' : 'Open a video'}</h3>
-            <p>Play an MKV with clickable English subtitles and Burmese lookup.</p>
+            <h3>{dragActive ? 'Drop your video here' : 'Open a video'}</h3>
+            <p>Play an MKV or MP4 with clickable English subtitles and Burmese lookup.</p>
           </div>
           <button className="primary-action" type="button" onClick={openVideo} disabled={opening}>
             {opening ? 'Opening…' : 'Choose video'}
           </button>
-          <span className="drop-hint">or drag and drop an MKV anywhere on this panel</span>
+          <span className="drop-hint">or drag and drop an MKV or MP4 anywhere on this panel</span>
         </section>
 
         <section className="launch-card">
@@ -322,6 +322,11 @@ export function PlaybackProof(): React.JSX.Element {
       </details>
     </section>
   )
+}
+
+function isSupportedLocalVideo(fileName: string): boolean {
+  const normalized = fileName.toLocaleLowerCase('en-US')
+  return normalized.endsWith('.mkv') || normalized.endsWith('.mp4')
 }
 
 function Metric({ label, value }: { label: string; value: string }): React.JSX.Element {
