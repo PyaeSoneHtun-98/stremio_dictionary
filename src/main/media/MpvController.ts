@@ -110,6 +110,10 @@ export class MpvController {
       this.sendCommand(['loadfile', mediaTarget, 'replace'])
       this.sendCommand(['set_property', 'pause', false])
     } catch (error) {
+      if (generation !== this.playbackGeneration) {
+        return
+      }
+
       const message = toUserMessage(error)
       diagnosticLog('media.loadFailed', { fileName: displayName, message })
       this.patchState({ status: 'unavailable', currentTime: null, error: message })
