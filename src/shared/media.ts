@@ -102,6 +102,7 @@ export type StremioHandoffState = 'enabled' | 'disabled' | 'unknown' | 'unavaila
 export interface StremioHandoffStatus {
   state: StremioHandoffState
   message: string
+  canChange: boolean
 }
 
 export interface StremioHandoffResult {
