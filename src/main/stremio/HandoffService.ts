@@ -46,7 +46,8 @@ export class StremioHandoffService {
       throw new Error('The saved Stremio handoff target record is invalid.')
     }
 
-    const parsed = JSON.parse(readFileSync(statePath, 'utf8')) as Partial<StremioTargetState>
+    const stateText = readFileSync(statePath, 'utf8').replace(/^\uFEFF/, '')
+    const parsed = JSON.parse(stateText) as Partial<StremioTargetState>
     if (
       parsed.version !== 1 ||
       parsed.application !== 'Subtitle Bridge' ||
