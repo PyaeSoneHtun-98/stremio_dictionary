@@ -15,6 +15,18 @@ export function normalizeSubtitleDelay(value: number): number {
   return Math.round(value * 1000) / 1000
 }
 
+export function adjustSubtitleDelayBy(currentSeconds: number, deltaSeconds: number): number {
+  if (!Number.isFinite(currentSeconds) || !Number.isFinite(deltaSeconds)) {
+    throw new Error('Subtitle delay adjustment must use finite numbers.')
+  }
+
+  const next = Math.min(
+    MAX_SUBTITLE_DELAY_SECONDS,
+    Math.max(MIN_SUBTITLE_DELAY_SECONDS, currentSeconds + deltaSeconds)
+  )
+  return normalizeSubtitleDelay(next)
+}
+
 export function adjustedSubtitleTime(
   playbackTime: number | null,
   delaySeconds: number | null | undefined
