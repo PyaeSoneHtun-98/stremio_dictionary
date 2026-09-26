@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 
 export type StremioHandoffAction = 'enable' | 'disable'
 
@@ -62,6 +62,16 @@ export class StremioHandoffService {
         if (typeof value !== 'string' || !value.trim()) {
           throw new Error('The saved Stremio handoff target record contains an invalid path.')
         }
+
+        if (
+          process.platform === 'win32' &&
+          (!win32.isAbsolute(value) ||
+            value.startsWith('\\\\') ||
+            win32.basename(value).toLocaleLowerCase('en-US') !== 'server.js')
+        ) {
+          throw new Error('The saved Stremio handoff target record contains an unsafe path.')
+        }
+
         return value
       })
       .filter((value, index, values) => values.indexOf(value) === index)
