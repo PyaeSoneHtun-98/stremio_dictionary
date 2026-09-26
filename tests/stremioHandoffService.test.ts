@@ -99,6 +99,43 @@ describe('StremioHandoffService', () => {
     })
   })
 
+  it('marks a current executable patch for repair when the surrounding Stremio layout is no longer compatible', () => {
+    const helperRoot = createHelperFixture()
+    const statePath = join(helperRoot, 'stremio-handoff-targets.json')
+    const serverPath = join(helperRoot, 'server.js')
+    const executablePath = 'C:\\Subtitle Bridge.exe'
+    writeFileSync(
+      serverPath,
+      stremioPatch(executablePath).replace(
+        'devices.groups.external.push(player);',
+        'devices.groups.other.push(player);'
+      )
+    )
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        version: 1,
+        application: 'Subtitle Bridge',
+        paths: [serverPath]
+      })
+    )
+
+    const service = new StremioHandoffService(
+      helperRoot,
+      executablePath,
+      vi.fn(async () => undefined),
+      statePath
+    )
+
+    expect(service.inspectStatus()).toEqual({
+      enabled: false,
+      repairNeeded: true,
+      recordedTargets: 1,
+      patchedTargets: 1,
+      verifiedTargets: 0
+    })
+  })
+
   it('marks a patch for repair when it points to an old Subtitle Bridge executable', () => {
     const helperRoot = createHelperFixture()
     const statePath = join(helperRoot, 'stremio-handoff-targets.json')
@@ -179,6 +216,11 @@ function stremioPatch(executablePath: string): string {
     `  win32: { path: [ ${jsExecutable} ] }`,
     '};',
     '/* Subtitle Bridge external player END */',
+    'devices.groups.external = [], Object.keys(players).forEach((key) => {',
+    '  const player = players[key];',
+    '  player[process.platform] && player[process.platform].path.forEach(() => {});',
+    '  devices.groups.external.push(player);',
+    '});',
   ].join('\n')
 }
 
