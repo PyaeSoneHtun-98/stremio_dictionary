@@ -165,6 +165,11 @@ export function clampPlayerValue(value: number, minimum: number, maximum: number
   return Math.min(maximum, Math.max(minimum, value))
 }
 
+export function adjustSubtitleDelay(currentSeconds: number, deltaSeconds: number): number {
+  const clamped = clampPlayerValue(currentSeconds + deltaSeconds, -10, 10)
+  return Math.round(clamped * 10) / 10
+}
+
 export function subtitleRecoveryMessage(
   status: SubtitleModelStatus,
   error: string | null
