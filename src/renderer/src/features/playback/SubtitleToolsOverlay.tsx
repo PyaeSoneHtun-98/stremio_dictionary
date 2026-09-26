@@ -302,14 +302,14 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
                 <button
                   type="button"
                   disabled={!canControl}
-                  onClick={() => void updateDelay(Math.max(-10, delay - DELAY_STEP))}
+                  onClick={() => void updateDelay(Math.max(-20, delay - DELAY_STEP))}
                 >
                   Earlier
                 </button>
                 <input
                   type="range"
-                  min={-10}
-                  max={10}
+                  min={-20}
+                  max={20}
                   step={DELAY_STEP}
                   value={delay}
                   disabled={!canControl}
@@ -319,7 +319,7 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
                 <button
                   type="button"
                   disabled={!canControl}
-                  onClick={() => void updateDelay(Math.min(10, delay + DELAY_STEP))}
+                  onClick={() => void updateDelay(Math.min(20, delay + DELAY_STEP))}
                 >
                   Later
                 </button>
