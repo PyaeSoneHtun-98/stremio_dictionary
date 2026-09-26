@@ -4,13 +4,23 @@ import type { StremioHandoffInspection } from './HandoffService'
 export function packagedStremioStatus(
   inspection: StremioHandoffInspection
 ): StremioHandoffStatus {
+  if (inspection.automaticRepairBlocked) {
+    return {
+      state: 'unknown',
+      message:
+        'Subtitle Bridge cannot safely change this Stremio integration automatically because a recorded target could not be verified. Restore or update Stremio, then try again.',
+      canEnable: false,
+      canDisable: false
+    }
+  }
+
   if (inspection.repairNeeded) {
     return {
       state: 'repair',
       message:
-        'One or more Stremio handoff targets need repair. Disable the existing patches first, then Enable again to rebuild the integration.',
+        'The Stremio integration needs a safe reset. Disable the saved integration first, then Enable again to rebuild it.',
       canEnable: false,
-      canDisable: inspection.patchedTargets > 0
+      canDisable: inspection.recordedTargets > 0
     }
   }
 
@@ -44,8 +54,9 @@ export function developmentStremioStatus(): StremioHandoffStatus {
 export function unknownPackagedStremioStatus(): StremioHandoffStatus {
   return {
     state: 'unknown',
-    message: 'Could not verify the current Stremio integration state.',
-    canEnable: true,
-    canDisable: true
+    message:
+      'Could not verify the current Stremio integration state safely. Retry after restarting Stremio or Subtitle Bridge.',
+    canEnable: false,
+    canDisable: false
   }
 }
