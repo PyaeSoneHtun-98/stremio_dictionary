@@ -16,47 +16,64 @@ export function registerStremioIpc(): void {
   }
 
   registered = true
-  const statusService = new StremioHandoffService(resolveHelperRoot(), app.getPath('exe'))
-  const service = app.isPackaged ? statusService : null
+  const service = app.isPackaged
+    ? new StremioHandoffService(resolveHelperRoot(), app.getPath('exe'))
+    : null
 
   ipcMain.handle(STATUS_CHANNEL, (): StremioHandoffStatus => {
     if (process.platform !== 'win32') {
       return {
         state: 'unavailable',
         message: 'Stremio integration is currently available on Windows only.',
-        canChange: false
+        canEnable: false,
+        canDisable: false
+      }
+    }
+
+    if (!service) {
+      return {
+        state: 'unknown',
+        message:
+          'Stremio integration status is read-only in development. Check it from the installed Subtitle Bridge app.',
+        canEnable: false,
+        canDisable: false
       }
     }
 
     try {
-      const status = statusService.inspectStatus()
+      const status = service.inspectStatus()
+      if (status.repairNeeded) {
+        return {
+          state: 'repair',
+          message:
+            'One or more Stremio handoff targets need repair. Enable to repair them, or Disable to remove existing patches.',
+          canEnable: true,
+          canDisable: status.patchedTargets > 0
+        }
+      }
+
       if (status.enabled) {
         return {
           state: 'enabled',
           message: 'Play in Subtitle Bridge is enabled in Stremio.',
-          canChange: app.isPackaged
-        }
-      }
-
-      if (status.repairNeeded) {
-        return {
-          state: 'disabled',
-          message: 'The Stremio handoff needs repair for this Subtitle Bridge installation. Enable it again.',
-          canChange: app.isPackaged
+          canEnable: false,
+          canDisable: status.patchedTargets > 0
         }
       }
 
       return {
         state: 'disabled',
         message: 'Play in Subtitle Bridge is not enabled in Stremio.',
-        canChange: app.isPackaged
+        canEnable: true,
+        canDisable: false
       }
     } catch {
       diagnosticLog('stremio.handoffStatusFailed', { reason: 'inspection-failed' })
       return {
         state: 'unknown',
         message: 'Could not verify the current Stremio integration state.',
-        canChange: app.isPackaged
+        canEnable: true,
+        canDisable: true
       }
     }
   })
