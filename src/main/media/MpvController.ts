@@ -41,6 +41,7 @@ export class MpvController {
   private liveSubtitleEnd: number | null = null
   private liveSubtitleSignature: string | null = null
   private liveSubtitleCueCount = 0
+  private playbackGeneration = 0
   private state: PlaybackSnapshot = {
     status: 'idle',
     filePath: null,
@@ -76,9 +77,14 @@ export class MpvController {
     }
 
     diagnosticLog('media.loadRequested', { fileName: displayName })
+    const generation = ++this.playbackGeneration
 
     try {
-      await this.ensureStarted(windowId)
+      const started = await this.ensureStarted(windowId, generation)
+      if (!started || generation !== this.playbackGeneration) {
+        return
+      }
+
       this.resetSubtitleProcessing()
       this.selectedSubtitleTrackId = null
       this.paused = false
@@ -208,6 +214,7 @@ export class MpvController {
 
   stop(): void {
     diagnosticLog('media.stopRequested')
+    this.playbackGeneration += 1
     this.resetSubtitleProcessing()
     this.selectedSubtitleTrackId = null
     this.paused = false
@@ -231,6 +238,7 @@ export class MpvController {
   }
 
   dispose(): void {
+    this.playbackGeneration += 1
     this.subtitleExtractor.dispose()
     this.subtitleExtractionVersion += 1
     this.stopMpvProcess()
@@ -260,9 +268,9 @@ export class MpvController {
     }
   }
 
-  private async ensureStarted(windowId: string): Promise<void> {
+  private async ensureStarted(windowId: string, generation: number): Promise<boolean> {
     if (this.child && this.socket && !this.socket.destroyed) {
-      return
+      return generation === this.playbackGeneration
     }
 
     const runtime = resolveMpvExecutable()
@@ -307,6 +315,14 @@ export class MpvController {
       child.once('error', handleError)
     })
 
+    if (generation !== this.playbackGeneration) {
+      this.expectedExits.add(child)
+      if (!child.killed) {
+        child.kill()
+      }
+      return false
+    }
+
     this.child = child
 
     child.on('exit', (code, signal) => {
@@ -339,7 +355,22 @@ export class MpvController {
       if (!child.killed) {
         child.kill()
       }
+      if (generation !== this.playbackGeneration) {
+        return false
+      }
       throw error
+    }
+
+    if (generation !== this.playbackGeneration) {
+      if (this.child === child) {
+        this.child = null
+      }
+      this.expectedExits.add(child)
+      socket.destroy()
+      if (!child.killed) {
+        child.kill()
+      }
+      return false
     }
 
     this.socket = socket
@@ -363,6 +394,7 @@ export class MpvController {
     this.sendCommand(['observe_property', 9, 'sub-start/full'])
     this.sendCommand(['observe_property', 10, 'sub-end/full'])
     this.sendCommand(['observe_property', 11, 'paused-for-cache'])
+    return true
   }
 
   private handleSocketFailure(socket: Socket, child: ChildProcess, message: string): void {
