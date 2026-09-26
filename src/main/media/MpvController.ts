@@ -206,9 +206,42 @@ export class MpvController {
     await this.refreshSubtitleModel(this.state.tracks)
   }
 
+  stop(): void {
+    diagnosticLog('media.stopRequested')
+    this.resetSubtitleProcessing()
+    this.selectedSubtitleTrackId = null
+    this.paused = false
+    this.pausedForCache = false
+    this.seekPending = false
+    this.stopMpvProcess()
+    this.patchState({
+      status: 'idle',
+      filePath: null,
+      fileName: null,
+      currentTime: null,
+      duration: null,
+      volume: 100,
+      speed: 1,
+      subtitleDelay: 0,
+      buffering: false,
+      tracks: [],
+      subtitle: createEmptySubtitleModel(),
+      error: null
+    })
+  }
+
   dispose(): void {
     this.subtitleExtractor.dispose()
     this.subtitleExtractionVersion += 1
+    this.stopMpvProcess()
+  }
+
+  private stopMpvProcess(): void {
+    const child = this.child
+    if (child) {
+      this.expectedExits.add(child)
+    }
+    this.child = null
 
     const socket = this.socket
     this.socket = null
@@ -217,19 +250,13 @@ export class MpvController {
       try {
         socket.write(`${JSON.stringify({ command: ['quit'] })}\n`)
       } catch {
-        // The IPC pipe can already be closing during application shutdown.
+        // The IPC pipe may already be closing as the player window is dismissed.
       }
       socket.destroy()
     }
 
-    const child = this.child
-    this.child = null
-
-    if (child) {
-      this.expectedExits.add(child)
-      if (!child.killed) {
-        child.kill()
-      }
+    if (child && !child.killed) {
+      child.kill()
     }
   }
 
@@ -298,8 +325,7 @@ export class MpvController {
         return
       }
 
-      const detail = code !== null ? ` with exit code ${code}` : signal ? ` after signal ${signal}` : ''
-      this.failPlayback(`mpv exited unexpectedly${detail}. Reopen the video to retry.`)
+      this.failPlayback('The video player stopped unexpectedly. Reopen the video to retry.')
     })
 
     let socket: Socket
@@ -358,7 +384,7 @@ export class MpvController {
       }
     }
 
-    this.failPlayback(`${message} Reopen the video to retry.`)
+    this.failPlayback('The video player stopped unexpectedly. Reopen the video to retry.')
   }
 
   private handleChunk(chunk: string): void {
