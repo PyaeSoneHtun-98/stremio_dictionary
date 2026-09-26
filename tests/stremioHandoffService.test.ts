@@ -102,7 +102,7 @@ describe('StremioHandoffService', () => {
     })
   })
 
-  it('marks an inert marked block for repair even when it contains the current executable path', () => {
+  it('blocks automatic recovery for an inert marked block even when it contains the current executable path', () => {
     const helperRoot = createHelperFixture()
     const statePath = join(helperRoot, 'stremio-handoff-targets.json')
     const serverPath = join(helperRoot, 'server.js')
