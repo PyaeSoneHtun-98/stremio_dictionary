@@ -13,8 +13,8 @@ describe('subtitle timing controls', () => {
 
   it('rejects non-finite and out-of-range delays', () => {
     expect(() => normalizeSubtitleDelay(Number.NaN)).toThrow('finite')
-    expect(() => normalizeSubtitleDelay(10.001)).toThrow('between -10 and 10')
-    expect(() => normalizeSubtitleDelay(-10.001)).toThrow('between -10 and 10')
+    expect(() => normalizeSubtitleDelay(20.001)).toThrow('between -20 and 20')
+    expect(() => normalizeSubtitleDelay(-20.001)).toThrow('between -20 and 20')
   })
 
   it('delays positive offsets and advances negative offsets', () => {
