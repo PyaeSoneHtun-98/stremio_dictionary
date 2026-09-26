@@ -25,6 +25,23 @@ describe('Stremio handoff status mapping', () => {
     })
   })
 
+  it('allows the reset action for a stale recorded target even when its patch already disappeared', () => {
+    expect(
+      packagedStremioStatus({
+        enabled: false,
+        repairNeeded: true,
+        automaticRepairBlocked: false,
+        recordedTargets: 1,
+        patchedTargets: 0,
+        verifiedTargets: 0,
+      }),
+    ).toMatchObject({
+      state: 'repair',
+      canEnable: false,
+      canDisable: true,
+    })
+  })
+
   it('does not offer Enable directly for a repair state because the helper patches only one discovered target', () => {
     expect(
       packagedStremioStatus({
