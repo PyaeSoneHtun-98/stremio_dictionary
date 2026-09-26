@@ -176,7 +176,9 @@ Completed on Windows before final review fixes:
 
 The first Codex review found four P2s and one P3 covering startup error sanitization, stale Stremio patch verification, atomic subtitle-delay deltas, mpv IPC pipe reuse on rapid reopen, and stale IPC input buffering. Those fixes passed exact-head CI #463 at `017826e69eb4d3414dadcc91e07d198a1d820e28`.
 
-The second Codex review confirmed the playback/startup/delay findings resolved but found two remaining P2 Stremio-status cases plus one development-mode P3: inert marked patch blocks could still appear enabled, mixed working/stale targets could hide the Disable action, and development status could compare against Electron rather than an installed Subtitle Bridge executable. The current branch now validates the full generated patch structure, represents repair-needed state separately with independent Enable/Disable availability, and reports development status as read-only Unknown. Fresh exact-head CI and another Codex review are required for these fixes.
+The second Codex review confirmed the playback/startup/delay findings resolved but found two remaining P2 Stremio-status cases plus one development-mode P3: inert marked patch blocks could still appear enabled, mixed working/stale targets could hide the Disable action, and development status could compare against Electron rather than an installed Subtitle Bridge executable. Those fixes passed exact-head CI #471 at `3f0ec8e9602cf5e8d57cf0c277cf90589d281bbb`.
+
+The third Codex review confirmed those cases resolved except for one remaining P2: the UI promised that Enable alone could repair a mixed target state even though the current enable helper patches only one discovered `server.js`. The repair flow now intentionally requires **Disable first, then Enable**: Disable removes all recorded/discovered Subtitle Bridge patches and clears the target record, after which Enable rebuilds one clean current integration target. Fresh exact-head CI and another Codex review are required for this final review fix.
 
 Still-open manual regression gates:
 
