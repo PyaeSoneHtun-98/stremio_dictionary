@@ -446,8 +446,10 @@ export class MpvController {
       }
 
       if (message.reason === 'error') {
-        const detail = message.error ? ` (${message.error})` : ''
-        this.failPlayback(`This video could not be played${detail}. Try another video or stream.`)
+        diagnosticLog('media.playbackEndedWithError', {
+          reason: message.error ?? 'unknown'
+        })
+        this.failPlayback('This video could not be played. Try another video or stream.')
         return
       }
 
@@ -929,12 +931,8 @@ function finiteNumberOrNull(value: unknown): number | null {
 
 function toUserMessage(error: unknown): string {
   if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-    return 'mpv was not found. Reinstall Subtitle Bridge to restore its managed media runtime, or configure MPV_PATH for development.'
+    return 'The video player runtime is missing. Reinstall Subtitle Bridge and try again.'
   }
 
-  if (error instanceof Error) {
-    return `Could not start mpv: ${error.message}`
-  }
-
-  return 'Could not start mpv.'
+  return 'Could not start the video player. Reopen the video or restart Subtitle Bridge and try again.'
 }
