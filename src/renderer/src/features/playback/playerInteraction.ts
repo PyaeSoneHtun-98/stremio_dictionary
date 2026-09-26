@@ -166,7 +166,7 @@ export function clampPlayerValue(value: number, minimum: number, maximum: number
 }
 
 export function adjustSubtitleDelay(currentSeconds: number, deltaSeconds: number): number {
-  const clamped = clampPlayerValue(currentSeconds + deltaSeconds, -10, 10)
+  const clamped = clampPlayerValue(currentSeconds + deltaSeconds, -20, 20)
   return Math.round(clamped * 10) / 10
 }
 
