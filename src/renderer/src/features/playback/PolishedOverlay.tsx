@@ -145,6 +145,7 @@ export function PolishedOverlay(): React.JSX.Element {
   const translationRequestVersion = useRef(0)
   const stateRef = useRef<PlaybackSnapshot>(EMPTY_STATE)
   const shortcutSubtitleDelayRef = useRef(0)
+  const pendingSubtitleDelayRequests = useRef(0)
   const surfaceGestureCoordinator = useMemo(
     () =>
       new SurfaceGestureCoordinator(
@@ -172,7 +173,9 @@ export function PolishedOverlay(): React.JSX.Element {
 
       surfaceGestureCoordinator.handleStateTransition(stateRef.current, snapshot)
       stateRef.current = snapshot
-      shortcutSubtitleDelayRef.current = snapshot.subtitleDelay ?? 0
+      if (pendingSubtitleDelayRequests.current === 0) {
+        shortcutSubtitleDelayRef.current = snapshot.subtitleDelay ?? 0
+      }
 
       const nextCueId = snapshot.subtitle.activeCue?.id ?? null
       const selectionContextChanged =
@@ -413,14 +416,22 @@ export function PolishedOverlay(): React.JSX.Element {
         const previousDelay = shortcutSubtitleDelayRef.current
         const nextDelay = adjustSubtitleDelay(previousDelay, action.deltaSeconds)
         shortcutSubtitleDelayRef.current = nextDelay
+        pendingSubtitleDelayRequests.current += 1
 
         void runControl(async () => {
+          let succeeded = false
           try {
             await window.desktop.media.setSubtitleDelay(nextDelay)
+            succeeded = true
             showSubtitleDelayNotice(nextDelay)
-          } catch (error) {
-            shortcutSubtitleDelayRef.current = stateRef.current.subtitleDelay ?? previousDelay
-            throw error
+          } finally {
+            pendingSubtitleDelayRequests.current = Math.max(
+              0,
+              pendingSubtitleDelayRequests.current - 1,
+            )
+            if (!succeeded && pendingSubtitleDelayRequests.current === 0) {
+              shortcutSubtitleDelayRef.current = stateRef.current.subtitleDelay ?? previousDelay
+            }
           }
         })
         return
