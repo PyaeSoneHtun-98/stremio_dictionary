@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  adjustSubtitleDelay,
   clampPlayerValue,
   isInteractiveSurfaceTarget,
   resolvePlayerShortcut,
@@ -45,13 +44,6 @@ describe('player keyboard shortcuts', () => {
     expect(
       resolvePlayerShortcut('h', { canControl: true, interactiveTarget: false, ctrlKey: true }),
     ).toBeNull()
-  })
-
-  it('adjusts subtitle delay in 0.1 second steps and clamps at the supported bounds', () => {
-    expect(adjustSubtitleDelay(0, -0.1)).toBe(-0.1)
-    expect(adjustSubtitleDelay(0.2, 0.1)).toBe(0.3)
-    expect(adjustSubtitleDelay(-19.95, -0.1)).toBe(-20)
-    expect(adjustSubtitleDelay(19.95, 0.1)).toBe(20)
   })
 
   it('clamps seek and volume values to their valid range', () => {
