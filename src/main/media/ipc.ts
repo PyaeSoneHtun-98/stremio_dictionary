@@ -56,7 +56,11 @@ const externalSubtitleLoadCoordinator = new ExternalSubtitleLoadCoordinator({
   }
 })
 const subtitlePreferencesStore = new SubtitlePreferencesStore()
-const playbackSurface = new PlaybackSurface()
+const playbackSurface = new PlaybackSurface(() => {
+  externalSubtitleLoadCoordinator.invalidate()
+  externalSubtitleExtractor.cancel()
+  controller.stop()
+})
 const openMediaQueue = new SerialTaskQueue()
 let registered = false
 
