@@ -254,7 +254,7 @@ v1.0.0 may be published only when:
 3. Confirm subtitle delay changes by **-0.1 s** and an on-screen notice shows the new delay.
 4. Press **H** once.
 5. Confirm subtitle delay changes by **+0.1 s** relative to the current value and the notice refreshes.
-6. Press G/H repeatedly and confirm the value stays within **-10.0 s** to **+10.0 s**.
+6. Press G/H repeatedly and confirm the value stays within **-20.0 s** to **+20.0 s**.
 7. Open the subtitle controls and confirm its delay value matches the keyboard-adjusted value.
 8. Focus an input/select/button and confirm G/H do not trigger the shortcut while operating that control.
 9. Confirm the on-screen delay notice disappears automatically.
