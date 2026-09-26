@@ -18,7 +18,7 @@ export function packagedStremioStatus(
     return {
       state: 'repair',
       message:
-        'The Stremio integration needs a safe reset. Disable the saved integration first, then Enable again to rebuild it.',
+        'The Stremio integration needs a safe reset. Disable the saved integration first. After cleanup, Enable can be tried again if this Stremio version is compatible.',
       canEnable: false,
       canDisable: inspection.recordedTargets > 0
     }
