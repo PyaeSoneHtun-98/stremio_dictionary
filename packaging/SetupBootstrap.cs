@@ -109,7 +109,9 @@ internal static class SubtitleBridgeSetup
         try
         {
             Directory.CreateDirectory(extractRoot);
+            Directory.SetCurrentDirectory(extractRoot);
             WriteStatus(statusFile, "extract-root-created");
+            WriteStatus(statusFile, "working-directory-relocated");
 
             var payloadZip = Path.Combine(extractRoot, "payload.zip");
             ExtractAppendedPayload(payloadZip);
@@ -138,7 +140,8 @@ internal static class SubtitleBridgeSetup
                 CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden,
                 RedirectStandardOutput = true,
-                RedirectStandardError = true
+                RedirectStandardError = true,
+                WorkingDirectory = packageDir
             };
 
             using (var process = Process.Start(startInfo))
@@ -189,6 +192,15 @@ internal static class SubtitleBridgeSetup
         }
         finally
         {
+            try
+            {
+                Directory.SetCurrentDirectory(Path.GetTempPath());
+            }
+            catch
+            {
+                // Best effort only; cleanup below is still non-fatal.
+            }
+
             try
             {
                 if (Directory.Exists(extractRoot))

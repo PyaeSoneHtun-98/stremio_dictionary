@@ -19,6 +19,32 @@ export function currentInstallDirectory(executablePath: string): string {
   return installDirectory
 }
 
+export function installerWorkingDirectory(
+  installerPath: string,
+  installDirectory: string
+): string {
+  if (!installerPath || !win32.isAbsolute(installerPath)) {
+    throw new Error('The update installer path is invalid.')
+  }
+  if (!installDirectory || !win32.isAbsolute(installDirectory)) {
+    throw new Error('The current Subtitle Bridge install directory is invalid.')
+  }
+
+  const workingDirectory = win32.dirname(installerPath)
+  const relativeToInstall = win32.relative(installDirectory, workingDirectory)
+  const insideInstallDirectory =
+    relativeToInstall === '' ||
+    (!relativeToInstall.startsWith('..\\') &&
+      relativeToInstall !== '..' &&
+      !win32.isAbsolute(relativeToInstall))
+
+  if (insideInstallDirectory) {
+    throw new Error('The update installer working directory must be outside the install directory.')
+  }
+
+  return workingDirectory
+}
+
 export function createInstallerEnvironment(
   installDirectory: string,
   updateParentExecutablePath: string,

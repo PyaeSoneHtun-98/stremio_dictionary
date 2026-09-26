@@ -944,6 +944,49 @@ jobs:
             throw 'One-click setup did not update Windows uninstall metadata.'
           }
 
+          # Regression: the in-app updater can launch setup while Subtitle Bridge's process
+          # working directory is the install folder. Setup must relocate itself before the
+          # directory swap or Windows can report that the install directory is in use.
+          $cwdUpgradeStatusFile = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeSetupCwdUpgradeStatus.log'
+          Remove-Item -LiteralPath $cwdUpgradeStatusFile -Force -ErrorAction SilentlyContinue
+
+          $env:SUBTITLE_BRIDGE_INSTALL_DIR = $setupInstallDir
+          $env:SUBTITLE_BRIDGE_RUNTIME_MANIFEST = $runtimeManifest
+          $env:SUBTITLE_BRIDGE_RUNTIME_CACHE = $setupRuntimeCache
+          $env:SUBTITLE_BRIDGE_SETUP_NO_SHORTCUT = '1'
+          $env:SUBTITLE_BRIDGE_SETUP_NO_LAUNCH = '1'
+          $env:SUBTITLE_BRIDGE_SETUP_HEADLESS = '1'
+          $env:SUBTITLE_BRIDGE_SETUP_STATUS_FILE = $cwdUpgradeStatusFile
+
+          try {
+            $cwdUpgradeProcess = Start-Process -FilePath $setupExe -WorkingDirectory $setupInstallDir -Wait -PassThru
+          } finally {
+            Remove-Item Env:SUBTITLE_BRIDGE_INSTALL_DIR -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_RUNTIME_MANIFEST -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_RUNTIME_CACHE -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_SETUP_NO_SHORTCUT -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_SETUP_NO_LAUNCH -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_SETUP_HEADLESS -ErrorAction SilentlyContinue
+            Remove-Item Env:SUBTITLE_BRIDGE_SETUP_STATUS_FILE -ErrorAction SilentlyContinue
+          }
+
+          if ($cwdUpgradeProcess.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $cwdUpgradeStatusFile) {
+              Write-Host '--- setup cwd-upgrade status ---'
+              Get-Content -LiteralPath $cwdUpgradeStatusFile
+              Write-Host '--- end setup cwd-upgrade status ---'
+            }
+            throw "Setup failed when launched with the install directory as its working directory; exit code $($cwdUpgradeProcess.ExitCode)."
+          }
+
+          $cwdUpgradeStatus = Get-Content -LiteralPath $cwdUpgradeStatusFile -Raw
+          if ($cwdUpgradeStatus -notmatch 'working-directory-relocated') {
+            throw 'Setup did not confirm relocation away from the inherited install-directory working directory.'
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $setupInstallDir 'Subtitle Bridge.exe'))) {
+            throw 'Working-directory upgrade regression lost the installed application.'
+          }
+
           $setupStremioFixtureDir = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeSetupStremioFixture'
           New-Item -ItemType Directory -Path $setupStremioFixtureDir -Force | Out-Null
           $setupServerJs = Join-Path $setupStremioFixtureDir 'server.js'
