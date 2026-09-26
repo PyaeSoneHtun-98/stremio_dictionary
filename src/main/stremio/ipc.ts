@@ -23,7 +23,8 @@ export function registerStremioIpc(): void {
     if (process.platform !== 'win32') {
       return {
         state: 'unavailable',
-        message: 'Stremio integration is currently available on Windows only.'
+        message: 'Stremio integration is currently available on Windows only.',
+        canChange: false
       }
     }
 
@@ -32,19 +33,22 @@ export function registerStremioIpc(): void {
       if (status.enabled) {
         return {
           state: 'enabled',
-          message: 'Play in Subtitle Bridge is enabled in Stremio.'
+          message: 'Play in Subtitle Bridge is enabled in Stremio.',
+          canChange: app.isPackaged
         }
       }
 
       return {
         state: 'disabled',
-        message: 'Play in Subtitle Bridge is not enabled in Stremio.'
+        message: 'Play in Subtitle Bridge is not enabled in Stremio.',
+        canChange: app.isPackaged
       }
     } catch {
       diagnosticLog('stremio.handoffStatusFailed', { reason: 'inspection-failed' })
       return {
         state: 'unknown',
-        message: 'Could not verify the current Stremio integration state.'
+        message: 'Could not verify the current Stremio integration state.',
+        canChange: app.isPackaged
       }
     }
   })
