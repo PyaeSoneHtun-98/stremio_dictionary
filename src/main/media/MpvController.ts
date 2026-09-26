@@ -195,7 +195,7 @@ export class MpvController {
     const currentDelay = this.state.subtitleDelay ?? 0
     const nextDelay = adjustSubtitleDelayBy(currentDelay, deltaSeconds)
     this.setSubtitleDelay(nextDelay)
-    return this.state.subtitleDelay
+    return this.state.subtitleDelay ?? nextDelay
   }
 
   async selectSubtitleTrack(trackId: number): Promise<void> {
@@ -398,11 +398,11 @@ export class MpvController {
     this.socket = socket
     socket.setEncoding('utf8')
     socket.on('data', (chunk) => this.handleChunk(chunk.toString()))
-    socket.on('error', (error) => {
-      this.handleSocketFailure(socket, child, `Lost the mpv IPC connection: ${error.message}`)
+    socket.on('error', () => {
+      this.handleSocketFailure(socket, child)
     })
     socket.on('close', () => {
-      this.handleSocketFailure(socket, child, 'The mpv IPC connection closed unexpectedly.')
+      this.handleSocketFailure(socket, child)
     })
 
     this.sendCommand(['observe_property', 1, 'time-pos'])
@@ -419,7 +419,7 @@ export class MpvController {
     return true
   }
 
-  private handleSocketFailure(socket: Socket, child: ChildProcess, message: string): void {
+  private handleSocketFailure(socket: Socket, child: ChildProcess): void {
     if (this.socket !== socket) {
       return
     }
