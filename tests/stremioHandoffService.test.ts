@@ -40,6 +40,66 @@ describe('StremioHandoffService', () => {
     expect(runner).toHaveBeenCalledWith(join(helperRoot, 'Disable-StremioHandoff.ps1'), [])
   })
 
+  it('reports disabled when no handoff target record exists', () => {
+    const helperRoot = createHelperFixture()
+    const statePath = join(helperRoot, 'stremio-handoff-targets.json')
+    const service = new StremioHandoffService(
+      helperRoot,
+      'C:\\Subtitle Bridge.exe',
+      vi.fn(async () => undefined),
+      statePath
+    )
+
+    expect(service.inspectStatus()).toEqual({
+      enabled: false,
+      recordedTargets: 0,
+      patchedTargets: 0
+    })
+  })
+
+  it('reports enabled only when a recorded Stremio target still contains the patch markers', () => {
+    const helperRoot = createHelperFixture()
+    const statePath = join(helperRoot, 'stremio-handoff-targets.json')
+    const serverPath = join(helperRoot, 'server.js')
+    writeFileSync(
+      serverPath,
+      [
+        'const players = {};',
+        '/* Subtitle Bridge external player BEGIN */',
+        'players.subtitleBridge = {};',
+        '/* Subtitle Bridge external player END */'
+      ].join('\n')
+    )
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        version: 1,
+        application: 'Subtitle Bridge',
+        paths: [serverPath]
+      })
+    )
+
+    const service = new StremioHandoffService(
+      helperRoot,
+      'C:\\Subtitle Bridge.exe',
+      vi.fn(async () => undefined),
+      statePath
+    )
+
+    expect(service.inspectStatus()).toEqual({
+      enabled: true,
+      recordedTargets: 1,
+      patchedTargets: 1
+    })
+
+    writeFileSync(serverPath, 'const players = {};')
+    expect(service.inspectStatus()).toEqual({
+      enabled: false,
+      recordedTargets: 1,
+      patchedTargets: 0
+    })
+  })
+
   it('fails before launching PowerShell when a packaged helper is missing', async () => {
     const helperRoot = createTemporaryDirectory()
     const runner = vi.fn(async () => undefined)
