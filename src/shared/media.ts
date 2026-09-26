@@ -125,6 +125,7 @@ export interface DesktopBridge {
     setVolume: (volume: number) => Promise<void>
     setSpeed: (speed: number) => Promise<void>
     setSubtitleDelay: (seconds: number) => Promise<void>
+    adjustSubtitleDelay: (deltaSeconds: number) => Promise<number>
     selectSubtitleTrack: (trackId: number) => Promise<void>
     getSubtitlePreferences: () => Promise<SubtitlePreferencesSnapshot>
     updateSubtitlePreferences: (
