@@ -4,13 +4,13 @@
 
 Current stable `master`:
 
-`cbd1c8bd21edc20844137d9cff6e4b098e6545b4`
+`213b00d1564f6654eca39978e1e403fdd197e7a4`
 
-PR #58 is merged on top of the public v1.0.4 release source, adding the local MP4, subtitle-delay shortcut, launcher/player polish, and Stremio handoff reliability work planned for v1.0.5.
+PR #61 / Issue #60 is merged on top of the public v1.0.5 release source, fixing the real in-app upgrade install-directory lock caused by inherited setup working directories.
 
-PR #58 passed final review with no remaining P1/P2/P3 findings. Its merged master commit `cbd1c8bd21edc20844137d9cff6e4b098e6545b4` passed CI #498, including project validation, Windows packaging, packaged install/upgrade coverage, runtime checks, and Stremio regressions. The full manual regression set was also completed successfully before this release.
+PR #61 exact-head CI #501 passed on retry, including a new packaged Windows regression that deliberately launches setup with the installed Subtitle Bridge directory as its working directory. Merged master CI #502 passed at `213b00d1564f6654eca39978e1e403fdd197e7a4`.
 
-Issue #52 remains open intentionally until the real affected/test Windows PC completes an official in-app update to the now-published v1.0.4 successfully.
+The real v1.0.4 → v1.0.5 in-app update reproduced the install-directory lock. v1.0.6 is the targeted hotfix; final acceptance is a real in-app update to the published v1.0.6 build.
 
 Current stable capabilities include:
 
@@ -140,41 +140,37 @@ Production artifact: `src/main/translation/data/phrases.json`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
-## Active work — Windows v1.0.5
+## Active work — Windows v1.0.6 hotfix
 
 Release branch:
 
-`release/v1.0.5`
+`release/v1.0.6`
 
-v1.0.5 packages the completed PR #58 feature/reliability work on top of v1.0.4.
+v1.0.6 is a release-only package of the Issue #60 / PR #61 updater working-directory fix.
 
-Release scope:
+Hotfix behavior:
 
-- local MP4 playback through the existing mpv path;
-- external SRT/ASS/SSA picker and drag/drop support during MP4 playback;
-- G/H subtitle-delay shortcuts in 0.1-second steps with shared timing state and on-screen feedback;
-- compact launcher and cleaner player-close/error behavior;
-- Stremio handoff status inspection, repair guidance, and safer fail-closed enable/disable cleanup;
-- no dictionary, phrase dataset, updater trust-policy, runtime-source, or installer security weakening.
+- the in-app updater launches the downloaded setup executable with an explicit working directory outside the install tree;
+- updater launch rejects a setup working directory inside the installed application tree;
+- the setup bootstrap immediately relocates its own current directory to its temporary extraction root;
+- the PowerShell installer is launched with the extracted package directory as its working directory;
+- setup relocates back to the system temporary directory before cleaning its extraction folder;
+- updater trust, SHA-256 verification, process identity, rollback, runtime, custom install directory, playback, dictionary, and Stremio behavior remain unchanged.
 
-Completed gates before release preparation:
+Verification completed before release preparation:
 
-- PR #58 final review reported no remaining P1/P2/P3 findings;
-- merged master CI #498 passed at `cbd1c8bd21edc20844137d9cff6e4b098e6545b4`;
-- local MP4 + external SRT/ASS/SSA playback acceptance passed;
-- subtitle picker/drag-drop, clickable word/phrase lookup, and G/H timing acceptance passed;
-- local MKV embedded-subtitle regression passed;
-- Stremio/network playback regression passed;
-- playback close/failure messaging checks passed;
-- packaged and development-mode Stremio status/action checks passed.
+- PR #61 exact-head CI #501 passed;
+- the packaged Windows regression successfully upgraded while setup was deliberately launched with the install directory as cwd;
+- merged master CI #502 passed at `213b00d1564f6654eca39978e1e403fdd197e7a4`.
 
 Remaining release gates:
 
-- exact-head v1.0.5 release-PR CI;
+- exact-head v1.0.6 release-PR CI;
 - merge the release-only version/documentation PR;
 - successful exact-`master` CI;
-- successful Release Windows publication of v1.0.5;
-- verify the published EXE/ZIP/checksum assets.
+- successful Release Windows publication;
+- verify the four release assets and checksums;
+- real v1.0.5 → v1.0.6 in-app update on the affected Windows PC.
 
 ## Later work
 
