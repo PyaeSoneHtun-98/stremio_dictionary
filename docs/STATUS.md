@@ -87,7 +87,7 @@ The real official updater flow to v1.0.3 succeeded twice on one Windows PC. A se
 
 ## Updater shutdown-race fix
 
-Issue #52 / PR #54 are merged to master.
+PR #54 is merged to master. Issue #52 remains open until the real affected/test PC completes the published fixed updater flow.
 
 The fix:
 
@@ -139,7 +139,7 @@ Release-branch scope:
 
 Pending release gates:
 
-- exact-head PR CI;
+- exact-head PR CI #412 passed at `909c888b21394fad006d6ec40dc66467e340e819`;
 - final Codex review with no remaining P1/P2/P3 findings;
 - squash merge;
 - successful exact-`master` push CI;
