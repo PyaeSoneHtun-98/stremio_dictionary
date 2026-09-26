@@ -2,9 +2,9 @@
 
 Subtitle Bridge is a Windows desktop video player for English learners. It plays local MKV files and supported HTTP/HTTPS media streams, shows supported English text subtitles as clickable words, and provides offline English → Burmese word and phrase lookup without leaving the player.
 
-## Windows v1.0.3
+## Windows v1.0.4
 
-Subtitle Bridge v1.0.3 packages the current stable player UX, dictionary/phrase lookup, Stremio handoff, installer/runtime fixes, and secure user-approved in-app updater into the normal Windows release.
+Subtitle Bridge v1.0.4 is a focused Windows updater reliability release. It keeps the stable player UX, dictionary/phrase lookup, Stremio handoff, runtime, and secure user-approved updater from v1.0.3 while fixing the install-directory shutdown race that could make an in-app upgrade fail on some PCs.
 
 ### Normal installation
 
@@ -50,7 +50,7 @@ The one-click setup EXE is the recommended download for normal users.
 
 ## In-app update support
 
-Subtitle Bridge v1.0.3 includes a user-approved Windows updater built around the existing GitHub Release installer pipeline.
+Subtitle Bridge v1.0.4 includes the same user-approved Windows updater and strengthens the updater-to-installer shutdown handoff.
 
 - Subtitle Bridge checks the official stable GitHub Release shortly after startup and periodically.
 - Up-to-date checks stay unobtrusive.
@@ -62,9 +62,9 @@ Subtitle Bridge v1.0.3 includes a user-approved Windows updater built around the
 - Installation is blocked while video playback is loading, playing, or paused.
 - Offline/update-server failures do not block normal playback or dictionary use.
 
-The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository. Public v1.0.2 predates the updater, so existing v1.0.2 users must install v1.0.3 manually once; later releases can then be handled in-app.
+The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository. v1.0.4 also waits safely for the launching app to exit, tolerates bounded transient install-directory locks, verifies updater-parent identity, and remains compatible with older updater-enabled builds that do not pass the new identity metadata.
 
-## What v1.0.3 includes
+## What v1.0.4 includes
 
 - local MKV playback;
 - HTTP/HTTPS and Stremio stream playback;
