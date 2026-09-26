@@ -446,9 +446,7 @@ export class MpvController {
       }
 
       if (message.reason === 'error') {
-        diagnosticLog('media.playbackEndedWithError', {
-          reason: message.error ?? 'unknown'
-        })
+        diagnosticLog('media.playbackEndedWithError', { reason: 'end-file-error' })
         this.failPlayback('This video could not be played. Try another video or stream.')
         return
       }
