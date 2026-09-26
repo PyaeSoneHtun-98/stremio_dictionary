@@ -124,7 +124,7 @@ export class StremioHandoffService {
       patchedTargets += 1
       const block = text.slice(begin, end + HANDOFF_MARKER_END.length)
       const baseText = text.slice(0, begin) + text.slice(end + HANDOFF_MARKER_END.length)
-      const configuredExecutable = readPatchedExecutable(block)
+      const configuredExecutable = readGeneratedPatchExecutable(block)
       const currentExecutable =
         configuredExecutable && sameWindowsPath(configuredExecutable, this.executablePath)
       const compatibleLayout = hasCompatibleStremioLayout(baseText)
@@ -173,10 +173,25 @@ function hasCompatibleStremioLayout(text: string): boolean {
   )
 }
 
-function readPatchedExecutable(block: string): string | null {
-  const match = block.match(
-    /win32\s*:\s*\{\s*path\s*:\s*\[\s*("(?:\\.|[^"\\])*")\s*\]\s*\}/
-  )
+function readGeneratedPatchExecutable(block: string): string | null {
+  const markerBegin = escapeRegExp(HANDOFF_MARKER_BEGIN)
+  const markerEnd = escapeRegExp(HANDOFF_MARKER_END)
+  const pattern =
+    '^\\s*' +
+    markerBegin +
+    '\\s*players\\.subtitleBridge\\s*=\\s*\\{\\s*' +
+    'title\\s*:\\s*"Subtitle Bridge"\\s*,\\s*' +
+    'args\\s*:\\s*\\[\\s*""\\s*\\]\\s*,\\s*' +
+    'subArg\\s*:\\s*""\\s*,\\s*' +
+    'timeArg\\s*:\\s*""\\s*,\\s*' +
+    'playArg\\s*:\\s*""\\s*,\\s*' +
+    'darwin\\s*:\\s*\\{\\s*path\\s*:\\s*\\[\\s*\\]\\s*\\}\\s*,\\s*' +
+    'linux\\s*:\\s*\\{\\s*path\\s*:\\s*\\[\\s*\\]\\s*\\}\\s*,\\s*' +
+    'win32\\s*:\\s*\\{\\s*path\\s*:\\s*\\[\\s*("(?:\\\\.|[^"\\\\])*")\\s*\\]\\s*\\}\\s*' +
+    '\\}\\s*;\\s*' +
+    markerEnd +
+    '\\s*$'
+  const match = block.match(new RegExp(pattern))
   if (!match) {
     return null
   }
@@ -195,6 +210,10 @@ function readPatchedExecutable(block: string): string | null {
   } catch {
     return null
   }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^$()|[\]\\]/g, '\\$&')
 }
 
 function sameWindowsPath(left: string, right: string): boolean {
