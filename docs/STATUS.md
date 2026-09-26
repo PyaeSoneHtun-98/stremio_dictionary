@@ -160,15 +160,32 @@ Current implementation scope:
 - normal player-window close clears playback state without surfacing raw mpv/IPC errors;
 - Stremio handoff card reports actual recorded patch state and avoids redundant enable/disable actions.
 
-Pending gates:
+Validation status:
 
-- exact-head CI;
-- real Windows MP4 playback + external subtitle test;
-- real Windows G/H timing + OSD test;
-- real Windows compact launcher + normal player-close test;
-- packaged Stremio Enabled/Disabled state test;
-- final Codex review;
-- squash merge after manual acceptance and review.
+Completed on Windows before final review fixes:
+
+- MP4 playback with external SRT;
+- clickable word and phrase lookup on MP4 subtitles;
+- G/H subtitle-delay timing and on-screen feedback;
+- subtitle-delay control synchronization;
+- subtitle settings outside-click dismissal;
+- compact launcher / unnecessary-scrollbar check;
+- normal player-window close without a raw mpv/IPC error;
+- visible Stremio status;
+- pre-review exact-head CI #448 at `3106668ead9c4b94cd4b7ffe24906dc1a90616bd`.
+
+The first Codex review then found four P2s and one P3 covering startup error sanitization, stale Stremio patch verification, atomic subtitle-delay deltas, mpv IPC pipe reuse on rapid reopen, and stale IPC input buffering. Those review fixes are in progress and require fresh exact-head CI plus another Codex review.
+
+Still-open manual regression gates:
+
+- external ASS/SSA and subtitle drag/drop;
+- local MKV embedded subtitle regression;
+- Stremio/network playback regression;
+- genuine unexpected playback-failure messaging;
+- packaged Stremio Enabled/Disabled action behavior;
+- development-mode Stremio read-only behavior.
+
+Merge still requires green exact-head CI, completion of the required manual regression gates, final Codex review with no unresolved P1/P2/P3 findings, and squash merge.
 
 ## Later work
 
