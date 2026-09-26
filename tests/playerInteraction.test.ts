@@ -26,7 +26,24 @@ describe('player keyboard shortcuts', () => {
     expect(resolvePlayerShortcut('ArrowRight', options)).toEqual({ kind: 'seek', deltaSeconds: 5 })
     expect(resolvePlayerShortcut('ArrowDown', options)).toEqual({ kind: 'volume', delta: -5 })
     expect(resolvePlayerShortcut('ArrowUp', options)).toEqual({ kind: 'volume', delta: 5 })
+    expect(resolvePlayerShortcut('g', options)).toEqual({
+      kind: 'subtitle-delay',
+      deltaSeconds: -0.1,
+    })
+    expect(resolvePlayerShortcut('H', options)).toEqual({
+      kind: 'subtitle-delay',
+      deltaSeconds: 0.1,
+    })
     expect(resolvePlayerShortcut('f', options)).toEqual({ kind: 'fullscreen' })
+  })
+
+  it('does not trigger subtitle-delay shortcuts while a control is focused or modifiers are held', () => {
+    expect(
+      resolvePlayerShortcut('g', { canControl: true, interactiveTarget: true }),
+    ).toBeNull()
+    expect(
+      resolvePlayerShortcut('h', { canControl: true, interactiveTarget: false, ctrlKey: true }),
+    ).toBeNull()
   })
 
   it('clamps seek and volume values to their valid range', () => {
