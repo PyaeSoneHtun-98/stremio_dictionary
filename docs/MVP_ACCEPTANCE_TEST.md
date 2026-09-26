@@ -258,3 +258,16 @@ v1.0.0 may be published only when:
 7. Open the subtitle controls and confirm its delay value matches the keyboard-adjusted value.
 8. Focus an input/select/button and confirm G/H do not trigger the shortcut while operating that control.
 9. Confirm the on-screen delay notice disappears automatically.
+
+
+## Main launcher release-polish acceptance
+
+1. Launch Subtitle Bridge at the normal 1200×800 main-window size with no media open.
+2. Confirm the idle launcher fits without an unnecessary vertical page scrollbar.
+3. Confirm the local video and Stremio cards remain readable and usable at the minimum supported window size.
+4. Open a video, then close the separate playback window using the normal Windows close button.
+5. Confirm the main launcher returns to **idle** and does not show an mpv/IPC connection error.
+6. Confirm a real playback-open failure still shows a concise user-facing recovery message without raw IPC diagnostics.
+7. Confirm the Stremio card displays **Enabled**, **Disabled**, **Unknown**, or **Unavailable** based on the detected handoff state.
+8. In a packaged build, confirm Enable becomes unavailable when already enabled and Disable becomes unavailable when already disabled.
+9. In development mode, confirm the Stremio state can be inspected but mutation actions are read-only.
