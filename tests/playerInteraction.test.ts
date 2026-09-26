@@ -5,6 +5,8 @@ import {
   resolvePlayerShortcut,
   shouldHandleSurfacePointer,
   subtitleRecoveryMessage,
+  subtitleRecoveryNoticeDuration,
+  SUBTITLE_RECOVERY_NOTICE_MS,
   SurfaceGestureCoordinator
 } from '../src/renderer/src/features/playback/playerInteraction'
 
@@ -118,6 +120,14 @@ describe('subtitle recovery copy', () => {
     expect(subtitleRecoveryMessage('error', 'FFmpeg could not read this track.')).toBe(
       'FFmpeg could not read this track. Playback still works; try another text subtitle track or another video.'
     )
+  })
+
+  it('auto-dismisses recovery notices but keeps active extraction status persistent', () => {
+    expect(subtitleRecoveryNoticeDuration('missing')).toBe(SUBTITLE_RECOVERY_NOTICE_MS)
+    expect(subtitleRecoveryNoticeDuration('unsupported')).toBe(SUBTITLE_RECOVERY_NOTICE_MS)
+    expect(subtitleRecoveryNoticeDuration('error')).toBe(SUBTITLE_RECOVERY_NOTICE_MS)
+    expect(subtitleRecoveryNoticeDuration('extracting')).toBeNull()
+    expect(subtitleRecoveryNoticeDuration('ready')).toBeNull()
   })
 })
 
