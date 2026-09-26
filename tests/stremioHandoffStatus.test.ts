@@ -11,6 +11,7 @@ describe('Stremio handoff status mapping', () => {
       packagedStremioStatus({
         enabled: false,
         repairNeeded: true,
+        automaticRepairBlocked: false,
         recordedTargets: 2,
         patchedTargets: 2,
         verifiedTargets: 1,
@@ -18,7 +19,7 @@ describe('Stremio handoff status mapping', () => {
     ).toEqual({
       state: 'repair',
       message:
-        'One or more Stremio handoff targets need repair. Disable the existing patches first, then Enable again to rebuild the integration.',
+        'The Stremio integration needs a safe reset. Disable the saved integration first, then Enable again to rebuild it.',
       canEnable: false,
       canDisable: true,
     })
@@ -29,6 +30,7 @@ describe('Stremio handoff status mapping', () => {
       packagedStremioStatus({
         enabled: false,
         repairNeeded: true,
+        automaticRepairBlocked: false,
         recordedTargets: 1,
         patchedTargets: 1,
         verifiedTargets: 0,
@@ -45,6 +47,7 @@ describe('Stremio handoff status mapping', () => {
       packagedStremioStatus({
         enabled: true,
         repairNeeded: false,
+        automaticRepairBlocked: false,
         recordedTargets: 1,
         patchedTargets: 1,
         verifiedTargets: 1,
@@ -59,6 +62,7 @@ describe('Stremio handoff status mapping', () => {
       packagedStremioStatus({
         enabled: false,
         repairNeeded: false,
+        automaticRepairBlocked: false,
         recordedTargets: 0,
         patchedTargets: 0,
         verifiedTargets: 0,
@@ -78,11 +82,28 @@ describe('Stremio handoff status mapping', () => {
     })
   })
 
-  it('keeps recovery actions available when packaged status inspection fails', () => {
+  it('blocks automatic actions when a recorded patch cannot be verified safely', () => {
+    expect(
+      packagedStremioStatus({
+        enabled: false,
+        repairNeeded: false,
+        automaticRepairBlocked: true,
+        recordedTargets: 1,
+        patchedTargets: 1,
+        verifiedTargets: 0,
+      }),
+    ).toMatchObject({
+      state: 'unknown',
+      canEnable: false,
+      canDisable: false,
+    })
+  })
+
+  it('fails closed when packaged status inspection itself fails', () => {
     expect(unknownPackagedStremioStatus()).toMatchObject({
       state: 'unknown',
-      canEnable: true,
-      canDisable: true,
+      canEnable: false,
+      canDisable: false,
     })
   })
 })
