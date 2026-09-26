@@ -19,6 +19,9 @@ export class PlaybackSurface {
       return getWin32WindowId(this.hostWindow)
     }
 
+    if (this.hostWindow || this.overlayWindow) {
+      this.onUserClosed?.()
+    }
     this.dispose()
 
     const hostWindow = new BaseWindow({
