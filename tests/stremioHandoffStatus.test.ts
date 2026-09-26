@@ -6,7 +6,7 @@ import {
 } from '../src/main/stremio/status'
 
 describe('Stremio handoff status mapping', () => {
-  it('keeps Disable available when verified and repair-needed targets are mixed', () => {
+  it('requires Disable then Enable when verified and repair-needed targets are mixed', () => {
     expect(
       packagedStremioStatus({
         enabled: false,
@@ -18,8 +18,24 @@ describe('Stremio handoff status mapping', () => {
     ).toEqual({
       state: 'repair',
       message:
-        'One or more Stremio handoff targets need repair. Enable to repair them, or Disable to remove existing patches.',
-      canEnable: true,
+        'One or more Stremio handoff targets need repair. Disable the existing patches first, then Enable again to rebuild the integration.',
+      canEnable: false,
+      canDisable: true,
+    })
+  })
+
+  it('does not offer Enable directly for a repair state because the helper patches only one discovered target', () => {
+    expect(
+      packagedStremioStatus({
+        enabled: false,
+        repairNeeded: true,
+        recordedTargets: 1,
+        patchedTargets: 1,
+        verifiedTargets: 0,
+      }),
+    ).toMatchObject({
+      state: 'repair',
+      canEnable: false,
       canDisable: true,
     })
   })
