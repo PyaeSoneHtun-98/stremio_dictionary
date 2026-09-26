@@ -1119,6 +1119,73 @@ jobs:
             throw 'Malformed-marker Stremio server.js was modified.'
           }
 
+          # A verified generated Subtitle Bridge block must remain removable if Stremio updates
+          # the surrounding discovery layout. The cleanup must remove only our block and preserve
+          # the newer surrounding Stremio content exactly.
+          $repairStatePath = Join-Path $env:RUNNER_TEMP 'SubtitleBridgeStremioRepairTargets.json'
+          Remove-Item -LiteralPath $repairStatePath -Force -ErrorAction SilentlyContinue
+          $env:SUBTITLE_BRIDGE_STREMIO_TARGETS_PATH = $repairStatePath
+          try {
+            $layoutChangedServerJs = Join-Path $stremioFixtureDir 'layout-changed-server.js'
+            [System.IO.File]::WriteAllText($layoutChangedServerJs, $originalServerJs)
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $layoutChangedServerJs
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Could not prepare the layout-changed Stremio cleanup fixture.'
+            }
+
+            $layoutChangedBase = $originalServerJs.Replace(
+              'devices.groups.external.push',
+              'devices.groups.other.push'
+            )
+            $layoutChangedPatched = [System.IO.File]::ReadAllText($layoutChangedServerJs).Replace(
+              'devices.groups.external.push',
+              'devices.groups.other.push'
+            )
+            [System.IO.File]::WriteAllText($layoutChangedServerJs, $layoutChangedPatched)
+
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -ServerJsPath $layoutChangedServerJs
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Disable helper could not remove a verified Subtitle Bridge block after the surrounding Stremio layout changed.'
+            }
+            if ([System.IO.File]::ReadAllText($layoutChangedServerJs) -ne $layoutChangedBase) {
+              throw 'Layout-changed cleanup modified Stremio content outside the generated Subtitle Bridge block.'
+            }
+            if (Test-Path -LiteralPath $repairStatePath) {
+              throw 'Successful layout-changed cleanup left the persisted Stremio target record behind.'
+            }
+
+            # If content inside our markers was edited, cleanup must fail closed instead of
+            # deleting arbitrary code merely because the familiar markers are still present.
+            $tamperedPatchServerJs = Join-Path $stremioFixtureDir 'tampered-patch-server.js'
+            [System.IO.File]::WriteAllText($tamperedPatchServerJs, $originalServerJs)
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $tamperedPatchServerJs
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Could not prepare the tampered Stremio patch fixture.'
+            }
+
+            $tamperedPatchContent = [System.IO.File]::ReadAllText($tamperedPatchServerJs).Replace(
+              'players.subtitleBridge = {',
+              'const inertSubtitleBridge = {'
+            )
+            [System.IO.File]::WriteAllText($tamperedPatchServerJs, $tamperedPatchContent)
+
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -ServerJsPath $tamperedPatchServerJs
+            $tamperedDisableExitCode = $LASTEXITCODE
+            $global:LASTEXITCODE = 0
+            if ($tamperedDisableExitCode -eq 0) {
+              throw 'Disable helper removed an edited marker block that no longer matched the generated Subtitle Bridge structure.'
+            }
+            if ([System.IO.File]::ReadAllText($tamperedPatchServerJs) -ne $tamperedPatchContent) {
+              throw 'Fail-closed cleanup modified the edited Stremio marker block.'
+            }
+            if (-not (Test-Path -LiteralPath $repairStatePath -PathType Leaf)) {
+              throw 'Failed Stremio cleanup discarded the persisted target record needed for recovery.'
+            }
+          } finally {
+            Remove-Item Env:SUBTITLE_BRIDGE_STREMIO_TARGETS_PATH -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $repairStatePath -Force -ErrorAction SilentlyContinue
+          }
+
           $updatedServerJs = Join-Path $stremioFixtureDir 'updated-server.js'
           [System.IO.File]::WriteAllText($updatedServerJs, $originalServerJs)
           $existingBackup = "$updatedServerJs.subtitle-bridge.backup"
