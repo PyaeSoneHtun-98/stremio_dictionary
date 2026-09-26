@@ -35,6 +35,10 @@ const EMPTY_STATE: PlaybackSnapshot = {
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
+const SUBTITLE_DELAY_MIN = -10
+const SUBTITLE_DELAY_MAX = 10
+const SUBTITLE_DELAY_STEP = 0.1
+const SUBTITLE_DELAY_NOTICE_MS = 1600
 const TARGET_LANGUAGE_OPTIONS = [
   { code: 'my', label: 'Burmese' },
   { code: 'ja', label: 'Japanese' },
@@ -107,6 +111,27 @@ export function PolishedOverlay(): React.JSX.Element {
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [controlError, setControlError] = useState<string | null>(null)
   const [doubleClickIntervalMs, setDoubleClickIntervalMs] = useState(500)
+  const [subtitleDelayNotice, setSubtitleDelayNotice] = useState<number | null>(null)
+  const subtitleDelayNoticeTimer = useRef<number | null>(null)
+
+  const showSubtitleDelayNotice = useCallback((value: number): void => {
+    setSubtitleDelayNotice(value)
+    if (subtitleDelayNoticeTimer.current !== null) {
+      window.clearTimeout(subtitleDelayNoticeTimer.current)
+    }
+    subtitleDelayNoticeTimer.current = window.setTimeout(() => {
+      subtitleDelayNoticeTimer.current = null
+      setSubtitleDelayNotice(null)
+    }, SUBTITLE_DELAY_NOTICE_MS)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (subtitleDelayNoticeTimer.current !== null) {
+        window.clearTimeout(subtitleDelayNoticeTimer.current)
+      }
+    }
+  }, [])
 
   const runControl = useCallback(async (action: () => Promise<void>): Promise<void> => {
     setControlError(null)
@@ -157,6 +182,11 @@ export function PolishedOverlay(): React.JSX.Element {
 
       if (currentFilePath.current !== snapshot.filePath) {
         setControlError(null)
+        setSubtitleDelayNotice(null)
+        if (subtitleDelayNoticeTimer.current !== null) {
+          window.clearTimeout(subtitleDelayNoticeTimer.current)
+          subtitleDelayNoticeTimer.current = null
+        }
       }
 
       if (selectionContextChanged) {
@@ -379,6 +409,24 @@ export function PolishedOverlay(): React.JSX.Element {
         return
       }
 
+      if (action.kind === 'subtitle-delay') {
+        const currentDelay = state.subtitleDelay ?? 0
+        const nextDelay =
+          Math.round(
+            clampPlayerValue(
+              currentDelay + action.deltaSeconds,
+              SUBTITLE_DELAY_MIN,
+              SUBTITLE_DELAY_MAX,
+            ) * 10,
+          ) / 10
+
+        void runControl(async () => {
+          await window.desktop.media.setSubtitleDelay(nextDelay)
+          showSubtitleDelayNotice(nextDelay)
+        })
+        return
+      }
+
       void runControl(() => window.desktop.media.toggleFullscreen())
     }
 
@@ -395,6 +443,8 @@ export function PolishedOverlay(): React.JSX.Element {
     panel,
     closePanel,
     state.volume,
+    state.subtitleDelay,
+    showSubtitleDelayNotice,
   ])
 
   const updateTranslationSettings = async (update: TranslationSettingsUpdate): Promise<boolean> => {
@@ -524,6 +574,12 @@ export function PolishedOverlay(): React.JSX.Element {
           <span className="player-buffering-spinner" aria-hidden="true" />
           <strong>{state.status === 'loading' ? 'Opening video…' : 'Buffering…'}</strong>
           <span>{state.buffering ? 'Waiting for stream data' : 'Preparing playback'}</span>
+        </div>
+      ) : null}
+
+      {subtitleDelayNotice !== null ? (
+        <div className="subtitle-delay-osd" role="status" aria-live="polite">
+          Subtitle delay: <strong>{formatSubtitleDelay(subtitleDelayNotice)}</strong>
         </div>
       ) : null}
 
@@ -704,6 +760,12 @@ export function PolishedOverlay(): React.JSX.Element {
                   <dt>Volume</dt>
                   <dd>
                     <kbd>↑</kbd> <kbd>↓</kbd>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Subtitle delay</dt>
+                  <dd>
+                    earlier <kbd>G</kbd> · later <kbd>H</kbd>
                   </dd>
                 </div>
                 <div>
@@ -1214,6 +1276,13 @@ function subtitleControlTitle(state: PlaybackSnapshot, tracks: MediaTrack[]): st
     return 'Pause playback to change subtitle tracks.'
   }
   return 'Choose an embedded text subtitle track.'
+}
+
+function formatSubtitleDelay(seconds: number): string {
+  if (Math.abs(seconds) < 0.0001) {
+    return '0.0 s'
+  }
+  return `${seconds > 0 ? '+' : ''}${seconds.toFixed(1)} s`
 }
 
 function formatTime(seconds: number | null): string {
