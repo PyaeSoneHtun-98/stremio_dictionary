@@ -1,5 +1,9 @@
-import { useEffect, useState } from 'react'
-import type { OpenVideoResult, PlaybackSnapshot } from '../../../../shared/media'
+import { useCallback, useEffect, useState } from 'react'
+import type {
+  OpenVideoResult,
+  PlaybackSnapshot,
+  StremioHandoffStatus,
+} from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
 import './PlaybackProof.css'
 
@@ -24,6 +28,22 @@ export function PlaybackProof(): React.JSX.Element {
   const [localError, setLocalError] = useState<string | null>(null)
   const [stremioBusy, setStremioBusy] = useState(false)
   const [stremioMessage, setStremioMessage] = useState<string | null>(null)
+  const [stremioStatus, setStremioStatus] = useState<StremioHandoffStatus | null>(null)
+
+  const refreshStremioStatus = useCallback(async (): Promise<void> => {
+    try {
+      setStremioStatus(await window.desktop.stremio.getHandoffStatus())
+    } catch {
+      setStremioStatus({
+        state: 'unknown',
+        message: 'Could not verify the current Stremio integration state.',
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshStremioStatus()
+  }, [refreshStremioStatus])
 
   useEffect(() => {
     let active = true
@@ -101,6 +121,9 @@ export function PlaybackProof(): React.JSX.Element {
         ? await window.desktop.stremio.enableHandoff()
         : await window.desktop.stremio.disableHandoff()
       setStremioMessage(result.message)
+      if (result.ok) {
+        await refreshStremioStatus()
+      }
     } catch {
       setStremioMessage('Could not update the Stremio integration. Try again.')
     } finally {
@@ -137,7 +160,7 @@ export function PlaybackProof(): React.JSX.Element {
       <div className="launcher-panel-heading">
         <div>
           <span className="eyebrow">Start watching</span>
-          <h2 id="playback-proof-title">Your player, ready when you are.</h2>
+          <h2 id="playback-proof-title">Choose how to play</h2>
         </div>
         <span className={`status-pill status-${displayStatus}`}>
           <span className="status-indicator" aria-hidden="true" />
@@ -173,15 +196,28 @@ export function PlaybackProof(): React.JSX.Element {
             </svg>
           </div>
           <div className="launch-card-copy">
-            <span className="launch-card-kicker">Streaming</span>
+            <div className="launch-card-kicker-row">
+              <span className="launch-card-kicker">Stremio</span>
+              <span
+                className={`integration-state integration-${stremioStatus?.state ?? 'checking'}`}
+                title={stremioStatus?.message ?? 'Checking Stremio integration…'}
+              >
+                <span aria-hidden="true" />
+                {stremioStatus ? formatStremioState(stremioStatus.state) : 'Checking'}
+              </span>
+            </div>
             <h3>Play from Stremio</h3>
-            <p>Enable the handoff once, restart Stremio, then choose Play in Subtitle Bridge.</p>
+            <p>
+              {stremioStatus?.state === 'enabled'
+                ? 'Handoff is ready. Choose Play in Subtitle Bridge from Stremio.'
+                : 'Enable once, restart Stremio, then choose Play in Subtitle Bridge.'}
+            </p>
           </div>
           <div className="stremio-actions">
             <button
               className="secondary-action"
               type="button"
-              disabled={stremioBusy}
+              disabled={stremioBusy || stremioStatus === null || stremioStatus.state === 'enabled'}
               onClick={() => void updateStremioHandoff(true)}
             >
               {stremioBusy ? 'Working…' : 'Enable'}
@@ -189,11 +225,16 @@ export function PlaybackProof(): React.JSX.Element {
             <button
               className="secondary-action secondary-action-quiet"
               type="button"
-              disabled={stremioBusy}
+              disabled={stremioBusy || stremioStatus === null || stremioStatus.state === 'disabled'}
               onClick={() => void updateStremioHandoff(false)}
             >
               Disable
             </button>
+            {stremioMessage ? (
+              <span className="stremio-feedback" aria-live="polite">
+                {stremioMessage}
+              </span>
+            ) : null}
           </div>
         </section>
       </div>
@@ -225,12 +266,6 @@ export function PlaybackProof(): React.JSX.Element {
             </span>
           </div>
         </section>
-      ) : null}
-
-      {stremioMessage ? (
-        <p className="playback-help" aria-live="polite">
-          {stremioMessage}
-        </p>
       ) : null}
 
       {state.error || localError ? (
@@ -322,6 +357,19 @@ export function PlaybackProof(): React.JSX.Element {
       </details>
     </section>
   )
+}
+
+function formatStremioState(state: StremioHandoffStatus['state']): string {
+  switch (state) {
+    case 'enabled':
+      return 'Enabled'
+    case 'disabled':
+      return 'Disabled'
+    case 'unavailable':
+      return 'Unavailable'
+    default:
+      return 'Unknown'
+  }
 }
 
 function isSupportedLocalVideo(fileName: string): boolean {
