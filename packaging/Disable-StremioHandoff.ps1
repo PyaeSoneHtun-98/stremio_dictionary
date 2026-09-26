@@ -21,7 +21,9 @@ $GeneratedPatchPattern = (
   'win32\s*:\s*\{\s*path\s*:\s*\[\s*"(?:\\.|[^"\\])*"\s*\]\s*\}\s*' +
   '\}\s*;\s*' +
   [regex]::Escape($MarkerEnd) +
-  '\s*
+  '\s*$'
+)
+
 function Get-StremioTargetStatePath {
   if (-not [string]::IsNullOrWhiteSpace($env:SUBTITLE_BRIDGE_STREMIO_TARGETS_PATH)) {
     return [System.IO.Path]::GetFullPath($env:SUBTITLE_BRIDGE_STREMIO_TARGETS_PATH)
