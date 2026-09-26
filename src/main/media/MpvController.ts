@@ -328,7 +328,7 @@ export class MpvController {
       }
       const handleError = (error: Error): void => {
         child.off('spawn', handleSpawn)
-        diagnosticLog('mpv.spawnFailed', { source: runtime.source, message: error.message })
+        diagnosticLog('mpv.spawnFailed', { source: runtime.source, reason: 'spawn-error' })
         reject(error)
       }
 
@@ -424,7 +424,7 @@ export class MpvController {
       return
     }
 
-    diagnosticLog('mpv.ipcFailure', { message })
+    diagnosticLog('mpv.ipcFailure', { reason: 'connection-lost' })
     this.socket = null
     if (!socket.destroyed) {
       socket.destroy()
