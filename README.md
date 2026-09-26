@@ -2,9 +2,9 @@
 
 Subtitle Bridge is a Windows desktop video player for English learners. It plays local MKV files and supported HTTP/HTTPS media streams, shows supported English text subtitles as clickable words, and provides offline English → Burmese word and phrase lookup without leaving the player.
 
-## Windows v1.0.4
+## Windows v1.0.5
 
-Subtitle Bridge v1.0.4 is a focused Windows updater reliability release. It keeps the stable player UX, dictionary/phrase lookup, Stremio handoff, runtime, and secure user-approved updater from v1.0.3 while fixing the install-directory shutdown race that could make an in-app upgrade fail on some PCs.
+Subtitle Bridge v1.0.5 adds local MP4 playback, faster subtitle timing adjustment with G/H shortcuts, launcher/player polish, and safer Stremio integration status and recovery while preserving the updater reliability fixes from v1.0.4.
 
 ### Normal installation
 
@@ -50,7 +50,7 @@ The one-click setup EXE is the recommended download for normal users.
 
 ## In-app update support
 
-Subtitle Bridge v1.0.4 includes the same user-approved Windows updater and strengthens the updater-to-installer shutdown handoff.
+Subtitle Bridge v1.0.5 keeps the user-approved Windows updater and the hardened updater-to-installer shutdown handoff from v1.0.4.
 
 - Subtitle Bridge checks the official stable GitHub Release shortly after startup and periodically.
 - Up-to-date checks stay unobtrusive.
@@ -62,25 +62,25 @@ Subtitle Bridge v1.0.4 includes the same user-approved Windows updater and stren
 - Installation is blocked while video playback is loading, playing, or paused.
 - Offline/update-server failures do not block normal playback or dictionary use.
 
-The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository. v1.0.4 also waits safely for the launching app to exit, tolerates bounded transient install-directory locks, verifies updater-parent identity, and remains compatible with older updater-enabled builds that do not pass the new identity metadata.
+The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository. v1.0.5 retains the v1.0.4 shutdown protections: verified updater-parent identity, safe exit waiting, bounded transient install-directory lock handling, and compatibility with older updater-enabled builds.
 
-## What v1.0.4 includes
+## What v1.0.5 includes
 
-- local MKV playback;
+- local MKV and MP4 playback;
 - HTTP/HTTPS and Stremio stream playback;
 - centered stream buffering/loading feedback;
 - single-click video-surface play/pause;
 - double-click fullscreen using the Windows-configured double-click interval;
 - synchronized clickable embedded SRT/ASS/SSA text subtitles;
 - native external SRT/ASS/SSA file picker plus drag-and-drop loading;
-- subtitle delay, size, and position controls;
+- subtitle delay, size, and position controls, including G/H 0.1-second timing shortcuts with on-screen feedback;
 - frozen 30,000-headword English → Burmese Dictionary v1.0;
 - frozen 3,000-entry Phrase Dictionary v1.0.0 with longest-match phrase detection and normal single-word fallback;
 - compact launcher with Local video, Stremio, and current-session status;
 - installer-managed, pinned, SHA-256-verified mpv and FFmpeg;
 - Start Menu and Windows uninstall integration;
 - rollback-safe upgrades and recovery after interrupted setup;
-- opt-in in-app Stremio enable/disable controls;
+- opt-in in-app Stremio enable/disable controls with verified status, repair-state guidance, and fail-closed cleanup;
 - secure user-approved GitHub Release update checking/downloading with SHA-256 verification;
 - custom install-directory preservation during in-app updates;
 - redacted rotating diagnostics;
