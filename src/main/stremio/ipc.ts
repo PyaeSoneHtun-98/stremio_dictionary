@@ -1,9 +1,10 @@
 import { app, ipcMain } from 'electron'
 import { resolve } from 'node:path'
-import type { StremioHandoffResult } from '../../shared/media'
+import type { StremioHandoffResult, StremioHandoffStatus } from '../../shared/media'
 import { diagnosticLog } from '../diagnostics'
 import { StremioHandoffService } from './HandoffService'
 
+const STATUS_CHANNEL = 'stremio:get-handoff-status'
 const ENABLE_CHANNEL = 'stremio:enable-handoff'
 const DISABLE_CHANNEL = 'stremio:disable-handoff'
 
@@ -15,9 +16,38 @@ export function registerStremioIpc(): void {
   }
 
   registered = true
-  const service = app.isPackaged
-    ? new StremioHandoffService(resolveHelperRoot(), app.getPath('exe'))
-    : null
+  const statusService = new StremioHandoffService(resolveHelperRoot(), app.getPath('exe'))
+  const service = app.isPackaged ? statusService : null
+
+  ipcMain.handle(STATUS_CHANNEL, (): StremioHandoffStatus => {
+    if (process.platform !== 'win32') {
+      return {
+        state: 'unavailable',
+        message: 'Stremio integration is currently available on Windows only.'
+      }
+    }
+
+    try {
+      const status = statusService.inspectStatus()
+      if (status.enabled) {
+        return {
+          state: 'enabled',
+          message: 'Play in Subtitle Bridge is enabled in Stremio.'
+        }
+      }
+
+      return {
+        state: 'disabled',
+        message: 'Play in Subtitle Bridge is not enabled in Stremio.'
+      }
+    } catch {
+      diagnosticLog('stremio.handoffStatusFailed', { reason: 'inspection-failed' })
+      return {
+        state: 'unknown',
+        message: 'Could not verify the current Stremio integration state.'
+      }
+    }
+  })
 
   ipcMain.handle(ENABLE_CHANNEL, async (): Promise<StremioHandoffResult> => {
     diagnosticLog('stremio.handoffEnableRequested')
@@ -78,6 +108,7 @@ export function disposeStremioIpc(): void {
     return
   }
 
+  ipcMain.removeHandler(STATUS_CHANNEL)
   ipcMain.removeHandler(ENABLE_CHANNEL)
   ipcMain.removeHandler(DISABLE_CHANNEL)
   registered = false
