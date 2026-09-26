@@ -97,6 +97,13 @@ export interface LoadExternalSubtitleResult {
   error?: string
 }
 
+export type StremioHandoffState = 'enabled' | 'disabled' | 'unknown' | 'unavailable'
+
+export interface StremioHandoffStatus {
+  state: StremioHandoffState
+  message: string
+}
+
 export interface StremioHandoffResult {
   ok: boolean
   message: string
@@ -127,6 +134,7 @@ export interface DesktopBridge {
   }
   update: UpdateBridge
   stremio: {
+    getHandoffStatus: () => Promise<StremioHandoffStatus>
     enableHandoff: () => Promise<StremioHandoffResult>
     disableHandoff: () => Promise<StremioHandoffResult>
   }
