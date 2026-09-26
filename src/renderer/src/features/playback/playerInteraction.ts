@@ -5,6 +5,7 @@ export type PlayerShortcut =
   | { kind: 'toggle-playback' }
   | { kind: 'seek'; deltaSeconds: number }
   | { kind: 'volume'; delta: number }
+  | { kind: 'subtitle-delay'; deltaSeconds: number }
   | { kind: 'fullscreen' }
 
 export interface PlayerShortcutOptions {
@@ -146,6 +147,12 @@ export function resolvePlayerShortcut(
       return { kind: 'volume', delta: -5 }
     case 'ArrowUp':
       return { kind: 'volume', delta: 5 }
+    case 'g':
+    case 'G':
+      return { kind: 'subtitle-delay', deltaSeconds: -0.1 }
+    case 'h':
+    case 'H':
+      return { kind: 'subtitle-delay', deltaSeconds: 0.1 }
     case 'f':
     case 'F':
       return { kind: 'fullscreen' }
@@ -167,7 +174,7 @@ export function subtitleRecoveryMessage(
   }
 
   if (status === 'missing') {
-    return 'No usable embedded text subtitles were found. Playback still works; try another subtitle track or another MKV.'
+    return 'No usable embedded text subtitles were found. Playback still works; try another subtitle track or load an external subtitle file.'
   }
 
   if (status === 'unsupported') {
