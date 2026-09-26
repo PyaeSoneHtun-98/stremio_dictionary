@@ -70,9 +70,9 @@ export function registerMediaIpc(): void {
   ipcMain.handle(OPEN_VIDEO_CHANNEL, async (event): Promise<OpenVideoResult> => {
     const parentWindow = BrowserWindow.fromWebContents(event.sender)
     const options: OpenDialogOptions = {
-      title: 'Open MKV video',
+      title: 'Open video',
       properties: ['openFile'],
-      filters: [{ name: 'Matroska video', extensions: ['mkv'] }]
+      filters: [{ name: 'Video files', extensions: ['mkv', 'mp4'] }]
     }
     const result = parentWindow
       ? await dialog.showOpenDialog(parentWindow, options)
@@ -204,7 +204,7 @@ async function openMediaTargetNow(rawTarget: string): Promise<OpenVideoResult> {
 
     const mediaTarget = parseMediaTarget(rawTarget)
     if (mediaTarget.kind === 'file') {
-      await validateMkvFile(mediaTarget.target)
+      await validateLocalVideoFile(mediaTarget.target)
     }
 
     const windowId = await playbackSurface.ensure()
@@ -253,7 +253,7 @@ export function disposeMediaIpc(): void {
   registered = false
 }
 
-async function validateMkvFile(filePath: string): Promise<void> {
+async function validateLocalVideoFile(filePath: string): Promise<void> {
   let fileStats: Awaited<ReturnType<typeof stat>>
   try {
     fileStats = await stat(filePath)
