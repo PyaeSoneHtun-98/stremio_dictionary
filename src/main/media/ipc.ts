@@ -34,6 +34,7 @@ const SEEK_CHANNEL = 'media:seek'
 const SET_VOLUME_CHANNEL = 'media:set-volume'
 const SET_SPEED_CHANNEL = 'media:set-speed'
 const SET_SUBTITLE_DELAY_CHANNEL = 'media:set-subtitle-delay'
+const ADJUST_SUBTITLE_DELAY_CHANNEL = 'media:adjust-subtitle-delay'
 const SELECT_SUBTITLE_TRACK_CHANNEL = 'media:select-subtitle-track'
 const GET_SUBTITLE_PREFERENCES_CHANNEL = 'media:get-subtitle-preferences'
 const UPDATE_SUBTITLE_PREFERENCES_CHANNEL = 'media:update-subtitle-preferences'
@@ -154,6 +155,11 @@ export function registerMediaIpc(): void {
   ipcMain.handle(SET_SUBTITLE_DELAY_CHANNEL, (_event, seconds: unknown) => {
     controller.setSubtitleDelay(requireFiniteNumber(seconds, 'subtitle delay'))
   })
+  ipcMain.handle(ADJUST_SUBTITLE_DELAY_CHANNEL, (_event, deltaSeconds: unknown): number => {
+    return controller.adjustSubtitleDelay(
+      requireFiniteNumber(deltaSeconds, 'subtitle delay adjustment')
+    )
+  })
   ipcMain.handle(SELECT_SUBTITLE_TRACK_CHANNEL, async (_event, trackId: unknown) => {
     const value = requireFiniteNumber(trackId, 'subtitle track')
     if (!Number.isSafeInteger(value)) {
@@ -201,6 +207,8 @@ export function openMediaTarget(rawTarget: string): Promise<OpenVideoResult> {
 }
 
 async function openMediaTargetNow(rawTarget: string): Promise<OpenVideoResult> {
+  let controllerLoadStarted = false
+
   try {
     // Defense in depth: never allow an environment change after module initialization to
     // re-enable mpv's unsafe raw log-file output for a later media request.
@@ -215,6 +223,7 @@ async function openMediaTargetNow(rawTarget: string): Promise<OpenVideoResult> {
     externalSubtitleLoadCoordinator.invalidate()
     externalSubtitleExtractor.cancel()
     subtitleSession.clear(controller.getState())
+    controllerLoadStarted = true
     await controller.load(mediaTarget.target, windowId, mediaTarget.displayName)
     // Loading mpv can take long enough for the regular app window to finish showing
     // and steal foreground activation. Re-activate the player after mpv is ready so
@@ -222,9 +231,12 @@ async function openMediaTargetNow(rawTarget: string): Promise<OpenVideoResult> {
     playbackSurface.focus()
     return { cancelled: false }
   } catch (error) {
+    const safePlaybackError = controllerLoadStarted ? controller.getState().error : null
     return {
       cancelled: false,
-      error: error instanceof Error ? error.message : 'Could not open the video.'
+      error:
+        safePlaybackError ??
+        (error instanceof Error ? error.message : 'Could not open the video.')
     }
   }
 }
@@ -250,6 +262,7 @@ export function disposeMediaIpc(): void {
   ipcMain.removeHandler(SET_VOLUME_CHANNEL)
   ipcMain.removeHandler(SET_SPEED_CHANNEL)
   ipcMain.removeHandler(SET_SUBTITLE_DELAY_CHANNEL)
+  ipcMain.removeHandler(ADJUST_SUBTITLE_DELAY_CHANNEL)
   ipcMain.removeHandler(SELECT_SUBTITLE_TRACK_CHANNEL)
   ipcMain.removeHandler(GET_SUBTITLE_PREFERENCES_CHANNEL)
   ipcMain.removeHandler(UPDATE_SUBTITLE_PREFERENCES_CHANNEL)
