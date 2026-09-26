@@ -37,7 +37,8 @@ export function PlaybackProof(): React.JSX.Element {
       setStremioStatus({
         state: 'unknown',
         message: 'Could not verify the current Stremio integration state.',
-        canChange: false,
+        canEnable: false,
+        canDisable: false,
       })
     }
   }, [])
@@ -211,9 +212,14 @@ export function PlaybackProof(): React.JSX.Element {
             <p>
               {stremioStatus?.state === 'enabled'
                 ? 'Handoff is ready. Choose Play in Subtitle Bridge from Stremio.'
-                : stremioStatus && !stremioStatus.canChange
-                  ? 'Status is read-only in development. Change it from the installed app.'
-                  : 'Enable once, restart Stremio, then choose Play in Subtitle Bridge.'}
+                : stremioStatus?.state === 'repair'
+                  ? 'Handoff needs repair. Enable to repair it, or Disable to remove existing patches.'
+                  : stremioStatus &&
+                      !stremioStatus.canEnable &&
+                      !stremioStatus.canDisable &&
+                      stremioStatus.state === 'unknown'
+                    ? 'Status is read-only in development. Check it from the installed app.'
+                    : 'Enable once, restart Stremio, then choose Play in Subtitle Bridge.'}
             </p>
           </div>
           <div className="stremio-actions">
@@ -221,10 +227,7 @@ export function PlaybackProof(): React.JSX.Element {
               className="secondary-action"
               type="button"
               disabled={
-                stremioBusy ||
-                stremioStatus === null ||
-                !stremioStatus.canChange ||
-                stremioStatus.state === 'enabled'
+                stremioBusy || stremioStatus === null || !stremioStatus.canEnable
               }
               onClick={() => void updateStremioHandoff(true)}
             >
@@ -234,10 +237,7 @@ export function PlaybackProof(): React.JSX.Element {
               className="secondary-action secondary-action-quiet"
               type="button"
               disabled={
-                stremioBusy ||
-                stremioStatus === null ||
-                !stremioStatus.canChange ||
-                stremioStatus.state === 'disabled'
+                stremioBusy || stremioStatus === null || !stremioStatus.canDisable
               }
               onClick={() => void updateStremioHandoff(false)}
             >
@@ -380,6 +380,8 @@ function formatStremioState(state: StremioHandoffStatus['state']): string {
       return 'Enabled'
     case 'disabled':
       return 'Disabled'
+    case 'repair':
+      return 'Repair needed'
     case 'unavailable':
       return 'Unavailable'
     default:
