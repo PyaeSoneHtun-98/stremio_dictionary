@@ -11,7 +11,6 @@ import './Player.css'
 import { PlayerIcon } from './PlayerIcon'
 import { usePlayerChrome } from './usePlayerChrome'
 import {
-  adjustSubtitleDelay,
   clampPlayerValue,
   isInteractiveKeyboardTarget,
   isInteractiveSurfaceTarget,
@@ -144,8 +143,6 @@ export function PolishedOverlay(): React.JSX.Element {
   const currentSubtitleTrackId = useRef<number | null>(null)
   const translationRequestVersion = useRef(0)
   const stateRef = useRef<PlaybackSnapshot>(EMPTY_STATE)
-  const shortcutSubtitleDelayRef = useRef(0)
-  const pendingSubtitleDelayRequests = useRef(0)
   const surfaceGestureCoordinator = useMemo(
     () =>
       new SurfaceGestureCoordinator(
@@ -173,9 +170,6 @@ export function PolishedOverlay(): React.JSX.Element {
 
       surfaceGestureCoordinator.handleStateTransition(stateRef.current, snapshot)
       stateRef.current = snapshot
-      if (pendingSubtitleDelayRequests.current === 0) {
-        shortcutSubtitleDelayRef.current = snapshot.subtitleDelay ?? 0
-      }
 
       const nextCueId = snapshot.subtitle.activeCue?.id ?? null
       const selectionContextChanged =
@@ -413,26 +407,9 @@ export function PolishedOverlay(): React.JSX.Element {
       }
 
       if (action.kind === 'subtitle-delay') {
-        const previousDelay = shortcutSubtitleDelayRef.current
-        const nextDelay = adjustSubtitleDelay(previousDelay, action.deltaSeconds)
-        shortcutSubtitleDelayRef.current = nextDelay
-        pendingSubtitleDelayRequests.current += 1
-
         void runControl(async () => {
-          let succeeded = false
-          try {
-            await window.desktop.media.setSubtitleDelay(nextDelay)
-            succeeded = true
-            showSubtitleDelayNotice(nextDelay)
-          } finally {
-            pendingSubtitleDelayRequests.current = Math.max(
-              0,
-              pendingSubtitleDelayRequests.current - 1,
-            )
-            if (!succeeded && pendingSubtitleDelayRequests.current === 0) {
-              shortcutSubtitleDelayRef.current = stateRef.current.subtitleDelay ?? previousDelay
-            }
-          }
+          const nextDelay = await window.desktop.media.adjustSubtitleDelay(action.deltaSeconds)
+          showSubtitleDelayNotice(nextDelay)
         })
         return
       }
