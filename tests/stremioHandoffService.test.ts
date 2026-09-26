@@ -180,6 +180,40 @@ describe('StremioHandoffService', () => {
     })
   })
 
+  it('marks mixed state when a verified target is accompanied by a missing recorded target', () => {
+    const helperRoot = createHelperFixture()
+    const statePath = join(helperRoot, 'stremio-handoff-targets.json')
+    const patchedServerPath = join(helperRoot, 'server.js')
+    const missingServerPath = join(helperRoot, 'removed-stremio', 'server.js')
+    const executablePath = 'C:\\Subtitle Bridge.exe'
+
+    writeFileSync(patchedServerPath, stremioPatch(executablePath))
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        version: 1,
+        application: 'Subtitle Bridge',
+        paths: [patchedServerPath, missingServerPath]
+      })
+    )
+
+    const service = new StremioHandoffService(
+      helperRoot,
+      executablePath,
+      vi.fn(async () => undefined),
+      statePath
+    )
+
+    expect(service.inspectStatus()).toEqual({
+      enabled: false,
+      repairNeeded: true,
+      automaticRepairBlocked: false,
+      recordedTargets: 2,
+      patchedTargets: 1,
+      verifiedTargets: 1
+    })
+  })
+
   it('marks mixed state for a verified target plus an existing recorded target that lost its patch', () => {
     const helperRoot = createHelperFixture()
     const statePath = join(helperRoot, 'stremio-handoff-targets.json')
