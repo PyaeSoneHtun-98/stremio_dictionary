@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -96,6 +96,82 @@ describe('StremioHandoffService', () => {
       recordedTargets: 1,
       patchedTargets: 0,
       verifiedTargets: 0
+    })
+  })
+
+  it('marks an inert marked block for repair even when it contains the current executable path', () => {
+    const helperRoot = createHelperFixture()
+    const statePath = join(helperRoot, 'stremio-handoff-targets.json')
+    const serverPath = join(helperRoot, 'server.js')
+    const executablePath = 'C:\\Subtitle Bridge.exe'
+    writeFileSync(
+      serverPath,
+      stremioPatch(executablePath).replace('players.subtitleBridge = {', 'const inert = {')
+    )
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        version: 1,
+        application: 'Subtitle Bridge',
+        paths: [serverPath]
+      })
+    )
+
+    const service = new StremioHandoffService(
+      helperRoot,
+      executablePath,
+      vi.fn(async () => undefined),
+      statePath
+    )
+
+    expect(service.inspectStatus()).toEqual({
+      enabled: false,
+      repairNeeded: true,
+      recordedTargets: 1,
+      patchedTargets: 1,
+      verifiedTargets: 0
+    })
+  })
+
+  it('preserves mixed target information when one patch works and another needs repair', () => {
+    const helperRoot = createHelperFixture()
+    const statePath = join(helperRoot, 'stremio-handoff-targets.json')
+    const currentDirectory = join(helperRoot, 'current')
+    const staleDirectory = join(helperRoot, 'stale')
+    mkdirSync(currentDirectory)
+    mkdirSync(staleDirectory)
+
+    const currentServerPath = join(currentDirectory, 'server.js')
+    const staleServerPath = join(staleDirectory, 'server.js')
+    const executablePath = 'C:\\Subtitle Bridge.exe'
+
+    writeFileSync(currentServerPath, stremioPatch(executablePath))
+    writeFileSync(
+      staleServerPath,
+      stremioPatch('D:\\Old Subtitle Bridge\\Subtitle Bridge.exe')
+    )
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        version: 1,
+        application: 'Subtitle Bridge',
+        paths: [currentServerPath, staleServerPath]
+      })
+    )
+
+    const service = new StremioHandoffService(
+      helperRoot,
+      executablePath,
+      vi.fn(async () => undefined),
+      statePath
+    )
+
+    expect(service.inspectStatus()).toEqual({
+      enabled: false,
+      repairNeeded: true,
+      recordedTargets: 2,
+      patchedTargets: 2,
+      verifiedTargets: 1
     })
   })
 
