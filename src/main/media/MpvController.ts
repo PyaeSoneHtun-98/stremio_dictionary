@@ -6,10 +6,14 @@ import { diagnosticLog } from '../diagnostics'
 import { resolveMpvExecutable } from '../runtimeTools'
 import { SubtitleExtractor } from '../subtitles/SubtitleExtractor'
 import { findActiveCue, tokenizeSubtitleText } from '../subtitles/normalize'
-import { adjustedSubtitleTime, normalizeSubtitleDelay } from '../subtitles/timing'
+import {
+  adjustedSubtitleTime,
+  MAX_SUBTITLE_DELAY_SECONDS,
+  MIN_SUBTITLE_DELAY_SECONDS,
+  normalizeSubtitleDelay
+} from '../subtitles/timing'
 import { deriveBufferingState } from './bufferingState'
 
-const PIPE_PATH = `\\\\.\\pipe\\subtitle-bridge-mpv-${process.pid}`
 const CONNECT_RETRIES = 50
 const CONNECT_DELAY_MS = 100
 const MAX_LIVE_SUBTITLE_TOKENS = 500
@@ -117,7 +121,7 @@ export class MpvController {
       const message = toUserMessage(error)
       diagnosticLog('media.loadFailed', { fileName: displayName, message })
       this.patchState({ status: 'unavailable', currentTime: null, error: message })
-      throw error
+      throw new Error(message)
     }
   }
 
@@ -181,6 +185,21 @@ export class MpvController {
       subtitleDelay: nextDelay,
       subtitle: { ...this.state.subtitle, activeCue }
     })
+  }
+
+  adjustSubtitleDelay(deltaSeconds: number): number {
+    this.assertControllable()
+    if (!Number.isFinite(deltaSeconds)) {
+      throw new Error('Subtitle delay adjustment must be a finite number.')
+    }
+
+    const currentDelay = this.state.subtitleDelay ?? 0
+    const nextDelay = Math.min(
+      MAX_SUBTITLE_DELAY_SECONDS,
+      Math.max(MIN_SUBTITLE_DELAY_SECONDS, currentDelay + deltaSeconds)
+    )
+    this.setSubtitleDelay(nextDelay)
+    return this.state.subtitleDelay
   }
 
   async selectSubtitleTrack(trackId: number): Promise<void> {
@@ -249,6 +268,7 @@ export class MpvController {
   }
 
   private stopMpvProcess(): void {
+    this.incomingBuffer = ''
     const child = this.child
     if (child) {
       this.expectedExits.add(child)
@@ -278,6 +298,7 @@ export class MpvController {
     }
 
     const runtime = resolveMpvExecutable()
+    const pipePath = mpvPipePath(generation)
     diagnosticLog('mpv.start', { source: runtime.source })
     const child = spawn(
       runtime.executable,
@@ -295,7 +316,7 @@ export class MpvController {
         '--hwdec=no',
         ...mpvDiagnosticArguments(),
         `--wid=${windowId}`,
-        `--input-ipc-server=${PIPE_PATH}`
+        `--input-ipc-server=${pipePath}`
       ],
       {
         windowsHide: true,
@@ -350,7 +371,7 @@ export class MpvController {
 
     let socket: Socket
     try {
-      socket = await connectToPipe()
+      socket = await connectToPipe(pipePath)
     } catch (error) {
       if (this.child === child) {
         this.child = null
@@ -377,6 +398,7 @@ export class MpvController {
       return false
     }
 
+    this.incomingBuffer = ''
     this.socket = socket
     socket.setEncoding('utf8')
     socket.on('data', (chunk) => this.handleChunk(chunk.toString()))
@@ -904,12 +926,19 @@ function isHttpMediaTarget(value: string | null | undefined): boolean {
   }
 }
 
-async function connectToPipe(): Promise<Socket> {
+export function mpvPipePath(generation: number): string {
+  if (!Number.isSafeInteger(generation) || generation < 0) {
+    throw new Error('Invalid mpv playback generation.')
+  }
+  return `\\\\.\\pipe\\subtitle-bridge-mpv-${process.pid}-${generation}`
+}
+
+async function connectToPipe(pipePath: string): Promise<Socket> {
   let lastError: Error | null = null
 
   for (let attempt = 0; attempt < CONNECT_RETRIES; attempt += 1) {
     try {
-      return await connectOnce()
+      return await connectOnce(pipePath)
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
       await delay(CONNECT_DELAY_MS)
@@ -919,9 +948,9 @@ async function connectToPipe(): Promise<Socket> {
   throw lastError ?? new Error('Could not connect to mpv IPC')
 }
 
-function connectOnce(): Promise<Socket> {
+function connectOnce(pipePath: string): Promise<Socket> {
   return new Promise((resolve, reject) => {
-    const socket = createConnection(PIPE_PATH)
+    const socket = createConnection(pipePath)
     let connected = false
 
     const handleConnect = (): void => {
