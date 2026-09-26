@@ -184,10 +184,10 @@ p {
 }
 
 .primary-action {
-  min-width: 126px;
+  min-width: 116px;
   border: 0;
-  border-radius: 11px;
-  padding: 11px 16px;
+  border-radius: 10px;
+  padding: 9px 14px;
   background: #b5e6d1;
   color: #11281f;
   font-weight: 760;
