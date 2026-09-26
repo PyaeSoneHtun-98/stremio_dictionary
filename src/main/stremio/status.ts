@@ -8,8 +8,8 @@ export function packagedStremioStatus(
     return {
       state: 'repair',
       message:
-        'One or more Stremio handoff targets need repair. Enable to repair them, or Disable to remove existing patches.',
-      canEnable: true,
+        'One or more Stremio handoff targets need repair. Disable the existing patches first, then Enable again to rebuild the integration.',
+      canEnable: false,
       canDisable: inspection.patchedTargets > 0
     }
   }
