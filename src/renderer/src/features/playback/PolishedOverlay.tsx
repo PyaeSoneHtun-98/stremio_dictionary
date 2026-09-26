@@ -144,6 +144,7 @@ export function PolishedOverlay(): React.JSX.Element {
   const currentSubtitleTrackId = useRef<number | null>(null)
   const translationRequestVersion = useRef(0)
   const stateRef = useRef<PlaybackSnapshot>(EMPTY_STATE)
+  const shortcutSubtitleDelayRef = useRef(0)
   const surfaceGestureCoordinator = useMemo(
     () =>
       new SurfaceGestureCoordinator(
@@ -171,6 +172,7 @@ export function PolishedOverlay(): React.JSX.Element {
 
       surfaceGestureCoordinator.handleStateTransition(stateRef.current, snapshot)
       stateRef.current = snapshot
+      shortcutSubtitleDelayRef.current = snapshot.subtitleDelay ?? 0
 
       const nextCueId = snapshot.subtitle.activeCue?.id ?? null
       const selectionContextChanged =
@@ -408,12 +410,18 @@ export function PolishedOverlay(): React.JSX.Element {
       }
 
       if (action.kind === 'subtitle-delay') {
-        const currentDelay = state.subtitleDelay ?? 0
-        const nextDelay = adjustSubtitleDelay(currentDelay, action.deltaSeconds)
+        const previousDelay = shortcutSubtitleDelayRef.current
+        const nextDelay = adjustSubtitleDelay(previousDelay, action.deltaSeconds)
+        shortcutSubtitleDelayRef.current = nextDelay
 
         void runControl(async () => {
-          await window.desktop.media.setSubtitleDelay(nextDelay)
-          showSubtitleDelayNotice(nextDelay)
+          try {
+            await window.desktop.media.setSubtitleDelay(nextDelay)
+            showSubtitleDelayNotice(nextDelay)
+          } catch (error) {
+            shortcutSubtitleDelayRef.current = stateRef.current.subtitleDelay ?? previousDelay
+            throw error
+          }
         })
         return
       }
@@ -434,7 +442,6 @@ export function PolishedOverlay(): React.JSX.Element {
     panel,
     closePanel,
     state.volume,
-    state.subtitleDelay,
     showSubtitleDelayNotice,
   ])
 
