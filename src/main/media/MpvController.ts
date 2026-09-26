@@ -117,7 +117,7 @@ export class MpvController {
         return
       }
 
-      const message = toUserMessage(error)
+      const message = playbackStartupUserMessage(error)
       diagnosticLog('media.loadFailed', { fileName: displayName, message })
       this.patchState({ status: 'unavailable', currentTime: null, error: message })
       throw new Error(message)
@@ -988,7 +988,7 @@ function finiteNumberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function toUserMessage(error: unknown): string {
+export function playbackStartupUserMessage(error: unknown): string {
   if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
     return 'The video player runtime is missing. Reinstall Subtitle Bridge and try again.'
   }
