@@ -20,10 +20,10 @@ Release packages do not redistribute mpv or FFmpeg binaries inside the setup exe
 
 ## Main playback architecture
 
-### Local MKV files
+### Local MKV and MP4 files
 
 ```text
-Local MKV
+Local MKV / MP4
   ↓
 Electron main process
   ├─ mpv → video/audio playback
@@ -38,7 +38,7 @@ React interactive subtitle overlay
 click word → translation provider → Burmese popup
 ```
 
-Local subtitle extraction reads the complete selected embedded text track and normalizes it into cues. The existing overlay uses the cue timing to show synchronized clickable text.
+For local files with a supported embedded text track, subtitle extraction reads the complete selected track and normalizes it into cues. Local MP4 files do not need an embedded subtitle track to play; users can load an external SRT/ASS/SSA file through the existing subtitle picker or drag/drop path. The existing overlay uses cue timing to show synchronized clickable text.
 
 ### HTTP/HTTPS network streams
 
@@ -68,7 +68,7 @@ Interactive text support currently covers:
 - ASS
 - SSA
 
-External SRT/ASS/SSA files can be dragged onto active playback. Embedded/live and external subtitle sources remain switchable. Subtitle Bridge also provides delay/sync, font-size, and vertical-position controls for its rendered subtitle overlay.
+External SRT/ASS/SSA files can be dragged onto active playback. Embedded/live and external subtitle sources remain switchable. Subtitle Bridge also provides delay/sync, font-size, and vertical-position controls for its rendered subtitle overlay. Player keyboard shortcuts include G / H for 0.1-second subtitle-delay adjustments with temporary on-screen feedback.
 
 Image-based subtitles such as PGS and VobSub may be detected but are not converted into clickable text. The UI should show a clear unsupported state rather than pretending extraction succeeded.
 
