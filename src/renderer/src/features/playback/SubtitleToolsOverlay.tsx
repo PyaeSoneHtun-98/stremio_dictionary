@@ -27,6 +27,7 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const externalLoadVersion = useRef(0)
+  const chromeRef = useRef<HTMLDivElement | null>(null)
   const chromeVisible = usePlayerChrome(panelOpen || dragActive || loadingExternal)
 
   useEffect(() => {
@@ -54,6 +55,20 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
       unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    if (!panelOpen) return
+
+    const closeOnOutsidePointer = (event: PointerEvent): void => {
+      const target = event.target
+      if (target instanceof Node && !chromeRef.current?.contains(target)) {
+        setPanelOpen(false)
+      }
+    }
+
+    window.addEventListener('pointerdown', closeOnOutsidePointer, true)
+    return () => window.removeEventListener('pointerdown', closeOnOutsidePointer, true)
+  }, [panelOpen])
 
   useEffect(() => {
     const root = document.documentElement
@@ -225,7 +240,10 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
 
   return (
     <aside className="subtitle-tools-root" aria-label="Subtitle tools">
-      <div className={`subtitle-tools-chrome${chromeVisible ? '' : ' is-hidden'}`}>
+      <div
+        ref={chromeRef}
+        className={`subtitle-tools-chrome${chromeVisible ? '' : ' is-hidden'}`}
+      >
         <button
           type="button"
           className="subtitle-tools-toggle"
