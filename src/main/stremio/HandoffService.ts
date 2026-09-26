@@ -12,8 +12,10 @@ const MAX_RECORDED_TARGETS = 16
 
 export interface StremioHandoffInspection {
   enabled: boolean
+  repairNeeded: boolean
   recordedTargets: number
   patchedTargets: number
+  verifiedTargets: number
 }
 
 interface StremioTargetState {
@@ -38,7 +40,13 @@ export class StremioHandoffService {
   inspectStatus(): StremioHandoffInspection {
     const statePath = this.targetStatePath ?? defaultTargetStatePath()
     if (!statePath || !existsSync(statePath)) {
-      return { enabled: false, recordedTargets: 0, patchedTargets: 0 }
+      return {
+        enabled: false,
+        repairNeeded: false,
+        recordedTargets: 0,
+        patchedTargets: 0,
+        verifiedTargets: 0
+      }
     }
 
     const stateStats = statSync(statePath)
@@ -77,6 +85,8 @@ export class StremioHandoffService {
       .filter((value, index, values) => values.indexOf(value) === index)
 
     let patchedTargets = 0
+    let verifiedTargets = 0
+    let repairNeeded = false
     for (const path of paths) {
       if (!existsSync(path)) {
         continue
@@ -106,12 +116,21 @@ export class StremioHandoffService {
       }
 
       patchedTargets += 1
+      const block = text.slice(begin, end + HANDOFF_MARKER_END.length)
+      const configuredExecutable = readPatchedExecutable(block)
+      if (configuredExecutable && sameWindowsPath(configuredExecutable, this.executablePath)) {
+        verifiedTargets += 1
+      } else {
+        repairNeeded = true
+      }
     }
 
     return {
-      enabled: patchedTargets > 0,
+      enabled: verifiedTargets > 0 && !repairNeeded,
+      repairNeeded,
       recordedTargets: paths.length,
-      patchedTargets
+      patchedTargets,
+      verifiedTargets
     }
   }
 
@@ -132,6 +151,37 @@ export class StremioHandoffService {
     }
     return scriptPath
   }
+}
+
+function readPatchedExecutable(block: string): string | null {
+  const match = block.match(
+    /win32\s*:\s*\{\s*path\s*:\s*\[\s*("(?:\\.|[^"\\])*")\s*\]\s*\}/
+  )
+  if (!match) {
+    return null
+  }
+
+  try {
+    const quotedPath = JSON.parse(match[1]) as unknown
+    if (
+      typeof quotedPath !== 'string' ||
+      quotedPath.length < 3 ||
+      !quotedPath.startsWith('"') ||
+      !quotedPath.endsWith('"')
+    ) {
+      return null
+    }
+    return quotedPath.slice(1, -1)
+  } catch {
+    return null
+  }
+}
+
+function sameWindowsPath(left: string, right: string): boolean {
+  return (
+    win32.normalize(left).toLocaleLowerCase('en-US') ===
+    win32.normalize(right).toLocaleLowerCase('en-US')
+  )
 }
 
 function runPowerShellHelper(scriptPath: string, args: readonly string[]): Promise<void> {
