@@ -356,6 +356,9 @@ export function PolishedOverlay(): React.JSX.Element {
     ? null
     : subtitleRecoveryMessage(state.subtitle.status, state.subtitle.error)
   const subtitleRecoveryNoticeDurationMs = subtitleRecoveryNoticeDuration(state.subtitle.status)
+  const subtitleRecoveryNoticeKey = subtitleMessage
+    ? `${state.filePath ?? 'no-media'}\u0000${state.subtitle.status}\u0000${state.subtitle.error ?? ''}`
+    : null
 
   useEffect(() => {
     if (subtitleRecoveryNoticeTimer.current !== null) {
@@ -363,7 +366,7 @@ export function PolishedOverlay(): React.JSX.Element {
       subtitleRecoveryNoticeTimer.current = null
     }
 
-    if (!subtitleMessage) {
+    if (!subtitleMessage || !subtitleRecoveryNoticeKey) {
       setSubtitleRecoveryNoticeVisible(false)
       return
     }
@@ -388,13 +391,7 @@ export function PolishedOverlay(): React.JSX.Element {
         subtitleRecoveryNoticeTimer.current = null
       }
     }
-  }, [
-    state.filePath,
-    state.subtitle.error,
-    state.subtitle.status,
-    subtitleMessage,
-    subtitleRecoveryNoticeDurationMs,
-  ])
+  }, [subtitleMessage, subtitleRecoveryNoticeDurationMs, subtitleRecoveryNoticeKey])
 
   useEffect(() => {
     const handlePlayerShortcut = (event: KeyboardEvent): void => {
