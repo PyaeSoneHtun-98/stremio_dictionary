@@ -9,6 +9,12 @@ const HANDOFF_MARKER_END = '/* Subtitle Bridge external player END */'
 const MAX_STATUS_FILE_BYTES = 32 * 1024 * 1024
 const MAX_STATUS_STATE_BYTES = 256 * 1024
 const MAX_RECORDED_TARGETS = 16
+const STREMIO_EXTERNAL_DEVICES_PATTERN =
+  /devices\.groups\.external\s*=\s*\[\s*\]\s*[,;]\s*Object\.keys\(players\)\.forEach/
+const STREMIO_PLAYERS_DECLARATION_PATTERN = /\b(?:var|let|const)\s+players\s*=\s*\{/
+const STREMIO_PLATFORM_PATH_PATTERN =
+  /player\[process\.platform\]\s*&&\s*player\[process\.platform\]\.path\.forEach/
+const STREMIO_EXTERNAL_PUSH_PATTERN = /devices\.groups\.external\.push/
 
 export interface StremioHandoffInspection {
   enabled: boolean
@@ -117,8 +123,13 @@ export class StremioHandoffService {
 
       patchedTargets += 1
       const block = text.slice(begin, end + HANDOFF_MARKER_END.length)
+      const baseText = text.slice(0, begin) + text.slice(end + HANDOFF_MARKER_END.length)
       const configuredExecutable = readPatchedExecutable(block)
-      if (configuredExecutable && sameWindowsPath(configuredExecutable, this.executablePath)) {
+      const currentExecutable =
+        configuredExecutable && sameWindowsPath(configuredExecutable, this.executablePath)
+      const compatibleLayout = hasCompatibleStremioLayout(baseText)
+
+      if (currentExecutable && compatibleLayout) {
         verifiedTargets += 1
       } else {
         repairNeeded = true
@@ -151,6 +162,15 @@ export class StremioHandoffService {
     }
     return scriptPath
   }
+}
+
+function hasCompatibleStremioLayout(text: string): boolean {
+  return (
+    STREMIO_EXTERNAL_DEVICES_PATTERN.test(text) &&
+    STREMIO_PLAYERS_DECLARATION_PATTERN.test(text) &&
+    STREMIO_PLATFORM_PATH_PATTERN.test(text) &&
+    STREMIO_EXTERNAL_PUSH_PATTERN.test(text)
+  )
 }
 
 function readPatchedExecutable(block: string): string | null {
