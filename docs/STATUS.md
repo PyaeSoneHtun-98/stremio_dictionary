@@ -155,13 +155,18 @@ Current implementation scope:
 - keep shortcut delay in the existing shared subtitle-delay state;
 - show temporary VLC-style on-screen subtitle-delay feedback;
 - keep the keyboard-help panel synchronized;
-- no sidecar subtitle auto-detection in this issue.
+- no sidecar subtitle auto-detection in this issue;
+- compact main launcher layout with idle diagnostics hidden;
+- normal player-window close clears playback state without surfacing raw mpv/IPC errors;
+- Stremio handoff card reports actual recorded patch state and avoids redundant enable/disable actions.
 
 Pending gates:
 
 - exact-head CI;
 - real Windows MP4 playback + external subtitle test;
 - real Windows G/H timing + OSD test;
+- real Windows compact launcher + normal player-close test;
+- packaged Stremio Enabled/Disabled state test;
 - final Codex review;
 - squash merge after manual acceptance and review.
 
