@@ -174,7 +174,9 @@ Completed on Windows before final review fixes:
 - visible Stremio status;
 - pre-review exact-head CI #448 at `3106668ead9c4b94cd4b7ffe24906dc1a90616bd`.
 
-The first Codex review then found four P2s and one P3 covering startup error sanitization, stale Stremio patch verification, atomic subtitle-delay deltas, mpv IPC pipe reuse on rapid reopen, and stale IPC input buffering. Those review fixes are in progress and require fresh exact-head CI plus another Codex review.
+The first Codex review found four P2s and one P3 covering startup error sanitization, stale Stremio patch verification, atomic subtitle-delay deltas, mpv IPC pipe reuse on rapid reopen, and stale IPC input buffering. Those fixes passed exact-head CI #463 at `017826e69eb4d3414dadcc91e07d198a1d820e28`.
+
+The second Codex review confirmed the playback/startup/delay findings resolved but found two remaining P2 Stremio-status cases plus one development-mode P3: inert marked patch blocks could still appear enabled, mixed working/stale targets could hide the Disable action, and development status could compare against Electron rather than an installed Subtitle Bridge executable. The current branch now validates the full generated patch structure, represents repair-needed state separately with independent Enable/Disable availability, and reports development status as read-only Unknown. Fresh exact-head CI and another Codex review are required for these fixes.
 
 Still-open manual regression gates:
 
