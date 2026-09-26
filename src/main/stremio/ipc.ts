@@ -3,6 +3,11 @@ import { resolve } from 'node:path'
 import type { StremioHandoffResult, StremioHandoffStatus } from '../../shared/media'
 import { diagnosticLog } from '../diagnostics'
 import { StremioHandoffService } from './HandoffService'
+import {
+  developmentStremioStatus,
+  packagedStremioStatus,
+  unknownPackagedStremioStatus
+} from './status'
 
 const STATUS_CHANNEL = 'stremio:get-handoff-status'
 const ENABLE_CHANNEL = 'stremio:enable-handoff'
@@ -31,50 +36,14 @@ export function registerStremioIpc(): void {
     }
 
     if (!service) {
-      return {
-        state: 'unknown',
-        message:
-          'Stremio integration status is read-only in development. Check it from the installed Subtitle Bridge app.',
-        canEnable: false,
-        canDisable: false
-      }
+      return developmentStremioStatus()
     }
 
     try {
-      const status = service.inspectStatus()
-      if (status.repairNeeded) {
-        return {
-          state: 'repair',
-          message:
-            'One or more Stremio handoff targets need repair. Enable to repair them, or Disable to remove existing patches.',
-          canEnable: true,
-          canDisable: status.patchedTargets > 0
-        }
-      }
-
-      if (status.enabled) {
-        return {
-          state: 'enabled',
-          message: 'Play in Subtitle Bridge is enabled in Stremio.',
-          canEnable: false,
-          canDisable: status.patchedTargets > 0
-        }
-      }
-
-      return {
-        state: 'disabled',
-        message: 'Play in Subtitle Bridge is not enabled in Stremio.',
-        canEnable: true,
-        canDisable: false
-      }
+      return packagedStremioStatus(service.inspectStatus())
     } catch {
       diagnosticLog('stremio.handoffStatusFailed', { reason: 'inspection-failed' })
-      return {
-        state: 'unknown',
-        message: 'Could not verify the current Stremio integration state.',
-        canEnable: true,
-        canDisable: true
-      }
+      return unknownPackagedStremioStatus()
     }
   })
 
