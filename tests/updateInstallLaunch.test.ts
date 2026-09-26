@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createInstallerEnvironment,
   currentInstallDirectory,
+  installerWorkingDirectory,
   INSTALL_DIRECTORY_ENV,
   UPDATE_PARENT_EXE_ENV,
   UPDATE_PARENT_PID_ENV,
@@ -13,6 +14,27 @@ describe('updater installer launch environment', () => {
     expect(
       currentInstallDirectory('D:\\Apps\\Subtitle Bridge Custom\\Subtitle Bridge.exe')
     ).toBe('D:\\Apps\\Subtitle Bridge Custom')
+  })
+
+  it('uses the downloaded installer directory instead of the installed app directory', () => {
+    const installDirectory = 'C:\\Users\\Tester\\AppData\\Local\\Programs\\Subtitle Bridge'
+    const installerPath =
+      'C:\\Users\\Tester\\AppData\\Roaming\\subtitle-bridge\\updates\\v1.0.6\\SubtitleBridge-Setup-x64.exe'
+
+    expect(installerWorkingDirectory(installerPath, installDirectory)).toBe(
+      'C:\\Users\\Tester\\AppData\\Roaming\\subtitle-bridge\\updates\\v1.0.6'
+    )
+  })
+
+  it('rejects an updater working directory inside the installed application tree', () => {
+    const installDirectory = 'C:\\Apps\\Subtitle Bridge'
+
+    expect(() =>
+      installerWorkingDirectory(
+        'C:\\Apps\\Subtitle Bridge\\updates\\SubtitleBridge-Setup-x64.exe',
+        installDirectory
+      )
+    ).toThrow('working directory must be outside')
   })
 
   it('passes a complete updater process identity to setup', () => {
