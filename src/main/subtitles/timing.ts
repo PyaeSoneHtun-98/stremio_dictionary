@@ -1,5 +1,5 @@
-export const MIN_SUBTITLE_DELAY_SECONDS = -10
-export const MAX_SUBTITLE_DELAY_SECONDS = 10
+export const MIN_SUBTITLE_DELAY_SECONDS = -20
+export const MAX_SUBTITLE_DELAY_SECONDS = 20
 
 export function normalizeSubtitleDelay(value: number): number {
   if (!Number.isFinite(value)) {
