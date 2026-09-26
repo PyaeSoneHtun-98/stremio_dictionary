@@ -8,8 +8,7 @@ import { SubtitleExtractor } from '../subtitles/SubtitleExtractor'
 import { findActiveCue, tokenizeSubtitleText } from '../subtitles/normalize'
 import {
   adjustedSubtitleTime,
-  MAX_SUBTITLE_DELAY_SECONDS,
-  MIN_SUBTITLE_DELAY_SECONDS,
+  adjustSubtitleDelayBy,
   normalizeSubtitleDelay
 } from '../subtitles/timing'
 import { deriveBufferingState } from './bufferingState'
@@ -194,10 +193,7 @@ export class MpvController {
     }
 
     const currentDelay = this.state.subtitleDelay ?? 0
-    const nextDelay = Math.min(
-      MAX_SUBTITLE_DELAY_SECONDS,
-      Math.max(MIN_SUBTITLE_DELAY_SECONDS, currentDelay + deltaSeconds)
-    )
+    const nextDelay = adjustSubtitleDelayBy(currentDelay, deltaSeconds)
     this.setSubtitleDelay(nextDelay)
     return this.state.subtitleDelay
   }
