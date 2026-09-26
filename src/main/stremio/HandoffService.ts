@@ -90,9 +90,22 @@ export class StremioHandoffService {
       const text = readFileSync(path, 'utf8')
       const begin = text.indexOf(HANDOFF_MARKER_BEGIN)
       const end = text.indexOf(HANDOFF_MARKER_END)
-      if (begin >= 0 && end > begin) {
-        patchedTargets += 1
+      const hasAnyMarker = begin >= 0 || end >= 0
+
+      if (!hasAnyMarker) {
+        continue
       }
+
+      const hasDuplicateBegin =
+        begin >= 0 && text.indexOf(HANDOFF_MARKER_BEGIN, begin + HANDOFF_MARKER_BEGIN.length) >= 0
+      const hasDuplicateEnd =
+        end >= 0 && text.indexOf(HANDOFF_MARKER_END, end + HANDOFF_MARKER_END.length) >= 0
+
+      if (begin < 0 || end <= begin || hasDuplicateBegin || hasDuplicateEnd) {
+        throw new Error('A recorded Stremio target contains malformed Subtitle Bridge patch markers.')
+      }
+
+      patchedTargets += 1
     }
 
     return {
