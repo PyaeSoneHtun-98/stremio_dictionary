@@ -97,12 +97,13 @@ export interface LoadExternalSubtitleResult {
   error?: string
 }
 
-export type StremioHandoffState = 'enabled' | 'disabled' | 'unknown' | 'unavailable'
+export type StremioHandoffState = 'enabled' | 'disabled' | 'repair' | 'unknown' | 'unavailable'
 
 export interface StremioHandoffStatus {
   state: StremioHandoffState
   message: string
-  canChange: boolean
+  canEnable: boolean
+  canDisable: boolean
 }
 
 export interface StremioHandoffResult {
