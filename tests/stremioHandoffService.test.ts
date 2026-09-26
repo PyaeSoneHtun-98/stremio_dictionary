@@ -53,6 +53,7 @@ describe('StremioHandoffService', () => {
     expect(service.inspectStatus()).toEqual({
       enabled: false,
       repairNeeded: false,
+      automaticRepairBlocked: false,
       recordedTargets: 0,
       patchedTargets: 0,
       verifiedTargets: 0
@@ -84,6 +85,7 @@ describe('StremioHandoffService', () => {
     expect(service.inspectStatus()).toEqual({
       enabled: true,
       repairNeeded: false,
+      automaticRepairBlocked: false,
       recordedTargets: 1,
       patchedTargets: 1,
       verifiedTargets: 1
@@ -92,7 +94,8 @@ describe('StremioHandoffService', () => {
     writeFileSync(serverPath, 'const players = {};')
     expect(service.inspectStatus()).toEqual({
       enabled: false,
-      repairNeeded: false,
+      repairNeeded: true,
+      automaticRepairBlocked: false,
       recordedTargets: 1,
       patchedTargets: 0,
       verifiedTargets: 0
@@ -126,7 +129,8 @@ describe('StremioHandoffService', () => {
 
     expect(service.inspectStatus()).toEqual({
       enabled: false,
-      repairNeeded: true,
+      repairNeeded: false,
+      automaticRepairBlocked: true,
       recordedTargets: 1,
       patchedTargets: 1,
       verifiedTargets: 0
@@ -169,8 +173,49 @@ describe('StremioHandoffService', () => {
     expect(service.inspectStatus()).toEqual({
       enabled: false,
       repairNeeded: true,
+      automaticRepairBlocked: false,
       recordedTargets: 2,
       patchedTargets: 2,
+      verifiedTargets: 1
+    })
+  })
+
+  it('marks mixed state for a verified target plus an existing recorded target that lost its patch', () => {
+    const helperRoot = createHelperFixture()
+    const statePath = join(helperRoot, 'stremio-handoff-targets.json')
+    const currentDirectory = join(helperRoot, 'current-patched')
+    const replacedDirectory = join(helperRoot, 'current-replaced')
+    mkdirSync(currentDirectory)
+    mkdirSync(replacedDirectory)
+
+    const patchedServerPath = join(currentDirectory, 'server.js')
+    const replacedServerPath = join(replacedDirectory, 'server.js')
+    const executablePath = 'C:\\Subtitle Bridge.exe'
+
+    writeFileSync(patchedServerPath, stremioPatch(executablePath))
+    writeFileSync(replacedServerPath, stremioBaseLayout())
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        version: 1,
+        application: 'Subtitle Bridge',
+        paths: [patchedServerPath, replacedServerPath]
+      })
+    )
+
+    const service = new StremioHandoffService(
+      helperRoot,
+      executablePath,
+      vi.fn(async () => undefined),
+      statePath
+    )
+
+    expect(service.inspectStatus()).toEqual({
+      enabled: false,
+      repairNeeded: true,
+      automaticRepairBlocked: false,
+      recordedTargets: 2,
+      patchedTargets: 1,
       verifiedTargets: 1
     })
   })
@@ -206,6 +251,7 @@ describe('StremioHandoffService', () => {
     expect(service.inspectStatus()).toEqual({
       enabled: false,
       repairNeeded: true,
+      automaticRepairBlocked: false,
       recordedTargets: 1,
       patchedTargets: 1,
       verifiedTargets: 0
@@ -236,13 +282,14 @@ describe('StremioHandoffService', () => {
     expect(service.inspectStatus()).toEqual({
       enabled: false,
       repairNeeded: true,
+      automaticRepairBlocked: false,
       recordedTargets: 1,
       patchedTargets: 1,
       verifiedTargets: 0
     })
   })
 
-  it('rejects malformed recorded patch markers instead of reporting a false enabled state', () => {
+  it('blocks automatic recovery for malformed recorded patch markers', () => {
     const helperRoot = createHelperFixture()
     const statePath = join(helperRoot, 'stremio-handoff-targets.json')
     const serverPath = join(helperRoot, 'server.js')
@@ -263,7 +310,14 @@ describe('StremioHandoffService', () => {
       statePath
     )
 
-    expect(() => service.inspectStatus()).toThrow('malformed Subtitle Bridge patch markers')
+    expect(service.inspectStatus()).toEqual({
+      enabled: false,
+      repairNeeded: false,
+      automaticRepairBlocked: true,
+      recordedTargets: 1,
+      patchedTargets: 1,
+      verifiedTargets: 0
+    })
   })
 
   it('fails before launching PowerShell when a packaged helper is missing', async () => {
@@ -292,6 +346,17 @@ function stremioPatch(executablePath: string): string {
     `  win32: { path: [ ${jsExecutable} ] }`,
     '};',
     '/* Subtitle Bridge external player END */',
+    'devices.groups.external = [], Object.keys(players).forEach((key) => {',
+    '  const player = players[key];',
+    '  player[process.platform] && player[process.platform].path.forEach(() => {});',
+    '  devices.groups.external.push(player);',
+    '});',
+  ].join('\n')
+}
+
+function stremioBaseLayout(): string {
+  return [
+    'const players = {};',
     'devices.groups.external = [], Object.keys(players).forEach((key) => {',
     '  const player = players[key];',
     '  player[process.platform] && player[process.platform].path.forEach(() => {});',
