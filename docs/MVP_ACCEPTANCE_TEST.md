@@ -233,3 +233,28 @@ v1.0.0 may be published only when:
 5. the release workflow publishes from that exact successful `master` CI SHA;
 6. the GitHub Release contains all four expected artifacts;
 7. published checksums verify against the uploaded setup EXE and portable ZIP.
+
+
+## Local MP4 + external subtitle acceptance
+
+1. Open a local MP4 from **Choose video**.
+2. Confirm video/audio playback starts even when the MP4 has no embedded subtitle track.
+3. Pause or continue playback and choose an external SRT file from the existing subtitle controls.
+4. Confirm the SRT appears synchronized and each word remains clickable.
+5. Confirm Burmese word lookup and phrase lookup still work.
+6. Repeat with external ASS or SSA when representative files are available.
+7. Drag/drop a supported external subtitle during MP4 playback and confirm it loads.
+8. Reopen a representative MKV and confirm embedded subtitle extraction still works.
+9. Open a Stremio/network stream and confirm network subtitle behavior is unchanged.
+
+## Subtitle delay keyboard acceptance
+
+1. Start playback with a visible text subtitle source.
+2. Press **G** once.
+3. Confirm subtitle delay changes by **-0.1 s** and an on-screen notice shows the new delay.
+4. Press **H** once.
+5. Confirm subtitle delay changes by **+0.1 s** relative to the current value and the notice refreshes.
+6. Press G/H repeatedly and confirm the value stays within **-10.0 s** to **+10.0 s**.
+7. Open the subtitle controls and confirm its delay value matches the keyboard-adjusted value.
+8. Focus an input/select/button and confirm G/H do not trigger the shortcut while operating that control.
+9. Confirm the on-screen delay notice disappears automatically.
