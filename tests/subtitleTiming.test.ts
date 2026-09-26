@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   adjustedSubtitleTime,
+  adjustSubtitleDelayBy,
   normalizeSubtitleDelay,
 } from '../src/main/subtitles/timing'
 
@@ -15,6 +16,13 @@ describe('subtitle timing controls', () => {
     expect(() => normalizeSubtitleDelay(Number.NaN)).toThrow('finite')
     expect(() => normalizeSubtitleDelay(20.001)).toThrow('between -20 and 20')
     expect(() => normalizeSubtitleDelay(-20.001)).toThrow('between -20 and 20')
+  })
+
+  it('applies atomic delay deltas from the current authoritative value', () => {
+    expect(adjustSubtitleDelayBy(2, 0.1)).toBe(2.1)
+    expect(adjustSubtitleDelayBy(2.1, -0.1)).toBe(2)
+    expect(adjustSubtitleDelayBy(19.95, 0.1)).toBe(20)
+    expect(adjustSubtitleDelayBy(-19.95, -0.1)).toBe(-20)
   })
 
   it('delays positive offsets and advances negative offsets', () => {
