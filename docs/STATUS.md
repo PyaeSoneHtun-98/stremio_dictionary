@@ -4,13 +4,13 @@
 
 Current stable `master`:
 
-`f875a3b5a52be294f27e5d6907c86c253f494714`
+`6e41fb125be3984a80fb1f3178409801d72357ae`
 
-PR #54 / Issue #52 added the Windows updater shutdown-race fix on top of the public v1.0.3 release source.
+PR #56 released Subtitle Bridge v1.0.4 from the updater shutdown-race fix merged in PR #54.
 
 The reviewed PR #54 head `f536be8a6825b2715062a297406c97fff543911b` passed exact-head CI #410, including project validation, Windows packaging, process-isolation policy checks, packaged install/upgrade acceptance, runtime verification, Stremio acceptance, and artifact upload. Final Codex review reported no remaining P1/P2/P3/P4 findings.
 
-Issue #52 remains open intentionally until the fixed installer is published and the real affected/test Windows PC completes an official in-app update successfully.
+Issue #52 remains open intentionally until the real affected/test Windows PC completes an official in-app update to the now-published v1.0.4 successfully.
 
 Current stable capabilities include:
 
@@ -85,6 +85,24 @@ Official ZIP SHA-256:
 
 The real official updater flow to v1.0.3 succeeded twice on one Windows PC. A second PC reached installer launch but failed because the existing install directory was still in use; that failure became Issue #52 and is fixed on current master.
 
+### v1.0.4
+
+Issue #55 / PR #56 published the updater shutdown-race fix.
+
+Published source:
+
+`6e41fb125be3984a80fb1f3178409801d72357ae`
+
+Official setup SHA-256:
+
+`bfb7f286950289166fb87a044f2b2adc312eae1798cd58eb05d1fbdc87f956c2`
+
+Official ZIP SHA-256:
+
+`deb5cd07c69765f0ae5bccffd2abaced45134140e713a94b7e8d818957bf715a`
+
+Exact merged master CI #414 and Release Windows #82 passed. Issue #52 remains open only for the real affected/test-PC in-app updater acceptance.
+
 ## Updater shutdown-race fix
 
 PR #54 is merged to master. Issue #52 remains open until the real affected/test PC completes the published fixed updater flow.
@@ -122,31 +140,30 @@ Production artifact: `src/main/translation/data/phrases.json`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
-## Active work — Windows v1.0.4
+## Active work — Issue #57 local MP4 + subtitle delay shortcuts
 
-Issue #55 is the active release task on:
+Issue #57 is active on:
 
-`release/issue-55-v1.0.4`
+`feat/issue-57-mp4-subtitle-delay-shortcuts`
 
-v1.0.4 is a focused release of the already-reviewed Issue #52 updater/installer reliability fix.
+Current implementation scope:
 
-Release-branch scope:
+- accept local MP4 alongside MKV in the picker, launcher drag/drop, and launch-target parser;
+- reuse the existing mpv path for MP4 playback;
+- keep the existing external SRT/ASS/SSA picker and drag/drop path unchanged;
+- add G = 0.1 s earlier and H = 0.1 s later subtitle timing shortcuts;
+- keep shortcut delay in the existing shared subtitle-delay state;
+- show temporary VLC-style on-screen subtitle-delay feedback;
+- keep the keyboard-help panel synchronized;
+- no sidecar subtitle auto-detection in this issue.
 
-- bump package/app metadata from 1.0.3 to 1.0.4;
-- add `docs/releases/v1.0.4.md`;
-- update README and STATUS;
-- keep playback, subtitle, dictionary, runtime, updater trust policy, and Stremio behavior unchanged.
+Pending gates:
 
-Pending release gates:
-
-- exact-head PR CI #412 passed at `909c888b21394fad006d6ec40dc66467e340e819`;
-- final Codex review with no remaining P1/P2/P3 findings;
-- squash merge;
-- successful exact-`master` push CI;
-- successful Release Windows publication of v1.0.4;
-- verification of published installer/ZIP/checksum assets;
-- real official in-app update to v1.0.4 on the affected/test Windows PC without manually closing Subtitle Bridge;
-- close Issue #52 only after that real updater retest succeeds.
+- exact-head CI;
+- real Windows MP4 playback + external subtitle test;
+- real Windows G/H timing + OSD test;
+- final Codex review;
+- squash merge after manual acceptance and review.
 
 ## Later work
 
