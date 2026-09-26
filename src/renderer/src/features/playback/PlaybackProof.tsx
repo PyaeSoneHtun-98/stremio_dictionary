@@ -213,7 +213,7 @@ export function PlaybackProof(): React.JSX.Element {
               {stremioStatus?.state === 'enabled'
                 ? 'Handoff is ready. Choose Play in Subtitle Bridge from Stremio.'
                 : stremioStatus?.state === 'repair'
-                  ? 'Handoff needs repair. Enable to repair it, or Disable to remove existing patches.'
+                  ? 'Handoff needs repair. Disable the existing patches, then Enable again to rebuild it.'
                   : stremioStatus &&
                       !stremioStatus.canEnable &&
                       !stremioStatus.canDisable &&
