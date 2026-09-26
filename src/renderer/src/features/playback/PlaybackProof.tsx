@@ -37,6 +37,7 @@ export function PlaybackProof(): React.JSX.Element {
       setStremioStatus({
         state: 'unknown',
         message: 'Could not verify the current Stremio integration state.',
+        canChange: false,
       })
     }
   }, [])
@@ -210,14 +211,21 @@ export function PlaybackProof(): React.JSX.Element {
             <p>
               {stremioStatus?.state === 'enabled'
                 ? 'Handoff is ready. Choose Play in Subtitle Bridge from Stremio.'
-                : 'Enable once, restart Stremio, then choose Play in Subtitle Bridge.'}
+                : stremioStatus && !stremioStatus.canChange
+                  ? 'Status is read-only in development. Change it from the installed app.'
+                  : 'Enable once, restart Stremio, then choose Play in Subtitle Bridge.'}
             </p>
           </div>
           <div className="stremio-actions">
             <button
               className="secondary-action"
               type="button"
-              disabled={stremioBusy || stremioStatus === null || stremioStatus.state === 'enabled'}
+              disabled={
+                stremioBusy ||
+                stremioStatus === null ||
+                !stremioStatus.canChange ||
+                stremioStatus.state === 'enabled'
+              }
               onClick={() => void updateStremioHandoff(true)}
             >
               {stremioBusy ? 'Working…' : 'Enable'}
@@ -225,7 +233,12 @@ export function PlaybackProof(): React.JSX.Element {
             <button
               className="secondary-action secondary-action-quiet"
               type="button"
-              disabled={stremioBusy || stremioStatus === null || stremioStatus.state === 'disabled'}
+              disabled={
+                stremioBusy ||
+                stremioStatus === null ||
+                !stremioStatus.canChange ||
+                stremioStatus.state === 'disabled'
+              }
               onClick={() => void updateStremioHandoff(false)}
             >
               Disable
