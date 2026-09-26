@@ -100,6 +100,30 @@ describe('StremioHandoffService', () => {
     })
   })
 
+  it('rejects malformed recorded patch markers instead of reporting a false enabled state', () => {
+    const helperRoot = createHelperFixture()
+    const statePath = join(helperRoot, 'stremio-handoff-targets.json')
+    const serverPath = join(helperRoot, 'server.js')
+    writeFileSync(serverPath, '/* Subtitle Bridge external player BEGIN */\nconst players = {};')
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        version: 1,
+        application: 'Subtitle Bridge',
+        paths: [serverPath]
+      })
+    )
+
+    const service = new StremioHandoffService(
+      helperRoot,
+      'C:\\Subtitle Bridge.exe',
+      vi.fn(async () => undefined),
+      statePath
+    )
+
+    expect(() => service.inspectStatus()).toThrow('malformed Subtitle Bridge patch markers')
+  })
+
   it('fails before launching PowerShell when a packaged helper is missing', async () => {
     const helperRoot = createTemporaryDirectory()
     const runner = vi.fn(async () => undefined)
