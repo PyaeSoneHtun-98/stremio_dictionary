@@ -38,6 +38,14 @@ export function registerStremioIpc(): void {
         }
       }
 
+      if (status.repairNeeded) {
+        return {
+          state: 'disabled',
+          message: 'The Stremio handoff needs repair for this Subtitle Bridge installation. Enable it again.',
+          canChange: app.isPackaged
+        }
+      }
+
       return {
         state: 'disabled',
         message: 'Play in Subtitle Bridge is not enabled in Stremio.',
