@@ -1,9 +1,15 @@
 import { app, ipcMain } from 'electron'
 import { resolve } from 'node:path'
-import type { StremioHandoffResult } from '../../shared/media'
+import type { StremioHandoffResult, StremioHandoffStatus } from '../../shared/media'
 import { diagnosticLog } from '../diagnostics'
 import { StremioHandoffService } from './HandoffService'
+import {
+  developmentStremioStatus,
+  packagedStremioStatus,
+  unknownPackagedStremioStatus
+} from './status'
 
+const STATUS_CHANNEL = 'stremio:get-handoff-status'
 const ENABLE_CHANNEL = 'stremio:enable-handoff'
 const DISABLE_CHANNEL = 'stremio:disable-handoff'
 
@@ -18,6 +24,28 @@ export function registerStremioIpc(): void {
   const service = app.isPackaged
     ? new StremioHandoffService(resolveHelperRoot(), app.getPath('exe'))
     : null
+
+  ipcMain.handle(STATUS_CHANNEL, (): StremioHandoffStatus => {
+    if (process.platform !== 'win32') {
+      return {
+        state: 'unavailable',
+        message: 'Stremio integration is currently available on Windows only.',
+        canEnable: false,
+        canDisable: false
+      }
+    }
+
+    if (!service) {
+      return developmentStremioStatus()
+    }
+
+    try {
+      return packagedStremioStatus(service.inspectStatus())
+    } catch {
+      diagnosticLog('stremio.handoffStatusFailed', { reason: 'inspection-failed' })
+      return unknownPackagedStremioStatus()
+    }
+  })
 
   ipcMain.handle(ENABLE_CHANNEL, async (): Promise<StremioHandoffResult> => {
     diagnosticLog('stremio.handoffEnableRequested')
@@ -78,6 +106,7 @@ export function disposeStremioIpc(): void {
     return
   }
 
+  ipcMain.removeHandler(STATUS_CHANNEL)
   ipcMain.removeHandler(ENABLE_CHANNEL)
   ipcMain.removeHandler(DISABLE_CHANNEL)
   registered = false

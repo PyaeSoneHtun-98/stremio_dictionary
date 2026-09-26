@@ -27,6 +27,7 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const externalLoadVersion = useRef(0)
+  const chromeRef = useRef<HTMLDivElement | null>(null)
   const chromeVisible = usePlayerChrome(panelOpen || dragActive || loadingExternal)
 
   useEffect(() => {
@@ -54,6 +55,20 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
       unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    if (!panelOpen) return
+
+    const closeOnOutsidePointer = (event: PointerEvent): void => {
+      const target = event.target
+      if (target instanceof Node && !chromeRef.current?.contains(target)) {
+        setPanelOpen(false)
+      }
+    }
+
+    window.addEventListener('pointerdown', closeOnOutsidePointer, true)
+    return () => window.removeEventListener('pointerdown', closeOnOutsidePointer, true)
+  }, [panelOpen])
 
   useEffect(() => {
     const root = document.documentElement
@@ -225,7 +240,10 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
 
   return (
     <aside className="subtitle-tools-root" aria-label="Subtitle tools">
-      <div className={`subtitle-tools-chrome${chromeVisible ? '' : ' is-hidden'}`}>
+      <div
+        ref={chromeRef}
+        className={`subtitle-tools-chrome${chromeVisible ? '' : ' is-hidden'}`}
+      >
         <button
           type="button"
           className="subtitle-tools-toggle"
@@ -302,14 +320,14 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
                 <button
                   type="button"
                   disabled={!canControl}
-                  onClick={() => void updateDelay(Math.max(-10, delay - DELAY_STEP))}
+                  onClick={() => void updateDelay(Math.max(-20, delay - DELAY_STEP))}
                 >
                   Earlier
                 </button>
                 <input
                   type="range"
-                  min={-10}
-                  max={10}
+                  min={-20}
+                  max={20}
                   step={DELAY_STEP}
                   value={delay}
                   disabled={!canControl}
@@ -319,7 +337,7 @@ export function SubtitleToolsOverlay(): React.JSX.Element {
                 <button
                   type="button"
                   disabled={!canControl}
-                  onClick={() => void updateDelay(Math.min(10, delay + DELAY_STEP))}
+                  onClick={() => void updateDelay(Math.min(20, delay + DELAY_STEP))}
                 >
                   Later
                 </button>

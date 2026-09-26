@@ -19,6 +19,8 @@ const desktopBridge: DesktopBridge = {
     setVolume: (volume) => ipcRenderer.invoke('media:set-volume', volume),
     setSpeed: (speed) => ipcRenderer.invoke('media:set-speed', speed),
     setSubtitleDelay: (seconds) => ipcRenderer.invoke('media:set-subtitle-delay', seconds),
+    adjustSubtitleDelay: (deltaSeconds) =>
+      ipcRenderer.invoke('media:adjust-subtitle-delay', deltaSeconds),
     selectSubtitleTrack: (trackId) => ipcRenderer.invoke('media:select-subtitle-track', trackId),
     getSubtitlePreferences: () => ipcRenderer.invoke('media:get-subtitle-preferences'),
     updateSubtitlePreferences: (update) =>
@@ -43,6 +45,7 @@ const desktopBridge: DesktopBridge = {
     }
   },
   stremio: {
+    getHandoffStatus: () => ipcRenderer.invoke('stremio:get-handoff-status'),
     enableHandoff: () => ipcRenderer.invoke('stremio:enable-handoff'),
     disableHandoff: () => ipcRenderer.invoke('stremio:disable-handoff')
   },

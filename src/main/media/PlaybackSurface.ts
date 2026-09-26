@@ -4,6 +4,9 @@ import { join } from 'node:path'
 export class PlaybackSurface {
   private hostWindow: BaseWindow | null = null
   private overlayWindow: BrowserWindow | null = null
+  private readonly expectedHostCloses = new WeakSet<BaseWindow>()
+
+  constructor(private readonly onUserClosed?: () => void) {}
 
   async ensure(): Promise<string> {
     if (
@@ -16,6 +19,9 @@ export class PlaybackSurface {
       return getWin32WindowId(this.hostWindow)
     }
 
+    if (this.hostWindow || this.overlayWindow) {
+      this.onUserClosed?.()
+    }
     this.dispose()
 
     const hostWindow = new BaseWindow({
@@ -68,6 +74,12 @@ export class PlaybackSurface {
         // Electron overlay so player shortcuts continue to work after the host or
         // its title bar receives focus.
         overlayWindow.focus()
+      }
+    })
+
+    hostWindow.on('close', () => {
+      if (!this.expectedHostCloses.has(hostWindow)) {
+        this.onUserClosed?.()
       }
     })
 
@@ -140,6 +152,7 @@ export class PlaybackSurface {
     }
 
     if (hostWindow && !hostWindow.isDestroyed()) {
+      this.expectedHostCloses.add(hostWindow)
       hostWindow.close()
     }
   }

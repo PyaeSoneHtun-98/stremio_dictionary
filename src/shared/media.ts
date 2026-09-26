@@ -97,6 +97,15 @@ export interface LoadExternalSubtitleResult {
   error?: string
 }
 
+export type StremioHandoffState = 'enabled' | 'disabled' | 'repair' | 'unknown' | 'unavailable'
+
+export interface StremioHandoffStatus {
+  state: StremioHandoffState
+  message: string
+  canEnable: boolean
+  canDisable: boolean
+}
+
 export interface StremioHandoffResult {
   ok: boolean
   message: string
@@ -117,6 +126,7 @@ export interface DesktopBridge {
     setVolume: (volume: number) => Promise<void>
     setSpeed: (speed: number) => Promise<void>
     setSubtitleDelay: (seconds: number) => Promise<void>
+    adjustSubtitleDelay: (deltaSeconds: number) => Promise<number>
     selectSubtitleTrack: (trackId: number) => Promise<void>
     getSubtitlePreferences: () => Promise<SubtitlePreferencesSnapshot>
     updateSubtitlePreferences: (
@@ -127,6 +137,7 @@ export interface DesktopBridge {
   }
   update: UpdateBridge
   stremio: {
+    getHandoffStatus: () => Promise<StremioHandoffStatus>
     enableHandoff: () => Promise<StremioHandoffResult>
     disableHandoff: () => Promise<StremioHandoffResult>
   }

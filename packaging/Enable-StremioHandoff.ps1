@@ -7,6 +7,22 @@ $ErrorActionPreference = 'Stop'
 
 $MarkerBegin = '/* Subtitle Bridge external player BEGIN */'
 $MarkerEnd = '/* Subtitle Bridge external player END */'
+$GeneratedPatchPattern = (
+  '(?s)^\s*' +
+  [regex]::Escape($MarkerBegin) +
+  '\s*players\.subtitleBridge\s*=\s*\{\s*' +
+  'title\s*:\s*"Subtitle Bridge"\s*,\s*' +
+  'args\s*:\s*\[\s*""\s*\]\s*,\s*' +
+  'subArg\s*:\s*""\s*,\s*' +
+  'timeArg\s*:\s*""\s*,\s*' +
+  'playArg\s*:\s*""\s*,\s*' +
+  'darwin\s*:\s*\{\s*path\s*:\s*\[\s*\]\s*\}\s*,\s*' +
+  'linux\s*:\s*\{\s*path\s*:\s*\[\s*\]\s*\}\s*,\s*' +
+  'win32\s*:\s*\{\s*path\s*:\s*\[\s*"(?:\\.|[^"\\])*"\s*\]\s*\}\s*' +
+  '\}\s*;\s*' +
+  [regex]::Escape($MarkerEnd) +
+  '\s*$'
+)
 $ExternalDevicesPattern = 'devices\.groups\.external\s*=\s*\[\s*\]\s*[,;]\s*Object\.keys\(players\)\.forEach'
 $PlayersDeclarationPattern = '\b(?:var|let|const)\s+players\s*=\s*\{'
 $PlatformPathPattern = 'player\[process\.platform\]\s*&&\s*player\[process\.platform\]\.path\.forEach'
@@ -113,6 +129,23 @@ function Get-PatchState([string]$Text) {
   }
 
   return $true
+}
+
+function Get-PatchBlock([string]$Text) {
+  $hasPatch = Get-PatchState $Text
+  if (-not $hasPatch) {
+    return $null
+  }
+
+  $beginIndex = $Text.IndexOf($MarkerBegin, [System.StringComparison]::Ordinal)
+  $endIndex = $Text.IndexOf($MarkerEnd, [System.StringComparison]::Ordinal) + $MarkerEnd.Length
+  return $Text.Substring($beginIndex, $endIndex - $beginIndex)
+}
+
+function Assert-GeneratedPatchBlock([string]$PatchBlock) {
+  if (-not [regex]::IsMatch($PatchBlock, $GeneratedPatchPattern)) {
+    throw 'The existing Subtitle Bridge marker block was modified and cannot be replaced automatically. No changes were written.'
+  }
 }
 
 function Remove-PatchBlock([string]$Text) {
@@ -231,6 +264,8 @@ function Resolve-StremioServerJs([string]$ExplicitPath) {
     }
 
     if ($candidateContent.Contains($MarkerBegin) -or $candidateContent.Contains($MarkerEnd)) {
+      $candidatePatchBlock = Get-PatchBlock $candidateContent
+      Assert-GeneratedPatchBlock $candidatePatchBlock
       $candidateBase = Remove-PatchBlock $candidateContent
       Assert-CompatibleStremioLayout $candidateBase
       return $candidate
@@ -255,6 +290,9 @@ if (-not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf)) {
 $ServerJsPath = Resolve-StremioServerJs $ServerJsPath
 $content = [System.IO.File]::ReadAllText($ServerJsPath)
 $hasExistingPatch = Get-PatchState $content
+if ($hasExistingPatch) {
+  Assert-GeneratedPatchBlock (Get-PatchBlock $content)
+}
 $baseContent = Remove-PatchBlock $content
 
 Assert-CompatibleStremioLayout $baseContent

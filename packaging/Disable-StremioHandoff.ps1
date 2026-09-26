@@ -7,10 +7,22 @@ $ErrorActionPreference = 'Stop'
 
 $MarkerBegin = '/* Subtitle Bridge external player BEGIN */'
 $MarkerEnd = '/* Subtitle Bridge external player END */'
-$ExternalDevicesPattern = 'devices\.groups\.external\s*=\s*\[\s*\]\s*[,;]\s*Object\.keys\(players\)\.forEach'
-$PlayersDeclarationPattern = '\b(?:var|let|const)\s+players\s*=\s*\{'
-$PlatformPathPattern = 'player\[process\.platform\]\s*&&\s*player\[process\.platform\]\.path\.forEach'
-$ExternalPushPattern = 'devices\.groups\.external\.push'
+$GeneratedPatchPattern = (
+  '(?s)^\s*' +
+  [regex]::Escape($MarkerBegin) +
+  '\s*players\.subtitleBridge\s*=\s*\{\s*' +
+  'title\s*:\s*"Subtitle Bridge"\s*,\s*' +
+  'args\s*:\s*\[\s*""\s*\]\s*,\s*' +
+  'subArg\s*:\s*""\s*,\s*' +
+  'timeArg\s*:\s*""\s*,\s*' +
+  'playArg\s*:\s*""\s*,\s*' +
+  'darwin\s*:\s*\{\s*path\s*:\s*\[\s*\]\s*\}\s*,\s*' +
+  'linux\s*:\s*\{\s*path\s*:\s*\[\s*\]\s*\}\s*,\s*' +
+  'win32\s*:\s*\{\s*path\s*:\s*\[\s*"(?:\\.|[^"\\])*"\s*\]\s*\}\s*' +
+  '\}\s*;\s*' +
+  [regex]::Escape($MarkerEnd) +
+  '\s*$'
+)
 
 function Get-StremioTargetStatePath {
   if (-not [string]::IsNullOrWhiteSpace($env:SUBTITLE_BRIDGE_STREMIO_TARGETS_PATH)) {
@@ -104,6 +116,23 @@ function Get-PatchState([string]$Text) {
   return $true
 }
 
+function Get-PatchBlock([string]$Text) {
+  $hasPatch = Get-PatchState $Text
+  if (-not $hasPatch) {
+    return $null
+  }
+
+  $beginIndex = $Text.IndexOf($MarkerBegin, [System.StringComparison]::Ordinal)
+  $endIndex = $Text.IndexOf($MarkerEnd, [System.StringComparison]::Ordinal) + $MarkerEnd.Length
+  return $Text.Substring($beginIndex, $endIndex - $beginIndex)
+}
+
+function Assert-GeneratedPatchBlock([string]$PatchBlock) {
+  if (-not [regex]::IsMatch($PatchBlock, $GeneratedPatchPattern)) {
+    throw 'The Subtitle Bridge marker block was modified and cannot be removed automatically. No changes were written.'
+  }
+}
+
 function Remove-PatchBlock([string]$Text) {
   $hasPatch = Get-PatchState $Text
   if (-not $hasPatch) {
@@ -117,26 +146,6 @@ function Remove-PatchBlock([string]$Text) {
     '',
     [System.Text.RegularExpressions.RegexOptions]::Singleline
   )
-}
-
-function Assert-CompatibleStremioLayout([string]$Text) {
-  $discoveryMatches = [regex]::Matches($Text, $ExternalDevicesPattern)
-  if ($discoveryMatches.Count -ne 1) {
-    throw 'This Stremio server.js external-player layout is not recognized. No changes were written.'
-  }
-
-  $discovery = $discoveryMatches[0]
-  $prefixStart = [Math]::Max(0, $discovery.Index - 50000)
-  $prefix = $Text.Substring($prefixStart, $discovery.Index - $prefixStart)
-  if ([regex]::Matches($prefix, $PlayersDeclarationPattern).Count -lt 1) {
-    throw 'This Stremio server.js player table is not recognized. No changes were written.'
-  }
-
-  $suffixLength = [Math]::Min(50000, $Text.Length - $discovery.Index)
-  $suffix = $Text.Substring($discovery.Index, $suffixLength)
-  if (-not [regex]::IsMatch($suffix, $PlatformPathPattern) -or -not [regex]::IsMatch($suffix, $ExternalPushPattern)) {
-    throw 'This Stremio server.js player discovery logic is not recognized. No changes were written.'
-  }
 }
 
 function Write-AtomicUtf8([string]$Path, [string]$Text) {
@@ -245,13 +254,15 @@ foreach ($resolvedServerJsPath in $ServerJsPaths) {
     throw "Could not read a recorded or discovered Stremio server.js. Cleanup was aborted: $resolvedServerJsPath"
   }
 
-  $hasPatch = Get-PatchState $content
-  if (-not $hasPatch) {
+  $patchBlock = Get-PatchBlock $content
+  if ($null -eq $patchBlock) {
     continue
   }
 
+  # Removing our own exact generated block is safe even if a Stremio update changed the
+  # surrounding discovery code. Anything edited inside the markers still fails closed.
+  Assert-GeneratedPatchBlock $patchBlock
   $cleaned = Remove-PatchBlock $content
-  Assert-CompatibleStremioLayout $cleaned
 
   if ($cleaned -eq $content) {
     throw "Subtitle Bridge patch markers were found but the patch block could not be removed safely: $resolvedServerJsPath"

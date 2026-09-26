@@ -22,10 +22,13 @@ describe('parseMediaTarget', () => {
     })
   })
 
-  it('accepts an absolute Windows MKV path', () => {
-    expect(parseMediaTarget('D:\\Movies\\Example.mkv')).toEqual({
-      target: 'D:\\Movies\\Example.mkv',
-      displayName: 'Example.mkv',
+  it.each([
+    ['D:\\Movies\\Example.mkv', 'Example.mkv'],
+    ['D:\\Movies\\Example.mp4', 'Example.mp4']
+  ])('accepts an absolute Windows local video path %s', (target, displayName) => {
+    expect(parseMediaTarget(target)).toEqual({
+      target,
+      displayName,
       kind: 'file',
       source: 'local'
     })
@@ -34,8 +37,8 @@ describe('parseMediaTarget', () => {
   it.each([
     ['ftp://example.com/video.mkv', 'Unsupported media URL scheme: ftp'],
     ['vlc://file:///C:/video.mkv', 'Unsupported media URL scheme: file'],
-    ['relative/video.mkv', 'absolute MKV path'],
-    ['D:\\Movies\\Example.mp4', 'local MKV files only']
+    ['relative/video.mkv', 'absolute MKV/MP4 path'],
+    ['D:\\Movies\\Example.avi', 'local MKV and MP4 files only']
   ])('rejects unsafe or unsupported target %s', (value, message) => {
     expect(() => parseMediaTarget(value)).toThrow(message)
   })
@@ -52,10 +55,11 @@ describe('findLaunchTargetArgument', () => {
     ).toBe('vlc://https://example.com/video.mkv')
   })
 
-  it('finds a local MKV launch argument', () => {
-    expect(findLaunchTargetArgument(['Subtitle Bridge.exe', 'D:\\Movies\\Example.mkv'])).toBe(
-      'D:\\Movies\\Example.mkv'
-    )
+  it.each([
+    'D:\\Movies\\Example.mkv',
+    'D:\\Movies\\Example.mp4'
+  ])('finds a supported local video launch argument %s', (target) => {
+    expect(findLaunchTargetArgument(['Subtitle Bridge.exe', target])).toBe(target)
   })
 
   it('returns null when there is no media target', () => {

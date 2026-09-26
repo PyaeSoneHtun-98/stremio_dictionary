@@ -6,10 +6,13 @@ import { diagnosticLog } from '../diagnostics'
 import { resolveMpvExecutable } from '../runtimeTools'
 import { SubtitleExtractor } from '../subtitles/SubtitleExtractor'
 import { findActiveCue, tokenizeSubtitleText } from '../subtitles/normalize'
-import { adjustedSubtitleTime, normalizeSubtitleDelay } from '../subtitles/timing'
+import {
+  adjustedSubtitleTime,
+  adjustSubtitleDelayBy,
+  normalizeSubtitleDelay
+} from '../subtitles/timing'
 import { deriveBufferingState } from './bufferingState'
 
-const PIPE_PATH = `\\\\.\\pipe\\subtitle-bridge-mpv-${process.pid}`
 const CONNECT_RETRIES = 50
 const CONNECT_DELAY_MS = 100
 const MAX_LIVE_SUBTITLE_TOKENS = 500
@@ -41,6 +44,7 @@ export class MpvController {
   private liveSubtitleEnd: number | null = null
   private liveSubtitleSignature: string | null = null
   private liveSubtitleCueCount = 0
+  private playbackGeneration = 0
   private state: PlaybackSnapshot = {
     status: 'idle',
     filePath: null,
@@ -76,9 +80,14 @@ export class MpvController {
     }
 
     diagnosticLog('media.loadRequested', { fileName: displayName })
+    const generation = ++this.playbackGeneration
 
     try {
-      await this.ensureStarted(windowId)
+      const started = await this.ensureStarted(windowId, generation)
+      if (!started || generation !== this.playbackGeneration) {
+        return
+      }
+
       this.resetSubtitleProcessing()
       this.selectedSubtitleTrackId = null
       this.paused = false
@@ -104,10 +113,14 @@ export class MpvController {
       this.sendCommand(['loadfile', mediaTarget, 'replace'])
       this.sendCommand(['set_property', 'pause', false])
     } catch (error) {
-      const message = toUserMessage(error)
+      if (generation !== this.playbackGeneration) {
+        return
+      }
+
+      const message = playbackStartupUserMessage(error)
       diagnosticLog('media.loadFailed', { fileName: displayName, message })
       this.patchState({ status: 'unavailable', currentTime: null, error: message })
-      throw error
+      throw new Error(message)
     }
   }
 
@@ -173,6 +186,18 @@ export class MpvController {
     })
   }
 
+  adjustSubtitleDelay(deltaSeconds: number): number {
+    this.assertControllable()
+    if (!Number.isFinite(deltaSeconds)) {
+      throw new Error('Subtitle delay adjustment must be a finite number.')
+    }
+
+    const currentDelay = this.state.subtitleDelay ?? 0
+    const nextDelay = adjustSubtitleDelayBy(currentDelay, deltaSeconds)
+    this.setSubtitleDelay(nextDelay)
+    return this.state.subtitleDelay ?? nextDelay
+  }
+
   async selectSubtitleTrack(trackId: number): Promise<void> {
     this.assertControllable()
 
@@ -206,9 +231,45 @@ export class MpvController {
     await this.refreshSubtitleModel(this.state.tracks)
   }
 
+  stop(): void {
+    diagnosticLog('media.stopRequested')
+    this.playbackGeneration += 1
+    this.resetSubtitleProcessing()
+    this.selectedSubtitleTrackId = null
+    this.paused = false
+    this.pausedForCache = false
+    this.seekPending = false
+    this.stopMpvProcess()
+    this.patchState({
+      status: 'idle',
+      filePath: null,
+      fileName: null,
+      currentTime: null,
+      duration: null,
+      volume: 100,
+      speed: 1,
+      subtitleDelay: 0,
+      buffering: false,
+      tracks: [],
+      subtitle: createEmptySubtitleModel(),
+      error: null
+    })
+  }
+
   dispose(): void {
+    this.playbackGeneration += 1
     this.subtitleExtractor.dispose()
     this.subtitleExtractionVersion += 1
+    this.stopMpvProcess()
+  }
+
+  private stopMpvProcess(): void {
+    this.incomingBuffer = ''
+    const child = this.child
+    if (child) {
+      this.expectedExits.add(child)
+    }
+    this.child = null
 
     const socket = this.socket
     this.socket = null
@@ -217,28 +278,23 @@ export class MpvController {
       try {
         socket.write(`${JSON.stringify({ command: ['quit'] })}\n`)
       } catch {
-        // The IPC pipe can already be closing during application shutdown.
+        // The IPC pipe may already be closing as the player window is dismissed.
       }
       socket.destroy()
     }
 
-    const child = this.child
-    this.child = null
-
-    if (child) {
-      this.expectedExits.add(child)
-      if (!child.killed) {
-        child.kill()
-      }
+    if (child && !child.killed) {
+      child.kill()
     }
   }
 
-  private async ensureStarted(windowId: string): Promise<void> {
+  private async ensureStarted(windowId: string, generation: number): Promise<boolean> {
     if (this.child && this.socket && !this.socket.destroyed) {
-      return
+      return generation === this.playbackGeneration
     }
 
     const runtime = resolveMpvExecutable()
+    const pipePath = mpvPipePath(generation)
     diagnosticLog('mpv.start', { source: runtime.source })
     const child = spawn(
       runtime.executable,
@@ -256,7 +312,7 @@ export class MpvController {
         '--hwdec=no',
         ...mpvDiagnosticArguments(),
         `--wid=${windowId}`,
-        `--input-ipc-server=${PIPE_PATH}`
+        `--input-ipc-server=${pipePath}`
       ],
       {
         windowsHide: true,
@@ -272,13 +328,21 @@ export class MpvController {
       }
       const handleError = (error: Error): void => {
         child.off('spawn', handleSpawn)
-        diagnosticLog('mpv.spawnFailed', { source: runtime.source, message: error.message })
+        diagnosticLog('mpv.spawnFailed', { source: runtime.source, reason: 'spawn-error' })
         reject(error)
       }
 
       child.once('spawn', handleSpawn)
       child.once('error', handleError)
     })
+
+    if (generation !== this.playbackGeneration) {
+      this.expectedExits.add(child)
+      if (!child.killed) {
+        child.kill()
+      }
+      return false
+    }
 
     this.child = child
 
@@ -298,13 +362,12 @@ export class MpvController {
         return
       }
 
-      const detail = code !== null ? ` with exit code ${code}` : signal ? ` after signal ${signal}` : ''
-      this.failPlayback(`mpv exited unexpectedly${detail}. Reopen the video to retry.`)
+      this.failPlayback('The video player stopped unexpectedly. Reopen the video to retry.')
     })
 
     let socket: Socket
     try {
-      socket = await connectToPipe()
+      socket = await connectToPipe(pipePath)
     } catch (error) {
       if (this.child === child) {
         this.child = null
@@ -313,17 +376,33 @@ export class MpvController {
       if (!child.killed) {
         child.kill()
       }
+      if (generation !== this.playbackGeneration) {
+        return false
+      }
       throw error
     }
 
+    if (generation !== this.playbackGeneration) {
+      if (this.child === child) {
+        this.child = null
+      }
+      this.expectedExits.add(child)
+      socket.destroy()
+      if (!child.killed) {
+        child.kill()
+      }
+      return false
+    }
+
+    this.incomingBuffer = ''
     this.socket = socket
     socket.setEncoding('utf8')
     socket.on('data', (chunk) => this.handleChunk(chunk.toString()))
-    socket.on('error', (error) => {
-      this.handleSocketFailure(socket, child, `Lost the mpv IPC connection: ${error.message}`)
+    socket.on('error', () => {
+      this.handleSocketFailure(socket, child)
     })
     socket.on('close', () => {
-      this.handleSocketFailure(socket, child, 'The mpv IPC connection closed unexpectedly.')
+      this.handleSocketFailure(socket, child)
     })
 
     this.sendCommand(['observe_property', 1, 'time-pos'])
@@ -337,14 +416,15 @@ export class MpvController {
     this.sendCommand(['observe_property', 9, 'sub-start/full'])
     this.sendCommand(['observe_property', 10, 'sub-end/full'])
     this.sendCommand(['observe_property', 11, 'paused-for-cache'])
+    return true
   }
 
-  private handleSocketFailure(socket: Socket, child: ChildProcess, message: string): void {
+  private handleSocketFailure(socket: Socket, child: ChildProcess): void {
     if (this.socket !== socket) {
       return
     }
 
-    diagnosticLog('mpv.ipcFailure', { message })
+    diagnosticLog('mpv.ipcFailure', { reason: 'connection-lost' })
     this.socket = null
     if (!socket.destroyed) {
       socket.destroy()
@@ -358,7 +438,7 @@ export class MpvController {
       }
     }
 
-    this.failPlayback(`${message} Reopen the video to retry.`)
+    this.failPlayback('The video player stopped unexpectedly. Reopen the video to retry.')
   }
 
   private handleChunk(chunk: string): void {
@@ -420,8 +500,8 @@ export class MpvController {
       }
 
       if (message.reason === 'error') {
-        const detail = message.error ? ` (${message.error})` : ''
-        this.failPlayback(`This video could not be played${detail}. Try another video or stream.`)
+        diagnosticLog('media.playbackEndedWithError', { reason: 'end-file-error' })
+        this.failPlayback('This video could not be played. Try another video or stream.')
         return
       }
 
@@ -842,12 +922,19 @@ function isHttpMediaTarget(value: string | null | undefined): boolean {
   }
 }
 
-async function connectToPipe(): Promise<Socket> {
+export function mpvPipePath(generation: number): string {
+  if (!Number.isSafeInteger(generation) || generation < 0) {
+    throw new Error('Invalid mpv playback generation.')
+  }
+  return `\\\\.\\pipe\\subtitle-bridge-mpv-${process.pid}-${generation}`
+}
+
+async function connectToPipe(pipePath: string): Promise<Socket> {
   let lastError: Error | null = null
 
   for (let attempt = 0; attempt < CONNECT_RETRIES; attempt += 1) {
     try {
-      return await connectOnce()
+      return await connectOnce(pipePath)
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
       await delay(CONNECT_DELAY_MS)
@@ -857,9 +944,9 @@ async function connectToPipe(): Promise<Socket> {
   throw lastError ?? new Error('Could not connect to mpv IPC')
 }
 
-function connectOnce(): Promise<Socket> {
+function connectOnce(pipePath: string): Promise<Socket> {
   return new Promise((resolve, reject) => {
-    const socket = createConnection(PIPE_PATH)
+    const socket = createConnection(pipePath)
     let connected = false
 
     const handleConnect = (): void => {
@@ -901,14 +988,10 @@ function finiteNumberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function toUserMessage(error: unknown): string {
+export function playbackStartupUserMessage(error: unknown): string {
   if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-    return 'mpv was not found. Reinstall Subtitle Bridge to restore its managed media runtime, or configure MPV_PATH for development.'
+    return 'The video player runtime is missing. Reinstall Subtitle Bridge and try again.'
   }
 
-  if (error instanceof Error) {
-    return `Could not start mpv: ${error.message}`
-  }
-
-  return 'Could not start mpv.'
+  return 'Could not start the video player. Reopen the video or restart Subtitle Bridge and try again.'
 }

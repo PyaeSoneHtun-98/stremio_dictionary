@@ -1,5 +1,9 @@
-import { useEffect, useState } from 'react'
-import type { OpenVideoResult, PlaybackSnapshot } from '../../../../shared/media'
+import { useCallback, useEffect, useState } from 'react'
+import type {
+  OpenVideoResult,
+  PlaybackSnapshot,
+  StremioHandoffStatus,
+} from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
 import './PlaybackProof.css'
 
@@ -24,6 +28,24 @@ export function PlaybackProof(): React.JSX.Element {
   const [localError, setLocalError] = useState<string | null>(null)
   const [stremioBusy, setStremioBusy] = useState(false)
   const [stremioMessage, setStremioMessage] = useState<string | null>(null)
+  const [stremioStatus, setStremioStatus] = useState<StremioHandoffStatus | null>(null)
+
+  const refreshStremioStatus = useCallback(async (): Promise<void> => {
+    try {
+      setStremioStatus(await window.desktop.stremio.getHandoffStatus())
+    } catch {
+      setStremioStatus({
+        state: 'unknown',
+        message: 'Could not verify the current Stremio integration state.',
+        canEnable: false,
+        canDisable: false,
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshStremioStatus()
+  }, [refreshStremioStatus])
 
   useEffect(() => {
     let active = true
@@ -73,8 +95,8 @@ export function PlaybackProof(): React.JSX.Element {
     setOpening(true)
     setLocalError(null)
     try {
-      if (!file.name.toLowerCase().endsWith('.mkv')) {
-        setLocalError('Subtitle Bridge currently supports MKV files only.')
+      if (!isSupportedLocalVideo(file.name)) {
+        setLocalError('Subtitle Bridge currently supports MKV and MP4 files.')
         return
       }
 
@@ -101,6 +123,9 @@ export function PlaybackProof(): React.JSX.Element {
         ? await window.desktop.stremio.enableHandoff()
         : await window.desktop.stremio.disableHandoff()
       setStremioMessage(result.message)
+      if (result.ok) {
+        await refreshStremioStatus()
+      }
     } catch {
       setStremioMessage('Could not update the Stremio integration. Try again.')
     } finally {
@@ -137,7 +162,7 @@ export function PlaybackProof(): React.JSX.Element {
       <div className="launcher-panel-heading">
         <div>
           <span className="eyebrow">Start watching</span>
-          <h2 id="playback-proof-title">Your player, ready when you are.</h2>
+          <h2 id="playback-proof-title">Choose how to play</h2>
         </div>
         <span className={`status-pill status-${displayStatus}`}>
           <span className="status-indicator" aria-hidden="true" />
@@ -156,13 +181,13 @@ export function PlaybackProof(): React.JSX.Element {
           </div>
           <div className="launch-card-copy">
             <span className="launch-card-kicker">Local video</span>
-            <h3>{dragActive ? 'Drop your MKV here' : 'Open a video'}</h3>
-            <p>Play an MKV with clickable English subtitles and Burmese lookup.</p>
+            <h3>{dragActive ? 'Drop your video here' : 'Open a video'}</h3>
+            <p>Play an MKV or MP4 with clickable English subtitles and Burmese lookup.</p>
           </div>
           <button className="primary-action" type="button" onClick={openVideo} disabled={opening}>
             {opening ? 'Opening…' : 'Choose video'}
           </button>
-          <span className="drop-hint">or drag and drop an MKV anywhere on this panel</span>
+          <span className="drop-hint">or drag and drop an MKV or MP4 anywhere on this panel</span>
         </section>
 
         <section className="launch-card">
@@ -173,15 +198,32 @@ export function PlaybackProof(): React.JSX.Element {
             </svg>
           </div>
           <div className="launch-card-copy">
-            <span className="launch-card-kicker">Streaming</span>
+            <div className="launch-card-kicker-row">
+              <span className="launch-card-kicker">Stremio</span>
+              <span
+                className={`integration-state integration-${stremioStatus?.state ?? 'checking'}`}
+                title={stremioStatus?.message ?? 'Checking Stremio integration…'}
+              >
+                <span aria-hidden="true" />
+                {stremioStatus ? formatStremioState(stremioStatus.state) : 'Checking'}
+              </span>
+            </div>
             <h3>Play from Stremio</h3>
-            <p>Enable the handoff once, restart Stremio, then choose Play in Subtitle Bridge.</p>
+            <p>
+              {stremioStatus?.state === 'enabled'
+                ? 'Handoff is ready. Choose Play in Subtitle Bridge from Stremio.'
+                : stremioStatus?.state === 'disabled'
+                  ? 'Enable once, restart Stremio, then choose Play in Subtitle Bridge.'
+                  : (stremioStatus?.message ?? 'Checking Stremio integration…')}
+            </p>
           </div>
           <div className="stremio-actions">
             <button
               className="secondary-action"
               type="button"
-              disabled={stremioBusy}
+              disabled={
+                stremioBusy || stremioStatus === null || !stremioStatus.canEnable
+              }
               onClick={() => void updateStremioHandoff(true)}
             >
               {stremioBusy ? 'Working…' : 'Enable'}
@@ -189,11 +231,18 @@ export function PlaybackProof(): React.JSX.Element {
             <button
               className="secondary-action secondary-action-quiet"
               type="button"
-              disabled={stremioBusy}
+              disabled={
+                stremioBusy || stremioStatus === null || !stremioStatus.canDisable
+              }
               onClick={() => void updateStremioHandoff(false)}
             >
               Disable
             </button>
+            {stremioMessage ? (
+              <span className="stremio-feedback" aria-live="polite">
+                {stremioMessage}
+              </span>
+            ) : null}
           </div>
         </section>
       </div>
@@ -227,101 +276,117 @@ export function PlaybackProof(): React.JSX.Element {
         </section>
       ) : null}
 
-      {stremioMessage ? (
-        <p className="playback-help" aria-live="polite">
-          {stremioMessage}
-        </p>
-      ) : null}
-
       {state.error || localError ? (
         <div className="media-error">{localError ?? state.error}</div>
       ) : null}
 
-      <details className="media-details">
-        <summary>Technical playback details{state.fileName ? ` · ${state.fileName}` : ''}</summary>
+      {state.filePath || state.error ? (
+        <details className="media-details">
+          <summary>Technical playback details{state.fileName ? ` · ${state.fileName}` : ''}</summary>
 
-        <div className="playback-metrics">
-          <Metric label="File" value={state.fileName ?? 'No video loaded'} />
-          <Metric label="Position" value={formatTime(state.currentTime)} />
-          <Metric label="Duration" value={formatTime(state.duration)} />
-          <Metric label="Tracks" value={String(state.tracks.length)} />
-          <Metric label="Subtitle cues" value={String(state.subtitle.cueCount)} />
-          <Metric label="Subtitle state" value={state.subtitle.status} />
-        </div>
-
-        <div className="subtitle-diagnostic" aria-live="polite">
-          <div className="subtitle-diagnostic-header">
-            <div>
-              <span className="eyebrow">Selected subtitle model</span>
-              <strong>{subtitleTrackLabel(state)}</strong>
-            </div>
-            <span className={`status-pill subtitle-status-${state.subtitle.status}`}>
-              {state.subtitle.status}
-            </span>
+          <div className="playback-metrics">
+            <Metric label="File" value={state.fileName ?? 'No video loaded'} />
+            <Metric label="Position" value={formatTime(state.currentTime)} />
+            <Metric label="Duration" value={formatTime(state.duration)} />
+            <Metric label="Tracks" value={String(state.tracks.length)} />
+            <Metric label="Subtitle cues" value={String(state.subtitle.cueCount)} />
+            <Metric label="Subtitle state" value={state.subtitle.status} />
           </div>
 
-          {state.subtitle.error ? <div className="media-error">{state.subtitle.error}</div> : null}
-
-          {state.subtitle.activeCue ? (
-            <div className="active-cue-card">
-              <div className="active-cue-time">
-                {formatTime(state.subtitle.activeCue.startTime)} →{' '}
-                {formatTime(state.subtitle.activeCue.endTime)}
+          <div className="subtitle-diagnostic" aria-live="polite">
+            <div className="subtitle-diagnostic-header">
+              <div>
+                <span className="eyebrow">Selected subtitle model</span>
+                <strong>{subtitleTrackLabel(state)}</strong>
               </div>
-              <div className="active-cue-text">{state.subtitle.activeCue.text}</div>
+              <span className={`status-pill subtitle-status-${state.subtitle.status}`}>
+                {state.subtitle.status}
+              </span>
             </div>
-          ) : (
-            <div className="empty-subtitle-state">
-              {state.subtitle.status === 'ready'
-                ? 'No subtitle cue is active at the current playback position.'
-                : (state.subtitle.error ?? 'Open a video with an embedded text subtitle track.')}
-            </div>
-          )}
-        </div>
 
-        <div className="track-table-wrap">
-          <table className="track-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Type</th>
-                <th>Language</th>
-                <th>Title</th>
-                <th>Codec</th>
-                <th>Subtitle mode</th>
-                <th>App selected</th>
-                <th>FFmpeg index</th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.tracks.length > 0 ? (
-                state.tracks.map((track) => (
-                  <tr key={`${track.type}-${track.id}`}>
-                    <td>{track.id}</td>
-                    <td>{track.type}</td>
-                    <td>{track.language ?? '—'}</td>
-                    <td>{track.title ?? '—'}</td>
-                    <td>{track.codec ?? 'unknown'}</td>
-                    <td>{track.subtitleKind ?? '—'}</td>
-                    <td>
-                      {track.type === 'subtitle' && state.subtitle.trackId === track.id ? 'yes' : '—'}
-                    </td>
-                    <td>{track.ffIndex ?? '—'}</td>
-                  </tr>
-                ))
-              ) : (
+            {state.subtitle.error ? <div className="media-error">{state.subtitle.error}</div> : null}
+
+            {state.subtitle.activeCue ? (
+              <div className="active-cue-card">
+                <div className="active-cue-time">
+                  {formatTime(state.subtitle.activeCue.startTime)} →{' '}
+                  {formatTime(state.subtitle.activeCue.endTime)}
+                </div>
+                <div className="active-cue-text">{state.subtitle.activeCue.text}</div>
+              </div>
+            ) : (
+              <div className="empty-subtitle-state">
+                {state.subtitle.status === 'ready'
+                  ? 'No subtitle cue is active at the current playback position.'
+                  : (state.subtitle.error ?? 'Open a video with an embedded text subtitle track.')}
+              </div>
+            )}
+          </div>
+
+          <div className="track-table-wrap">
+            <table className="track-table">
+              <thead>
                 <tr>
-                  <td colSpan={8} className="empty-table-cell">
-                    Open a video to inspect its tracks.
-                  </td>
+                  <th>ID</th>
+                  <th>Type</th>
+                  <th>Language</th>
+                  <th>Title</th>
+                  <th>Codec</th>
+                  <th>Subtitle mode</th>
+                  <th>App selected</th>
+                  <th>FFmpeg index</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </details>
+              </thead>
+              <tbody>
+                {state.tracks.length > 0 ? (
+                  state.tracks.map((track) => (
+                    <tr key={`${track.type}-${track.id}`}>
+                      <td>{track.id}</td>
+                      <td>{track.type}</td>
+                      <td>{track.language ?? '—'}</td>
+                      <td>{track.title ?? '—'}</td>
+                      <td>{track.codec ?? 'unknown'}</td>
+                      <td>{track.subtitleKind ?? '—'}</td>
+                      <td>
+                        {track.type === 'subtitle' && state.subtitle.trackId === track.id ? 'yes' : '—'}
+                      </td>
+                      <td>{track.ffIndex ?? '—'}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="empty-table-cell">
+                      Open a video to inspect its tracks.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
     </section>
   )
+}
+
+function formatStremioState(state: StremioHandoffStatus['state']): string {
+  switch (state) {
+    case 'enabled':
+      return 'Enabled'
+    case 'disabled':
+      return 'Disabled'
+    case 'repair':
+      return 'Repair needed'
+    case 'unavailable':
+      return 'Unavailable'
+    default:
+      return 'Unknown'
+  }
+}
+
+function isSupportedLocalVideo(fileName: string): boolean {
+  const normalized = fileName.toLocaleLowerCase('en-US')
+  return normalized.endsWith('.mkv') || normalized.endsWith('.mp4')
 }
 
 function Metric({ label, value }: { label: string; value: string }): React.JSX.Element {

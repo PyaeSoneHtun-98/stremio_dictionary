@@ -19,10 +19,10 @@ export function App(): React.JSX.Element {
       <section className="launcher-hero" aria-labelledby="launcher-title">
         <div>
           <span className="eyebrow">Subtitle-first video player</span>
-          <h1 id="launcher-title">Watch the story. Understand the words.</h1>
+          <h1 id="launcher-title">Watch. Click. Understand.</h1>
           <p>
-            Open a video or send a stream from Stremio. Click English subtitle words and phrases
-            for instant Burmese meanings without leaving the player.
+            Open MKV or MP4, or play from Stremio. Click English subtitle words and phrases for
+            instant Burmese meanings.
           </p>
         </div>
         <ul className="launcher-capabilities" aria-label="Subtitle Bridge capabilities">

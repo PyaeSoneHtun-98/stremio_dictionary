@@ -2,6 +2,7 @@ import { win32 } from 'node:path'
 
 const MAX_TARGET_LENGTH = 16 * 1024
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i
+const LOCAL_VIDEO_EXTENSIONS = new Set(['.mkv', '.mp4'])
 
 export type MediaTargetKind = 'file' | 'network'
 export type MediaTargetSource = 'local' | 'http' | 'stremio-vlc'
@@ -50,11 +51,11 @@ export function parseMediaTarget(value: string): ParsedMediaTarget {
   }
 
   if (!win32.isAbsolute(raw)) {
-    throw new Error('The media target must be an absolute MKV path or an HTTP/HTTPS stream URL.')
+    throw new Error('The media target must be an absolute MKV/MP4 path or an HTTP/HTTPS stream URL.')
   }
 
-  if (win32.extname(raw).toLowerCase() !== '.mkv') {
-    throw new Error('Subtitle Bridge currently supports local MKV files only.')
+  if (!LOCAL_VIDEO_EXTENSIONS.has(win32.extname(raw).toLowerCase())) {
+    throw new Error('Subtitle Bridge currently supports local MKV and MP4 files only.')
   }
 
   return {
@@ -76,7 +77,7 @@ export function findLaunchTargetArgument(argv: readonly string[]): string | null
       return value
     }
 
-    if (win32.isAbsolute(value) && win32.extname(value).toLowerCase() === '.mkv') {
+    if (win32.isAbsolute(value) && LOCAL_VIDEO_EXTENSIONS.has(win32.extname(value).toLowerCase())) {
       return value
     }
   }

@@ -4,13 +4,13 @@
 
 Current stable `master`:
 
-`f875a3b5a52be294f27e5d6907c86c253f494714`
+`6e41fb125be3984a80fb1f3178409801d72357ae`
 
-PR #54 / Issue #52 added the Windows updater shutdown-race fix on top of the public v1.0.3 release source.
+PR #56 released Subtitle Bridge v1.0.4 from the updater shutdown-race fix merged in PR #54.
 
 The reviewed PR #54 head `f536be8a6825b2715062a297406c97fff543911b` passed exact-head CI #410, including project validation, Windows packaging, process-isolation policy checks, packaged install/upgrade acceptance, runtime verification, Stremio acceptance, and artifact upload. Final Codex review reported no remaining P1/P2/P3/P4 findings.
 
-Issue #52 remains open intentionally until the fixed installer is published and the real affected/test Windows PC completes an official in-app update successfully.
+Issue #52 remains open intentionally until the real affected/test Windows PC completes an official in-app update to the now-published v1.0.4 successfully.
 
 Current stable capabilities include:
 
@@ -85,6 +85,24 @@ Official ZIP SHA-256:
 
 The real official updater flow to v1.0.3 succeeded twice on one Windows PC. A second PC reached installer launch but failed because the existing install directory was still in use; that failure became Issue #52 and is fixed on current master.
 
+### v1.0.4
+
+Issue #55 / PR #56 published the updater shutdown-race fix.
+
+Published source:
+
+`6e41fb125be3984a80fb1f3178409801d72357ae`
+
+Official setup SHA-256:
+
+`bfb7f286950289166fb87a044f2b2adc312eae1798cd58eb05d1fbdc87f956c2`
+
+Official ZIP SHA-256:
+
+`deb5cd07c69765f0ae5bccffd2abaced45134140e713a94b7e8d818957bf715a`
+
+Exact merged master CI #414 and Release Windows #82 passed. Issue #52 remains open only for the real affected/test-PC in-app updater acceptance.
+
 ## Updater shutdown-race fix
 
 PR #54 is merged to master. Issue #52 remains open until the real affected/test PC completes the published fixed updater flow.
@@ -122,31 +140,60 @@ Production artifact: `src/main/translation/data/phrases.json`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
-## Active work — Windows v1.0.4
+## Active work — Issue #57 local MP4 + subtitle delay shortcuts
 
-Issue #55 is the active release task on:
+Issue #57 is active on:
 
-`release/issue-55-v1.0.4`
+`feat/issue-57-mp4-subtitle-delay-shortcuts`
 
-v1.0.4 is a focused release of the already-reviewed Issue #52 updater/installer reliability fix.
+Current implementation scope:
 
-Release-branch scope:
+- accept local MP4 alongside MKV in the picker, launcher drag/drop, and launch-target parser;
+- reuse the existing mpv path for MP4 playback;
+- keep the existing external SRT/ASS/SSA picker and drag/drop path unchanged;
+- add G = 0.1 s earlier and H = 0.1 s later subtitle timing shortcuts;
+- keep shortcut delay in the existing shared subtitle-delay state;
+- show temporary VLC-style on-screen subtitle-delay feedback;
+- keep the keyboard-help panel synchronized;
+- no sidecar subtitle auto-detection in this issue;
+- compact main launcher layout with idle diagnostics hidden;
+- normal player-window close clears playback state without surfacing raw mpv/IPC errors;
+- Stremio handoff card reports actual recorded patch state and avoids redundant enable/disable actions.
 
-- bump package/app metadata from 1.0.3 to 1.0.4;
-- add `docs/releases/v1.0.4.md`;
-- update README and STATUS;
-- keep playback, subtitle, dictionary, runtime, updater trust policy, and Stremio behavior unchanged.
+Validation status:
 
-Pending release gates:
+Completed on Windows before final review fixes:
 
-- exact-head PR CI #412 passed at `909c888b21394fad006d6ec40dc66467e340e819`;
-- final Codex review with no remaining P1/P2/P3 findings;
-- squash merge;
-- successful exact-`master` push CI;
-- successful Release Windows publication of v1.0.4;
-- verification of published installer/ZIP/checksum assets;
-- real official in-app update to v1.0.4 on the affected/test Windows PC without manually closing Subtitle Bridge;
-- close Issue #52 only after that real updater retest succeeds.
+- MP4 playback with external SRT;
+- clickable word and phrase lookup on MP4 subtitles;
+- G/H subtitle-delay timing and on-screen feedback;
+- subtitle-delay control synchronization;
+- subtitle settings outside-click dismissal;
+- compact launcher / unnecessary-scrollbar check;
+- normal player-window close without a raw mpv/IPC error;
+- visible Stremio status;
+- pre-review exact-head CI #448 at `3106668ead9c4b94cd4b7ffe24906dc1a90616bd`.
+
+The first Codex review found four P2s and one P3 covering startup error sanitization, stale Stremio patch verification, atomic subtitle-delay deltas, mpv IPC pipe reuse on rapid reopen, and stale IPC input buffering. Those fixes passed exact-head CI #463 at `017826e69eb4d3414dadcc91e07d198a1d820e28`.
+
+The second Codex review confirmed the playback/startup/delay findings resolved but found two remaining P2 Stremio-status cases plus one development-mode P3: inert marked patch blocks could still appear enabled, mixed working/stale targets could hide the Disable action, and development status could compare against Electron rather than an installed Subtitle Bridge executable. Those fixes passed exact-head CI #471 at `3f0ec8e9602cf5e8d57cf0c277cf90589d281bbb`.
+
+The third Codex review confirmed those cases resolved except for one remaining P2: the UI promised that Enable alone could repair a mixed target state even though the current enable helper patches only one discovered `server.js`. The repair flow was changed to **Disable first, then Enable**, and that fix passed exact-head CI #475 at `ce797d0c2c9bb4abac7a21720fa1ee33e6ae6d42`.
+
+The fourth Codex review confirmed the Enable-alone issue resolved but found two related P2 recovery/status gaps: Disable still rejected an exact generated patch if Stremio's surrounding discovery layout had changed, and an existing recorded target whose patch disappeared could be ignored while another old target remained verified. Those recovery fixes were implemented and the full code/test head `733d85bfacf83260d394e70091e508efb4bce15b` passed CI #495, including Windows PowerShell syntax, package build, packaged install/upgrade, and Stremio handoff regressions.
+
+The resulting recovery model is fail-closed: Disable may remove an exact generated Subtitle Bridge block even when surrounding Stremio code changed, but edited/malformed marker blocks disable automatic actions; missing/unmarked recorded targets force reset state so they cannot hide behind another verified target; and Enable also refuses edited marker blocks. The exact current PR-head CI gate is tracked on PR #58 before merge so this status document does not become stale from its own bookkeeping-only update.
+
+Still-open manual regression gates:
+
+- external ASS/SSA and subtitle drag/drop;
+- local MKV embedded subtitle regression;
+- Stremio/network playback regression;
+- genuine unexpected playback-failure messaging;
+- packaged Stremio Enabled/Disabled action behavior;
+- development-mode Stremio read-only behavior.
+
+Merge still requires green exact-head CI, completion of the required manual regression gates, final Codex review with no unresolved P1/P2/P3 findings, and squash merge.
 
 ## Later work
 
