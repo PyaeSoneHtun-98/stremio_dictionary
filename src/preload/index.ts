@@ -43,6 +43,7 @@ const desktopBridge: DesktopBridge = {
     }
   },
   stremio: {
+    getHandoffStatus: () => ipcRenderer.invoke('stremio:get-handoff-status'),
     enableHandoff: () => ipcRenderer.invoke('stremio:enable-handoff'),
     disableHandoff: () => ipcRenderer.invoke('stremio:disable-handoff')
   },
