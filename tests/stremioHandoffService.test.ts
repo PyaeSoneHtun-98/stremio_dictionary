@@ -72,11 +72,11 @@ describe('StremioHandoffService', () => {
     )
     writeFileSync(
       statePath,
-      JSON.stringify({
+      `\uFEFF${JSON.stringify({
         version: 1,
         application: 'Subtitle Bridge',
         paths: [serverPath]
-      })
+      })}`
     )
 
     const service = new StremioHandoffService(
