@@ -21,7 +21,8 @@ $GeneratedPatchPattern = (
   'win32\s*:\s*\{\s*path\s*:\s*\[\s*"(?:\\.|[^"\\])*"\s*\]\s*\}\s*' +
   '\}\s*;\s*' +
   [regex]::Escape($MarkerEnd) +
-  '\s*
+  '\s*$'
+)
 $ExternalDevicesPattern = 'devices\.groups\.external\s*=\s*\[\s*\]\s*[,;]\s*Object\.keys\(players\)\.forEach'
 $PlayersDeclarationPattern = '\b(?:var|let|const)\s+players\s*=\s*\{'
 $PlatformPathPattern = 'player\[process\.platform\]\s*&&\s*player\[process\.platform\]\.path\.forEach'
