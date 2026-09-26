@@ -1169,6 +1169,16 @@ jobs:
             )
             [System.IO.File]::WriteAllText($tamperedPatchServerJs, $tamperedPatchContent)
 
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $enableHandoff -ExecutablePath (Join-Path $installDir 'Subtitle Bridge.exe') -ServerJsPath $tamperedPatchServerJs
+            $tamperedEnableExitCode = $LASTEXITCODE
+            $global:LASTEXITCODE = 0
+            if ($tamperedEnableExitCode -eq 0) {
+              throw 'Enable helper replaced an edited marker block that no longer matched the generated Subtitle Bridge structure.'
+            }
+            if ([System.IO.File]::ReadAllText($tamperedPatchServerJs) -ne $tamperedPatchContent) {
+              throw 'Fail-closed enable modified the edited Stremio marker block.'
+            }
+
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $disableHandoff -ServerJsPath $tamperedPatchServerJs
             $tamperedDisableExitCode = $LASTEXITCODE
             $global:LASTEXITCODE = 0
