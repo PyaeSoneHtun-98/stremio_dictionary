@@ -22,6 +22,12 @@ const polishedOverlaySource = readFileSync(
   ),
   'utf8',
 )
+const subtitleToolsSource = readFileSync(
+  fileURLToPath(
+    new URL('../src/renderer/src/features/playback/SubtitleToolsOverlay.tsx', import.meta.url),
+  ),
+  'utf8',
+)
 
 describe('player presentation contracts', () => {
   it('moves subtitles lower when player chrome hides while preserving the saved offset', () => {
@@ -38,7 +44,7 @@ describe('player presentation contracts', () => {
       /@media \(max-width: 720px\)[\s\S]*?\.overlay-probe\.chrome-hidden \.subtitle-overlay\s*\{[\s\S]*?bottom:\s*calc\(24px \+ var\(--subtitle-position-offset, 0px\)\);/,
     )
     expect(subtitleToolsCss).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.overlay-probe \.subtitle-overlay,[\s\S]*?\.subtitle-tools-chrome\s*\{[\s\S]*?transition:\s*none;/,
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.overlay-probe \.subtitle-overlay\s*\{[\s\S]*?transition:\s*none;/,
     )
   })
 
@@ -74,5 +80,17 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).toContain(
       'const canChangeAudioTrack = canControl && audioTracks.length > 0',
     )
+  })
+
+  it('consolidates subtitle controls under CC and playback speed under settings', () => {
+    expect(subtitleToolsSource).not.toContain('subtitle-tools-toggle')
+    expect(subtitleToolsSource).not.toContain('Subtitle controls')
+    expect(polishedOverlaySource).toContain('Choose subtitle file')
+    expect(polishedOverlaySource).toContain('aria-label="Subtitle delay"')
+    expect(polishedOverlaySource).toContain('aria-label="Subtitle font size"')
+    expect(polishedOverlaySource).toContain('aria-label="Subtitle vertical position"')
+    expect(polishedOverlaySource).toContain('className="playback-speed-menu"')
+    expect(polishedOverlaySource).toContain('aria-label="Settings"')
+    expect(polishedOverlaySource).not.toContain('className="speed-control"')
   })
 })
