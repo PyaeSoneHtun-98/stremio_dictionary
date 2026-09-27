@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   createInstallerEnvironment,
@@ -61,6 +64,31 @@ describe('updater installer launch environment', () => {
         return installDirectory
       }),
     ).toThrow('working directory must be outside')
+  })
+
+  it('resolves a real Windows junction before the containment decision', () => {
+    if (process.platform !== 'win32') {
+      return
+    }
+
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'subtitle-bridge-updater-junction-'))
+    const installDirectory = join(fixtureRoot, 'Custom Install')
+    const insideTarget = join(installDirectory, 'updates', 'v1.0.7')
+    const externalAlias = join(fixtureRoot, 'DownloadAlias')
+
+    try {
+      mkdirSync(insideTarget, { recursive: true })
+      symlinkSync(insideTarget, externalAlias, 'junction')
+
+      expect(() =>
+        installerWorkingDirectory(
+          join(externalAlias, 'SubtitleBridge-Setup-x64.exe'),
+          installDirectory,
+        ),
+      ).toThrow('working directory must be outside')
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true })
+    }
   })
 
   it('fails closed when a physical updater path cannot be resolved', () => {
