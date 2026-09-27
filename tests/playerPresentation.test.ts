@@ -26,7 +26,13 @@ describe('player presentation contracts', () => {
       /\.overlay-probe\.chrome-hidden \.subtitle-overlay\s*\{[\s\S]*?bottom:\s*calc\(32px \+ var\(--subtitle-position-offset, 0px\)\);/,
     )
     expect(subtitleToolsCss).toMatch(
+      /@media \(max-width: 720px\)[\s\S]*?\.overlay-probe \.subtitle-overlay\s*\{[\s\S]*?bottom:\s*calc\(104px \+ var\(--subtitle-position-offset, 0px\)\);/,
+    )
+    expect(subtitleToolsCss).toMatch(
       /@media \(max-width: 720px\)[\s\S]*?\.overlay-probe\.chrome-hidden \.subtitle-overlay\s*\{[\s\S]*?bottom:\s*calc\(24px \+ var\(--subtitle-position-offset, 0px\)\);/,
+    )
+    expect(subtitleToolsCss).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.overlay-probe \.subtitle-overlay,[\s\S]*?\.subtitle-tools-chrome\s*\{[\s\S]*?transition:\s*none;/,
     )
   })
 
