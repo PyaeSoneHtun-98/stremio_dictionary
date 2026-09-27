@@ -88,17 +88,18 @@ export function PolishedOverlay(): React.JSX.Element {
   const panelTrigger = useRef<HTMLElement | null>(null)
   const panelRef = useRef<HTMLElement | null>(null)
   const closePanel = useCallback((): void => {
+    setSubtitleSettingsOpen(false)
     setPanel(null)
     panelTrigger.current?.focus()
   }, [])
   const togglePanel = (next: 'settings' | 'tracks' | 'help', trigger: HTMLElement): void => {
     panelTrigger.current = trigger
+    if (next !== 'tracks' || panel === 'tracks') {
+      setSubtitleSettingsOpen(false)
+    }
     setPanel((current) => (current === next ? null : next))
   }
   useEffect(() => {
-    if (panel !== 'tracks') {
-      setSubtitleSettingsOpen(false)
-    }
     if (!panel) return
     panelRef.current?.focus()
     const outside = (event: PointerEvent): void => {
