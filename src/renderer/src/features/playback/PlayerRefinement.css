@@ -21,7 +21,7 @@
 }
 
 /* Subtitles should read like subtitles, not like a floating dark card.
-   Their hit targets intentionally stay in one fixed safe area while player chrome fades/reveals. */
+   Their hit targets move with the subtitle layer: raised above visible controls and lower once chrome hides. */
 .subtitle-text {
   overflow: visible;
   border-radius: 0;
