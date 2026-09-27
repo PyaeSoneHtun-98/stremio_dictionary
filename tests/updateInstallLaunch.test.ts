@@ -111,6 +111,36 @@ describe('updater installer launch environment', () => {
     ).toThrow('could not be resolved safely')
   })
 
+  it('normalizes extended drive paths before containment checks', () => {
+    const installDirectory = 'C:\\Apps\\Subtitle Bridge'
+    const installerDirectory = 'C:\\Users\\Tester\\Downloads\\UpdateAlias'
+    const installerPath = `${installerDirectory}\\SubtitleBridge-Setup-x64.exe`
+
+    expect(() =>
+      installerWorkingDirectory(installerPath, installDirectory, (directoryPath) => {
+        if (directoryPath === installDirectory) {
+          return '\\\\?\\C:\\Apps\\Subtitle Bridge'
+        }
+        return '\\\\?\\C:\\Apps\\Subtitle Bridge\\updates\\v1.0.7'
+      }),
+    ).toThrow('working directory must be outside')
+  })
+
+  it('normalizes extended UNC paths before containment checks', () => {
+    const installDirectory = 'C:\\Apps\\Subtitle Bridge'
+    const installerDirectory = 'C:\\Users\\Tester\\Downloads\\UpdateAlias'
+    const installerPath = `${installerDirectory}\\SubtitleBridge-Setup-x64.exe`
+
+    expect(() =>
+      installerWorkingDirectory(installerPath, installDirectory, (directoryPath) => {
+        if (directoryPath === installDirectory) {
+          return '\\\\?\\UNC\\server\\share\\Subtitle Bridge'
+        }
+        return '\\\\?\\UNC\\server\\share\\Subtitle Bridge\\updates\\v1.0.7'
+      }),
+    ).toThrow('working directory must be outside')
+  })
+
   it('passes a complete updater process identity to setup', () => {
     const customInstallDirectory = 'D:\\Apps\\Subtitle Bridge Custom'
     const executablePath = `${customInstallDirectory}\\Subtitle Bridge.exe`
