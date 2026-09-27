@@ -18,6 +18,7 @@ const desktopBridge: DesktopBridge = {
     seek: (seconds) => ipcRenderer.invoke('media:seek', seconds),
     setVolume: (volume) => ipcRenderer.invoke('media:set-volume', volume),
     setSpeed: (speed) => ipcRenderer.invoke('media:set-speed', speed),
+    selectAudioTrack: (trackId) => ipcRenderer.invoke('media:select-audio-track', trackId),
     setSubtitleDelay: (seconds) => ipcRenderer.invoke('media:set-subtitle-delay', seconds),
     adjustSubtitleDelay: (deltaSeconds) =>
       ipcRenderer.invoke('media:adjust-subtitle-delay', deltaSeconds),
