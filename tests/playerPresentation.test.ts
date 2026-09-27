@@ -82,13 +82,24 @@ describe('player presentation contracts', () => {
     )
   })
 
-  it('consolidates subtitle controls under CC and playback speed under settings', () => {
+  it('keeps the CC panel compact and expands subtitle settings only on demand', () => {
     expect(subtitleToolsSource).not.toContain('subtitle-tools-toggle')
     expect(subtitleToolsSource).not.toContain('Subtitle controls')
+    expect(polishedOverlaySource).toContain('className="compact-tracks-panel')
     expect(polishedOverlaySource).toContain('Choose subtitle file')
+    expect(polishedOverlaySource).toContain('Subtitle settings')
+    expect(polishedOverlaySource).toContain('aria-expanded={subtitleSettingsOpen}')
+    expect(polishedOverlaySource).toContain('{subtitleSettingsOpen ? (')
     expect(polishedOverlaySource).toContain('aria-label="Subtitle delay"')
     expect(polishedOverlaySource).toContain('aria-label="Subtitle font size"')
     expect(polishedOverlaySource).toContain('aria-label="Subtitle vertical position"')
+    expect(polishedOverlaySource).toContain('aria-label="Audio track"')
+    expect(polishedOverlaySource).not.toContain(
+      'Text subtitles are clickable. Image subtitles are listed as unsupported.',
+    )
+  })
+
+  it('keeps playback speed inside settings instead of the bottom control row', () => {
     expect(polishedOverlaySource).toContain('className="playback-speed-menu"')
     expect(polishedOverlaySource).toContain('aria-label="Settings"')
     expect(polishedOverlaySource).not.toContain('className="speed-control"')
