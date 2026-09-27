@@ -1459,13 +1459,6 @@ function formatAudioTrack(track: MediaTrack): string {
   return `${language}${title} · ${codec}`
 }
 
-function audioControlTitle(tracks: MediaTrack[]): string {
-  if (tracks.length === 0) {
-    return 'This video has no audio tracks.'
-  }
-  return 'Choose an audio track. Audio can be changed during playback.'
-}
-
 function isSelectableSubtitleTrack(track: MediaTrack, filePath: string | null): boolean {
   if (track.subtitleKind !== 'text') {
     return false
@@ -1486,16 +1479,6 @@ function formatSubtitleTrack(track: MediaTrack, filePath: string | null): string
   const codec = track.codec ?? 'unknown'
   const unsupported = isSelectableSubtitleTrack(track, filePath) ? '' : ' · unsupported'
   return `${language}${title} · ${codec}${unsupported}`
-}
-
-function subtitleControlTitle(state: PlaybackSnapshot, tracks: MediaTrack[]): string {
-  if (tracks.length === 0) {
-    return 'This file has no embedded subtitle tracks.'
-  }
-  if (state.status !== 'paused') {
-    return 'Pause playback to change subtitle tracks.'
-  }
-  return 'Choose an embedded text subtitle track.'
 }
 
 function formatSubtitleDelay(seconds: number): string {
