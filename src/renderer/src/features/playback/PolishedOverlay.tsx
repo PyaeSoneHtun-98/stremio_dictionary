@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { MediaTrack, PlaybackSnapshot, SubtitleToken } from '../../../../shared/media'
-import { createEmptySubtitleModel } from '../../../../shared/media'
+import {
+  DEFAULT_SUBTITLE_PREFERENCES,
+  EXTERNAL_SUBTITLE_TRACK_ID,
+  createEmptySubtitleModel,
+  type MediaTrack,
+  type PlaybackSnapshot,
+  type SubtitlePreferencesSnapshot,
+  type SubtitlePreferencesUpdate,
+  type SubtitleToken,
+} from '../../../../shared/media'
 import {
   DEFAULT_TRANSLATION_SETTINGS,
   type TranslationSettingsSnapshot,
@@ -36,7 +44,8 @@ const EMPTY_STATE: PlaybackSnapshot = {
   error: null,
 }
 
-const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
+const SPEED_OPTIONS = [0.25, 0.5, 1, 1.5, 2]
+const SUBTITLE_DELAY_STEP = 0.1
 const SUBTITLE_DELAY_NOTICE_MS = 1600
 const TARGET_LANGUAGE_OPTIONS = [
   { code: 'my', label: 'Burmese' },
@@ -67,6 +76,10 @@ export function PolishedOverlay(): React.JSX.Element {
   const [translationSettings, setTranslationSettings] = useState<TranslationSettingsSnapshot>(
     DEFAULT_TRANSLATION_SETTINGS,
   )
+  const [subtitlePreferences, setSubtitlePreferences] = useState<SubtitlePreferencesSnapshot>(
+    DEFAULT_SUBTITLE_PREFERENCES,
+  )
+  const [loadingExternalSubtitle, setLoadingExternalSubtitle] = useState(false)
   const [panel, setPanel] = useState<'settings' | 'tracks' | 'help' | null>(null)
   const settingsOpen = panel === 'settings'
   const [controlsHovered, setControlsHovered] = useState(false)
@@ -258,6 +271,42 @@ export function PolishedOverlay(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
+    let active = true
+
+    void window.desktop.media
+      .getSubtitlePreferences()
+      .then((preferences) => {
+        if (active) {
+          setSubtitlePreferences(preferences)
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setControlError(controlErrorMessage(error, 'Could not load subtitle preferences.'))
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const root = document.documentElement
+    root.style.setProperty('--subtitle-font-min', `${19 * subtitlePreferences.fontScale}px`)
+    root.style.setProperty('--subtitle-font-fluid', `${2.65 * subtitlePreferences.fontScale}vw`)
+    root.style.setProperty('--subtitle-font-max', `${34 * subtitlePreferences.fontScale}px`)
+    root.style.setProperty('--subtitle-position-offset', `${subtitlePreferences.verticalOffset}px`)
+
+    return () => {
+      root.style.removeProperty('--subtitle-font-min')
+      root.style.removeProperty('--subtitle-font-fluid')
+      root.style.removeProperty('--subtitle-font-max')
+      root.style.removeProperty('--subtitle-position-offset')
+    }
+  }, [subtitlePreferences])
+
+  useEffect(() => {
     const clearRememberedFocus = (): void => {
       const activeElement = document.activeElement
       if (activeElement instanceof HTMLElement) {
@@ -357,6 +406,8 @@ export function PolishedOverlay(): React.JSX.Element {
   )
   const canChangeAudioTrack = canControl && audioTracks.length > 0
   const canChangeSubtitleTrack = state.status === 'paused' && supportedSubtitleTracks.length > 0
+  const canOpenExternalSubtitle = canControl && !loadingExternalSubtitle
+  const subtitleDelay = state.subtitleDelay ?? 0
   const subtitleMessage = activeCue
     ? null
     : subtitleRecoveryMessage(state.subtitle.status, state.subtitle.error)
@@ -492,6 +543,35 @@ export function PolishedOverlay(): React.JSX.Element {
     }
     if (await updateTranslationSettings({ apiKey: apiKeyDraft })) {
       setApiKeyDraft('')
+    }
+  }
+
+  const updateSubtitlePreferences = async (
+    update: SubtitlePreferencesUpdate,
+  ): Promise<void> => {
+    setControlError(null)
+    try {
+      setSubtitlePreferences(await window.desktop.media.updateSubtitlePreferences(update))
+    } catch (error) {
+      setControlError(controlErrorMessage(error, 'Could not save subtitle preferences.'))
+    }
+  }
+
+  const openExternalSubtitleFile = async (): Promise<void> => {
+    setControlError(null)
+    setLoadingExternalSubtitle(true)
+    try {
+      const result = await window.desktop.media.openExternalSubtitle()
+      if (result.cancelled) {
+        return
+      }
+      if (!result.loaded) {
+        throw new Error(result.error ?? 'Could not load this subtitle file.')
+      }
+    } catch (error) {
+      setControlError(controlErrorMessage(error, 'Could not open this subtitle file.'))
+    } finally {
+      setLoadingExternalSubtitle(false)
     }
   }
 
@@ -680,10 +760,10 @@ export function PolishedOverlay(): React.JSX.Element {
             <div className="panel-heading">
               <span>
                 {panel === 'tracks'
-                  ? 'Tracks'
+                  ? 'Subtitles & audio'
                   : panel === 'help'
                     ? 'Keyboard shortcuts'
-                    : 'Make it yours'}
+                    : 'Settings'}
               </span>
               <button
                 className="icon-button"
@@ -696,85 +776,184 @@ export function PolishedOverlay(): React.JSX.Element {
               </button>
             </div>
             {settingsOpen ? (
-              <TranslationSettingsPanel
-                settings={translationSettings}
-                apiKeyDraft={apiKeyDraft}
-                error={settingsError}
-                onApiKeyDraftChange={setApiKeyDraft}
-                onUpdate={(update) => {
-                  void updateTranslationSettings(update)
-                }}
-                onSaveApiKey={() => {
-                  void saveApiKey()
-                }}
-                onClearApiKey={() => {
-                  setApiKeyDraft('')
-                  void updateTranslationSettings({ apiKey: null })
-                }}
-                onClearCache={() => {
-                  void clearTranslationCache()
-                }}
-              />
+              <>
+                <section className="playback-settings-section" aria-label="Playback settings">
+                  <div className="settings-section-heading">Playback speed</div>
+                  <div className="playback-speed-menu">
+                    {SPEED_OPTIONS.map((speed) => (
+                      <button
+                        type="button"
+                        key={speed}
+                        className={Math.abs(state.speed - speed) < 0.001 ? 'is-selected' : ''}
+                        aria-pressed={Math.abs(state.speed - speed) < 0.001}
+                        disabled={!canControl}
+                        onClick={() => void runControl(() => window.desktop.media.setSpeed(speed))}
+                      >
+                        {speed}×
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                <TranslationSettingsPanel
+                  settings={translationSettings}
+                  apiKeyDraft={apiKeyDraft}
+                  error={settingsError}
+                  onApiKeyDraftChange={setApiKeyDraft}
+                  onUpdate={(update) => {
+                    void updateTranslationSettings(update)
+                  }}
+                  onSaveApiKey={() => {
+                    void saveApiKey()
+                  }}
+                  onClearApiKey={() => {
+                    setApiKeyDraft('')
+                    void updateTranslationSettings({ apiKey: null })
+                  }}
+                  onClearCache={() => {
+                    void clearTranslationCache()
+                  }}
+                />
+              </>
             ) : null}
 
             {panel === 'tracks' ? (
               <>
-                <label className="track-control" title={audioControlTitle(audioTracks)}>
-                  <span>Audio</span>
-                  <select
-                    aria-label="Audio track"
-                    value={selectedAudioTrack ? String(selectedAudioTrack.id) : ''}
-                    disabled={!canChangeAudioTrack}
-                    onChange={(event) => {
-                      const trackId = Number(event.currentTarget.value)
-                      void runControl(() => window.desktop.media.selectAudioTrack(trackId))
-                    }}
+                <section className="tracks-section" aria-label="Subtitle tracks and settings">
+                  <div className="settings-section-heading">Subtitles</div>
+                  <p className="panel-note">{subtitleControlTitle(state, subtitleTracks)}</p>
+                  <label
+                    className="track-control"
+                    title={subtitleControlTitle(state, subtitleTracks)}
                   >
-                    {audioTracks.length === 0 ? <option value="">No audio tracks</option> : null}
-                    {audioTracks.length > 0 && !selectedAudioTrack ? (
-                      <option value="">Select audio track</option>
-                    ) : null}
-                    {audioTracks.map((track) => (
-                      <option value={track.id} key={track.id}>
-                        {formatAudioTrack(track)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    <span>Subtitle track</span>
+                    <select
+                      aria-label="Embedded subtitle track"
+                      value={state.subtitle.trackId === null ? '' : String(state.subtitle.trackId)}
+                      disabled={!canChangeSubtitleTrack}
+                      onChange={(event) => {
+                        const trackId = Number(event.currentTarget.value)
+                        void runControl(() => window.desktop.media.selectSubtitleTrack(trackId))
+                      }}
+                    >
+                      {supportedSubtitleTracks.length === 0 ? (
+                        <option value="">No text tracks</option>
+                      ) : null}
+                      {subtitleTracks.map((track) => (
+                        <option
+                          value={track.id}
+                          key={track.id}
+                          disabled={!isSelectableSubtitleTrack(track, state.filePath)}
+                        >
+                          {formatSubtitleTrack(track, state.filePath)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <p className="panel-note">{subtitleControlTitle(state, subtitleTracks)}</p>
-                <label
-                  className="track-control"
-                  title={subtitleControlTitle(state, subtitleTracks)}
-                >
-                  <span>Subtitles</span>
-                  <select
-                    aria-label="Embedded subtitle track"
-                    value={state.subtitle.trackId === null ? '' : String(state.subtitle.trackId)}
-                    disabled={!canChangeSubtitleTrack}
-                    onChange={(event) => {
-                      const trackId = Number(event.currentTarget.value)
-                      void runControl(() => window.desktop.media.selectSubtitleTrack(trackId))
-                    }}
+                  <button
+                    type="button"
+                    className="menu-action-button"
+                    disabled={!canOpenExternalSubtitle}
+                    onClick={() => void openExternalSubtitleFile()}
                   >
-                    {supportedSubtitleTracks.length === 0 ? (
-                      <option value="">No text tracks</option>
-                    ) : null}
-                    {subtitleTracks.map((track) => (
-                      <option
-                        value={track.id}
-                        key={track.id}
-                        disabled={!isSelectableSubtitleTrack(track, state.filePath)}
-                      >
-                        {formatSubtitleTrack(track, state.filePath)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    {loadingExternalSubtitle ? 'Loading subtitle…' : 'Choose subtitle file'}
+                  </button>
 
-                <p className="panel-note">
-                  Text subtitles are clickable. Image subtitles are listed as unsupported.
-                </p>
+                  <div className="subtitle-settings-group">
+                    <div className="settings-section-heading">Subtitle settings</div>
+
+                    <label className="subtitle-setting-row">
+                      <span>
+                        Delay <output>{formatSubtitleDelay(subtitleDelay)}</output>
+                      </span>
+                      <input
+                        type="range"
+                        min={-20}
+                        max={20}
+                        step={SUBTITLE_DELAY_STEP}
+                        value={subtitleDelay}
+                        disabled={!canControl}
+                        aria-label="Subtitle delay"
+                        onChange={(event) =>
+                          void runControl(() =>
+                            window.desktop.media.setSubtitleDelay(
+                              roundSubtitleDelay(Number(event.currentTarget.value)),
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label className="subtitle-setting-row">
+                      <span>
+                        Size <output>{Math.round(subtitlePreferences.fontScale * 100)}%</output>
+                      </span>
+                      <input
+                        type="range"
+                        min={0.7}
+                        max={1.6}
+                        step={0.05}
+                        value={subtitlePreferences.fontScale}
+                        aria-label="Subtitle font size"
+                        onChange={(event) =>
+                          void updateSubtitlePreferences({
+                            fontScale: Number(event.currentTarget.value),
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label className="subtitle-setting-row">
+                      <span>
+                        Vertical position{' '}
+                        <output>{formatSubtitlePosition(subtitlePreferences.verticalOffset)}</output>
+                      </span>
+                      <input
+                        type="range"
+                        min={-24}
+                        max={240}
+                        step={4}
+                        value={subtitlePreferences.verticalOffset}
+                        aria-label="Subtitle vertical position"
+                        onChange={(event) =>
+                          void updateSubtitlePreferences({
+                            verticalOffset: Number(event.currentTarget.value),
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  <p className="panel-note">
+                    Text subtitles are clickable. Image subtitles are listed as unsupported.
+                  </p>
+                </section>
+
+                <section className="tracks-section audio-track-section" aria-label="Audio tracks">
+                  <div className="settings-section-heading">Audio</div>
+                  <label className="track-control" title={audioControlTitle(audioTracks)}>
+                    <span>Audio track</span>
+                    <select
+                      aria-label="Audio track"
+                      value={selectedAudioTrack ? String(selectedAudioTrack.id) : ''}
+                      disabled={!canChangeAudioTrack}
+                      onChange={(event) => {
+                        const trackId = Number(event.currentTarget.value)
+                        void runControl(() => window.desktop.media.selectAudioTrack(trackId))
+                      }}
+                    >
+                      {audioTracks.length === 0 ? <option value="">No audio tracks</option> : null}
+                      {audioTracks.length > 0 && !selectedAudioTrack ? (
+                        <option value="">Select audio track</option>
+                      ) : null}
+                      {audioTracks.map((track) => (
+                        <option value={track.id} key={track.id}>
+                          {formatAudioTrack(track)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </section>
               </>
             ) : null}
             {panel === 'help' ? (
@@ -946,31 +1125,12 @@ export function PolishedOverlay(): React.JSX.Element {
           >
             <PlayerIcon name="captions" />
           </button>
-          <label className="speed-control">
-            <span className="sr-only">Playback speed</span>
-            <select
-              value={String(state.speed)}
-              disabled={!canControl}
-              onChange={(event) => {
-                void runControl(() =>
-                  window.desktop.media.setSpeed(Number(event.currentTarget.value)),
-                )
-              }}
-            >
-              {SPEED_OPTIONS.map((speed) => (
-                <option value={speed} key={speed}>
-                  {speed}×
-                </option>
-              ))}
-            </select>
-          </label>
-
           <button
             type="button"
             className="icon-button"
             data-panel-trigger
-            aria-label="Translation settings"
-            title="Translation settings"
+            aria-label="Settings"
+            title="Settings"
             aria-expanded={settingsOpen}
             onClick={(event) => togglePanel('settings', event.currentTarget)}
           >
@@ -1303,13 +1463,20 @@ function audioControlTitle(tracks: MediaTrack[]): string {
 }
 
 function isSelectableSubtitleTrack(track: MediaTrack, filePath: string | null): boolean {
-  return (
-    track.subtitleKind === 'text' &&
-    (track.ffIndex !== null || /^https?:\/\//i.test(filePath ?? ''))
-  )
+  if (track.subtitleKind !== 'text') {
+    return false
+  }
+  if (track.id === EXTERNAL_SUBTITLE_TRACK_ID) {
+    return true
+  }
+  return track.ffIndex !== null || /^https?:\/\//i.test(filePath ?? '')
 }
 
 function formatSubtitleTrack(track: MediaTrack, filePath: string | null): string {
+  if (track.id === EXTERNAL_SUBTITLE_TRACK_ID) {
+    return `External · ${track.title ?? 'subtitle'} · ${track.codec ?? 'text'}`
+  }
+
   const language = track.language ?? 'und'
   const title = track.title ? ` · ${track.title}` : ''
   const codec = track.codec ?? 'unknown'
@@ -1332,6 +1499,26 @@ function formatSubtitleDelay(seconds: number): string {
     return '0.0 s'
   }
   return `${seconds > 0 ? '+' : ''}${seconds.toFixed(1)} s`
+}
+
+function roundSubtitleDelay(value: number): number {
+  return Math.round(value * 10) / 10
+}
+
+function formatSubtitlePosition(value: number): string {
+  if (value === 0) {
+    return 'Default'
+  }
+  return value > 0 ? `+${value}px higher` : `${Math.abs(value)}px lower`
+}
+
+function controlErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) {
+    return fallback
+  }
+  return error.message
+    .replace(/^Error invoking remote method '[^']+':\s*/i, '')
+    .replace(/^Error:\s*/i, '')
 }
 
 function formatTime(seconds: number | null): string {
