@@ -80,6 +80,7 @@ export function PolishedOverlay(): React.JSX.Element {
     DEFAULT_SUBTITLE_PREFERENCES,
   )
   const [loadingExternalSubtitle, setLoadingExternalSubtitle] = useState(false)
+  const [subtitleSettingsOpen, setSubtitleSettingsOpen] = useState(false)
   const [panel, setPanel] = useState<'settings' | 'tracks' | 'help' | null>(null)
   const settingsOpen = panel === 'settings'
   const [controlsHovered, setControlsHovered] = useState(false)
@@ -95,6 +96,9 @@ export function PolishedOverlay(): React.JSX.Element {
     setPanel((current) => (current === next ? null : next))
   }
   useEffect(() => {
+    if (panel !== 'tracks') {
+      setSubtitleSettingsOpen(false)
+    }
     if (!panel) return
     panelRef.current?.focus()
     const outside = (event: PointerEvent): void => {
@@ -818,14 +822,11 @@ export function PolishedOverlay(): React.JSX.Element {
 
             {panel === 'tracks' ? (
               <>
-                <section className="tracks-section" aria-label="Subtitle tracks and settings">
-                  <div className="settings-section-heading">Subtitles</div>
-                  <p className="panel-note">{subtitleControlTitle(state, subtitleTracks)}</p>
-                  <label
-                    className="track-control"
-                    title={subtitleControlTitle(state, subtitleTracks)}
-                  >
-                    <span>Subtitle track</span>
+                <section className="compact-tracks-section" aria-label="Subtitle controls">
+                  <div className="compact-section-title">Subtitles</div>
+
+                  <label className="compact-track-control">
+                    <span className="sr-only">Subtitle track</span>
                     <select
                       aria-label="Embedded subtitle track"
                       value={state.subtitle.trackId === null ? '' : String(state.subtitle.trackId)}
@@ -852,87 +853,93 @@ export function PolishedOverlay(): React.JSX.Element {
 
                   <button
                     type="button"
-                    className="menu-action-button"
+                    className="compact-menu-button"
                     disabled={!canOpenExternalSubtitle}
                     onClick={() => void openExternalSubtitleFile()}
                   >
                     {loadingExternalSubtitle ? 'Loading subtitle…' : 'Choose subtitle file'}
                   </button>
 
-                  <div className="subtitle-settings-group">
-                    <div className="settings-section-heading">Subtitle settings</div>
+                  <button
+                    type="button"
+                    className="compact-menu-button compact-subtitle-settings-toggle"
+                    aria-expanded={subtitleSettingsOpen}
+                    onClick={() => setSubtitleSettingsOpen((open) => !open)}
+                  >
+                    <span>Subtitle settings</span>
+                    <span aria-hidden="true">{subtitleSettingsOpen ? '−' : '+'}</span>
+                  </button>
 
-                    <label className="subtitle-setting-row">
-                      <span>
-                        Delay <output>{formatSubtitleDelay(subtitleDelay)}</output>
-                      </span>
-                      <input
-                        type="range"
-                        min={-20}
-                        max={20}
-                        step={SUBTITLE_DELAY_STEP}
-                        value={subtitleDelay}
-                        disabled={!canControl}
-                        aria-label="Subtitle delay"
-                        onChange={(event) =>
-                          void runControl(() =>
-                            window.desktop.media.setSubtitleDelay(
-                              roundSubtitleDelay(Number(event.currentTarget.value)),
-                            ),
-                          )
-                        }
-                      />
-                    </label>
+                  {subtitleSettingsOpen ? (
+                    <div className="compact-subtitle-settings">
+                      <label>
+                        <span>
+                          Delay <output>{formatSubtitleDelay(subtitleDelay)}</output>
+                        </span>
+                        <input
+                          type="range"
+                          min={-20}
+                          max={20}
+                          step={SUBTITLE_DELAY_STEP}
+                          value={subtitleDelay}
+                          disabled={!canControl}
+                          aria-label="Subtitle delay"
+                          onChange={(event) =>
+                            void runControl(() =>
+                              window.desktop.media.setSubtitleDelay(
+                                roundSubtitleDelay(Number(event.currentTarget.value)),
+                              ),
+                            )
+                          }
+                        />
+                      </label>
 
-                    <label className="subtitle-setting-row">
-                      <span>
-                        Size <output>{Math.round(subtitlePreferences.fontScale * 100)}%</output>
-                      </span>
-                      <input
-                        type="range"
-                        min={0.7}
-                        max={1.6}
-                        step={0.05}
-                        value={subtitlePreferences.fontScale}
-                        aria-label="Subtitle font size"
-                        onChange={(event) =>
-                          void updateSubtitlePreferences({
-                            fontScale: Number(event.currentTarget.value),
-                          })
-                        }
-                      />
-                    </label>
+                      <label>
+                        <span>
+                          Size <output>{Math.round(subtitlePreferences.fontScale * 100)}%</output>
+                        </span>
+                        <input
+                          type="range"
+                          min={0.7}
+                          max={1.6}
+                          step={0.05}
+                          value={subtitlePreferences.fontScale}
+                          aria-label="Subtitle font size"
+                          onChange={(event) =>
+                            void updateSubtitlePreferences({
+                              fontScale: Number(event.currentTarget.value),
+                            })
+                          }
+                        />
+                      </label>
 
-                    <label className="subtitle-setting-row">
-                      <span>
-                        Vertical position{' '}
-                        <output>{formatSubtitlePosition(subtitlePreferences.verticalOffset)}</output>
-                      </span>
-                      <input
-                        type="range"
-                        min={-24}
-                        max={240}
-                        step={4}
-                        value={subtitlePreferences.verticalOffset}
-                        aria-label="Subtitle vertical position"
-                        onChange={(event) =>
-                          void updateSubtitlePreferences({
-                            verticalOffset: Number(event.currentTarget.value),
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-
-                  <p className="panel-note">
-                    Text subtitles are clickable. Image subtitles are listed as unsupported.
-                  </p>
+                      <label>
+                        <span>
+                          Position{' '}
+                          <output>{formatSubtitlePosition(subtitlePreferences.verticalOffset)}</output>
+                        </span>
+                        <input
+                          type="range"
+                          min={-24}
+                          max={240}
+                          step={4}
+                          value={subtitlePreferences.verticalOffset}
+                          aria-label="Subtitle vertical position"
+                          onChange={(event) =>
+                            void updateSubtitlePreferences({
+                              verticalOffset: Number(event.currentTarget.value),
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                  ) : null}
                 </section>
 
-                <section className="tracks-section audio-track-section" aria-label="Audio tracks">
-                  <div className="settings-section-heading">Audio</div>
-                  <label className="track-control" title={audioControlTitle(audioTracks)}>
-                    <span>Audio track</span>
+                <section className="compact-tracks-section compact-audio-section" aria-label="Audio controls">
+                  <div className="compact-section-title">Audio</div>
+                  <label className="compact-track-control">
+                    <span className="sr-only">Audio track</span>
                     <select
                       aria-label="Audio track"
                       value={selectedAudioTrack ? String(selectedAudioTrack.id) : ''}
