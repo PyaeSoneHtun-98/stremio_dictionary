@@ -399,19 +399,6 @@ html.overlay-mode #root {
 .control-spacer {
   flex: 1;
 }
-.speed-control select {
-  width: 62px;
-  height: 40px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  color: #e7efea;
-  font-size: 12px;
-  cursor: pointer;
-}
-.speed-control select:hover {
-  background: #ffffff14;
-}
 .player-controls option {
   background: #152029;
   color: white;
@@ -647,6 +634,126 @@ html.overlay-mode #root {
   border-radius: 8px;
   color: white;
   padding: 0 10px;
+}
+
+.tracks-section,
+.playback-settings-section,
+.subtitle-settings-group {
+  display: grid;
+  gap: 10px;
+}
+
+.tracks-section + .tracks-section,
+.translation-settings-panel {
+  margin-top: 16px;
+  border-top: 1px solid #ffffff12;
+  padding-top: 16px;
+}
+
+.settings-section-heading {
+  color: #f1f7f4;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.menu-action-button {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #ffffff1f;
+  border-radius: 8px;
+  background: #ffffff08;
+  color: #edf5f1;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  padding: 0 12px;
+}
+
+.menu-action-button:hover:not(:disabled) {
+  background: #ffffff12;
+  border-color: #b5e6d150;
+}
+
+.menu-action-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.subtitle-settings-group {
+  margin-top: 4px;
+  border-top: 1px solid #ffffff0f;
+  padding-top: 14px;
+}
+
+.subtitle-setting-row {
+  display: grid;
+  gap: 6px;
+  color: #adbdb5;
+  font-size: 12px;
+}
+
+.subtitle-setting-row > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.subtitle-setting-row output {
+  color: #d8e8e0;
+  font-variant-numeric: tabular-nums;
+}
+
+.playback-speed-menu {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #ffffff16;
+  border-radius: 10px;
+  background: #ffffff05;
+}
+
+.playback-speed-menu button {
+  position: relative;
+  min-height: 40px;
+  border: 0;
+  border-bottom: 1px solid #ffffff0d;
+  padding: 0 14px;
+  background: transparent;
+  color: #edf5f1;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.playback-speed-menu button:last-child {
+  border-bottom: 0;
+}
+
+.playback-speed-menu button:hover:not(:disabled) {
+  background: #ffffff0d;
+}
+
+.playback-speed-menu button.is-selected {
+  background: #ffffff12;
+  color: var(--accent);
+}
+
+.playback-speed-menu button.is-selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+
+.playback-speed-menu button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 .shortcut-list {
   margin: 0;
