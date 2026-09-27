@@ -1,12 +1,13 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
-import { spawn } from 'node:child_process'
+import { spawn, type SpawnOptions } from 'node:child_process'
 import { join } from 'node:path'
 import type { UpdateActionResult, UpdateSnapshot } from '../../shared/update'
 import { GithubUpdateClient } from './GithubUpdateClient'
 import {
   createInstallerEnvironment,
   currentInstallDirectory,
-  installerWorkingDirectory
+  installerWorkingDirectory,
+  type WindowsDirectoryResolver,
 } from './installLaunch'
 import { UpdateService } from './UpdateService'
 
@@ -68,19 +69,32 @@ export function disposeUpdateIpc(): void {
   registered = false
 }
 
-async function launchInstaller(
+export function createInstallerSpawnOptions(
   installerPath: string,
-  executablePath: string
-): Promise<void> {
+  executablePath: string,
+  resolveDirectory?: WindowsDirectoryResolver,
+): SpawnOptions {
   const installDirectory = currentInstallDirectory(executablePath)
-  const workingDirectory = installerWorkingDirectory(installerPath, installDirectory)
-  const child = spawn(installerPath, [], {
+  const workingDirectory = installerWorkingDirectory(
+    installerPath,
+    installDirectory,
+    resolveDirectory,
+  )
+
+  return {
     detached: true,
     stdio: 'ignore',
     windowsHide: false,
     cwd: workingDirectory,
-    env: createInstallerEnvironment(installDirectory, executablePath)
-  })
+    env: createInstallerEnvironment(installDirectory, executablePath),
+  }
+}
+
+async function launchInstaller(
+  installerPath: string,
+  executablePath: string,
+): Promise<void> {
+  const child = spawn(installerPath, [], createInstallerSpawnOptions(installerPath, executablePath))
 
   await new Promise<void>((resolve, reject) => {
     child.once('spawn', resolve)
