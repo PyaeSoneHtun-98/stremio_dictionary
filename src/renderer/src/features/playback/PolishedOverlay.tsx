@@ -18,6 +18,7 @@ import {
   shouldHandleSurfacePointer,
   subtitleRecoveryMessage,
   subtitleRecoveryNoticeDuration,
+  SubtitleRecoveryNoticeCoordinator,
   SurfaceGestureCoordinator,
 } from './playerInteraction'
 import { buildPhraseLookupContext, segmentSubtitleCue } from './subtitleSegments'
@@ -112,7 +113,10 @@ export function PolishedOverlay(): React.JSX.Element {
   const [subtitleDelayNotice, setSubtitleDelayNotice] = useState<number | null>(null)
   const subtitleDelayNoticeTimer = useRef<number | null>(null)
   const [subtitleRecoveryNoticeVisible, setSubtitleRecoveryNoticeVisible] = useState(false)
-  const subtitleRecoveryNoticeTimer = useRef<number | null>(null)
+  const subtitleRecoveryNoticeCoordinator = useMemo(
+    () => new SubtitleRecoveryNoticeCoordinator(setSubtitleRecoveryNoticeVisible),
+    [],
+  )
 
   const showSubtitleDelayNotice = useCallback((value: number): void => {
     setSubtitleDelayNotice(value)
@@ -130,11 +134,9 @@ export function PolishedOverlay(): React.JSX.Element {
       if (subtitleDelayNoticeTimer.current !== null) {
         window.clearTimeout(subtitleDelayNoticeTimer.current)
       }
-      if (subtitleRecoveryNoticeTimer.current !== null) {
-        window.clearTimeout(subtitleRecoveryNoticeTimer.current)
-      }
+      subtitleRecoveryNoticeCoordinator.dispose()
     }
-  }, [])
+  }, [subtitleRecoveryNoticeCoordinator])
 
   const runControl = useCallback(async (action: () => Promise<void>): Promise<void> => {
     setControlError(null)
@@ -361,37 +363,15 @@ export function PolishedOverlay(): React.JSX.Element {
     : null
 
   useEffect(() => {
-    if (subtitleRecoveryNoticeTimer.current !== null) {
-      window.clearTimeout(subtitleRecoveryNoticeTimer.current)
-      subtitleRecoveryNoticeTimer.current = null
-    }
-
-    if (!subtitleMessage || !subtitleRecoveryNoticeKey) {
-      setSubtitleRecoveryNoticeVisible(false)
-      return
-    }
-
-    setSubtitleRecoveryNoticeVisible(true)
-
-    if (subtitleRecoveryNoticeDurationMs === null) {
-      return
-    }
-
-    const timer = window.setTimeout(() => {
-      if (subtitleRecoveryNoticeTimer.current === timer) {
-        subtitleRecoveryNoticeTimer.current = null
-      }
-      setSubtitleRecoveryNoticeVisible(false)
-    }, subtitleRecoveryNoticeDurationMs)
-    subtitleRecoveryNoticeTimer.current = timer
-
-    return () => {
-      window.clearTimeout(timer)
-      if (subtitleRecoveryNoticeTimer.current === timer) {
-        subtitleRecoveryNoticeTimer.current = null
-      }
-    }
-  }, [subtitleMessage, subtitleRecoveryNoticeDurationMs, subtitleRecoveryNoticeKey])
+    subtitleRecoveryNoticeCoordinator.update(
+      subtitleRecoveryNoticeKey,
+      subtitleRecoveryNoticeDurationMs,
+    )
+  }, [
+    subtitleRecoveryNoticeCoordinator,
+    subtitleRecoveryNoticeDurationMs,
+    subtitleRecoveryNoticeKey,
+  ])
 
   useEffect(() => {
     const handlePlayerShortcut = (event: KeyboardEvent): void => {

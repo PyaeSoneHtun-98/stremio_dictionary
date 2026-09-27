@@ -4,13 +4,15 @@
 
 Current stable `master`:
 
-`213b00d1564f6654eca39978e1e403fdd197e7a4`
+`e41f88ff8b8004f78a7802729549843d22ebf72d`
 
-PR #61 / Issue #60 is merged on top of the public v1.0.5 release source, fixing the real in-app upgrade install-directory lock caused by inherited setup working directories.
+Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
-PR #61 exact-head CI #501 passed on retry, including a new packaged Windows regression that deliberately launches setup with the installed Subtitle Bridge directory as its working directory. Merged master CI #502 passed at `213b00d1564f6654eca39978e1e403fdd197e7a4`.
+v1.0.6 fixed the real in-app updater install-directory lock. The affected Windows PC then completed the real **v1.0.5 → v1.0.6 in-app update successfully**, confirming the published hotfix outside CI.
 
-The real v1.0.4 → v1.0.5 in-app update reproduced the install-directory lock. v1.0.6 is the targeted hotfix; final acceptance is a real in-app update to the published v1.0.6 build.
+PR #64 / Issue #63 subsequently changed missing/unsupported/subtitle-error recovery text into a four-second notice while keeping active subtitle loading status persistent. PR CI #506 and merged-master CI #507 passed, and the MP4 manual acceptance test passed.
+
+A post-merge Codex review of PR #61 and PR #64 reported no P1/P2 findings. It found one P3 junction-containment gap plus three P4 test/documentation gaps; Issue #65 is the focused hardening follow-up before v1.0.7.
 
 Current stable capabilities include:
 
@@ -20,6 +22,7 @@ Current stable capabilities include:
 - clickable embedded SRT/ASS/SSA dialogue;
 - native external SRT/ASS/SSA picker plus drag-and-drop loading;
 - subtitle delay, size, and position controls, including G/H 0.1-second delay shortcuts with temporary on-screen feedback;
+- temporary recovery notices for missing/unsupported/error subtitle states;
 - centered stream buffering/loading feedback that distinguishes manual pause from cache/seek stalls;
 - single-click video-surface play/pause and Windows-system-aware double-click fullscreen;
 - compact launcher with Local video, Stremio, and current-session status;
@@ -44,6 +47,7 @@ Current stable capabilities include:
 - limited-access process-image lookup plus SID-based cross-user handling;
 - exact-standard-path and full-ancestor reparse-point checks before any cross-user exclusion;
 - bounded atomic same-volume install-directory move retry for transient locks;
+- updater/setup working-directory isolation from the installed application tree;
 - structured/redacted diagnostics;
 - renderer Node integration disabled and context isolation enabled.
 
@@ -103,9 +107,41 @@ Official ZIP SHA-256:
 
 Exact merged master CI #414 and Release Windows #82 passed. Issue #52 remains open only for the real affected/test-PC in-app updater acceptance.
 
+### v1.0.5
+
+PR #59 published the completed PR #58 playback and Stremio integration work.
+
+Published source:
+
+`74cc355264f1b7898dbb70199b94496fe61763a9`
+
+Official setup SHA-256:
+
+`645d8da8a3445a4d9e5dda11272650c65cd929566e07d4582e89d33820c0f3b3`
+
+The affected PC reproduced an install-directory lock during the real in-app update, leading to Issue #60 / PR #61.
+
+### v1.0.6
+
+PR #62 published the Issue #60 / PR #61 updater working-directory hotfix.
+
+Published source:
+
+`9c86f734c719cf0bacc1c15c510f0ea958813167`
+
+Official setup SHA-256:
+
+`2c3236da4162d3c3fa4c80835416e64337013b4d0a6c69ac73b14c2d67cb83ed`
+
+Official ZIP SHA-256:
+
+`7225d8e5889f2e0e00262ada206954560ed572c83629188b88600799db7d786e`
+
+Release Windows #173 passed. The real affected PC then completed the official **v1.0.5 → v1.0.6** in-app update successfully.
+
 ## Updater shutdown-race fix
 
-PR #54 is merged to master. Issue #52 remains open until the real affected/test PC completes the published fixed updater flow.
+PR #54 is merged to master, and the later v1.0.6 working-directory hotfix completed the real affected-PC updater acceptance.
 
 The fix:
 
@@ -121,7 +157,7 @@ The fix:
 - uses bounded `System.IO.Directory.Move` retries for transient locks without partial PowerShell `Move-Item` backups;
 - preserves rollback/recovery, ownership, custom-directory, updater trust, runtime, and Stremio invariants.
 
-The remaining acceptance gate is a real official in-app update using the published fixed installer.
+The real official in-app update acceptance passed on v1.0.6.
 
 ## Dictionary v1.0
 
@@ -140,37 +176,28 @@ Production artifact: `src/main/translation/data/phrases.json`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
-## Active work — Windows v1.0.6 hotfix
+## Active work — Issue #65 post-review hardening
 
-Release branch:
+Branch:
 
-`release/v1.0.6`
+`fix/issue-65-post-review-hardening`
 
-v1.0.6 is a release-only package of the Issue #60 / PR #61 updater working-directory fix.
+This follow-up addresses the Codex review of merged PR #61 and PR #64.
 
-Hotfix behavior:
+Scope:
 
-- the in-app updater launches the downloaded setup executable with an explicit working directory outside the install tree;
-- updater launch rejects a setup working directory inside the installed application tree;
-- the setup bootstrap immediately relocates its own current directory to its temporary extraction root;
-- the PowerShell installer is launched with the extracted package directory as its working directory;
-- setup relocates back to the system temporary directory before cleaning its extraction folder;
-- updater trust, SHA-256 verification, process identity, rollback, runtime, custom install directory, playback, dictionary, and Stremio behavior remain unchanged.
+- resolve updater install and download directories to physical Windows paths before containment checks so a junction cannot bypass the working-directory safety boundary;
+- fail closed if either physical directory cannot be resolved safely;
+- directly test the spawn options used by update IPC;
+- exercise the subtitle recovery notice timer lifecycle with fake timers, including dismissal, persistent extraction, video/state changes, external-subtitle replacement, and unmount cleanup;
+- keep playback, dictionary, updater trust, rollback, and Stremio behavior unchanged.
 
-Verification completed before release preparation:
+Release gate:
 
-- PR #61 exact-head CI #501 passed;
-- the packaged Windows regression successfully upgraded while setup was deliberately launched with the install directory as cwd;
-- merged master CI #502 passed at `213b00d1564f6654eca39978e1e403fdd197e7a4`.
-
-Remaining release gates:
-
-- exact-head v1.0.6 release-PR CI;
-- merge the release-only version/documentation PR;
-- successful exact-`master` CI;
-- successful Release Windows publication;
-- verify the four release assets and checksums;
-- real v1.0.5 → v1.0.6 in-app update on the affected Windows PC.
+- exact-head CI;
+- Codex re-review of the exact PR head with no unresolved P1/P2/P3;
+- targeted Windows/manual acceptance as needed;
+- merge before preparing v1.0.7.
 
 ## Later work
 

@@ -167,6 +167,42 @@ export function clampPlayerValue(value: number, minimum: number, maximum: number
 
 export const SUBTITLE_RECOVERY_NOTICE_MS = 4000
 
+export class SubtitleRecoveryNoticeCoordinator {
+  private timer: ReturnType<typeof setTimeout> | null = null
+
+  constructor(private readonly setVisible: (visible: boolean) => void) {}
+
+  update(noticeKey: string | null, durationMs: number | null): void {
+    this.cancelPending()
+
+    if (!noticeKey) {
+      this.setVisible(false)
+      return
+    }
+
+    this.setVisible(true)
+    if (durationMs === null) {
+      return
+    }
+
+    this.timer = setTimeout(() => {
+      this.timer = null
+      this.setVisible(false)
+    }, Math.max(0, durationMs))
+  }
+
+  dispose(): void {
+    this.cancelPending()
+  }
+
+  private cancelPending(): void {
+    if (this.timer !== null) {
+      clearTimeout(this.timer)
+      this.timer = null
+    }
+  }
+}
+
 export function subtitleRecoveryNoticeDuration(status: SubtitleModelStatus): number | null {
   return ['missing', 'unsupported', 'error'].includes(status)
     ? SUBTITLE_RECOVERY_NOTICE_MS
