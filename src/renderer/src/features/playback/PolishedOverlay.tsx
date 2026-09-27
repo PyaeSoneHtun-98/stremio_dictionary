@@ -349,10 +349,13 @@ export function PolishedOverlay(): React.JSX.Element {
   const currentTime = Math.min(state.currentTime ?? 0, duration || Number.MAX_SAFE_INTEGER)
   const activeCue = state.subtitle.activeCue
   const subtitleSegments = activeCue ? segmentSubtitleCue(activeCue) : []
+  const audioTracks = state.tracks.filter((track) => track.type === 'audio')
+  const selectedAudioTrack = audioTracks.find((track) => track.selected) ?? null
   const subtitleTracks = state.tracks.filter((track) => track.type === 'subtitle')
   const supportedSubtitleTracks = subtitleTracks.filter((track) =>
     isSelectableSubtitleTrack(track, state.filePath),
   )
+  const canChangeAudioTrack = canControl && audioTracks.length > 0
   const canChangeSubtitleTrack = state.status === 'paused' && supportedSubtitleTracks.length > 0
   const subtitleMessage = activeCue
     ? null
@@ -668,7 +671,7 @@ export function PolishedOverlay(): React.JSX.Element {
             tabIndex={-1}
             aria-label={
               panel === 'tracks'
-                ? 'Subtitle tracks'
+                ? 'Audio and subtitle tracks'
                 : panel === 'help'
                   ? 'Keyboard shortcuts'
                   : 'Settings'
@@ -677,7 +680,7 @@ export function PolishedOverlay(): React.JSX.Element {
             <div className="panel-heading">
               <span>
                 {panel === 'tracks'
-                  ? 'Subtitles'
+                  ? 'Tracks'
                   : panel === 'help'
                     ? 'Keyboard shortcuts'
                     : 'Make it yours'}
@@ -716,9 +719,32 @@ export function PolishedOverlay(): React.JSX.Element {
 
             {panel === 'tracks' ? (
               <>
+                <label className="track-control" title={audioControlTitle(audioTracks)}>
+                  <span>Audio</span>
+                  <select
+                    aria-label="Audio track"
+                    value={selectedAudioTrack ? String(selectedAudioTrack.id) : ''}
+                    disabled={!canChangeAudioTrack}
+                    onChange={(event) => {
+                      const trackId = Number(event.currentTarget.value)
+                      void runControl(() => window.desktop.media.selectAudioTrack(trackId))
+                    }}
+                  >
+                    {audioTracks.length === 0 ? <option value="">No audio tracks</option> : null}
+                    {audioTracks.length > 0 && !selectedAudioTrack ? (
+                      <option value="">Select audio track</option>
+                    ) : null}
+                    {audioTracks.map((track) => (
+                      <option value={track.id} key={track.id}>
+                        {formatAudioTrack(track)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
                 <p className="panel-note">{subtitleControlTitle(state, subtitleTracks)}</p>
                 <label
-                  className="subtitle-track-control"
+                  className="track-control"
                   title={subtitleControlTitle(state, subtitleTracks)}
                 >
                   <span>Subtitles</span>
@@ -913,8 +939,8 @@ export function PolishedOverlay(): React.JSX.Element {
             type="button"
             className="icon-button"
             data-panel-trigger
-            aria-label="Subtitle tracks"
-            title="Subtitle tracks"
+            aria-label="Audio and subtitle tracks"
+            title="Audio and subtitle tracks"
             aria-expanded={panel === 'tracks'}
             onClick={(event) => togglePanel('tracks', event.currentTarget)}
           >
@@ -1260,6 +1286,20 @@ function phraseTypeLabel(type: 'phrasal_verb' | 'idiom' | 'expression'): string 
 
 function languageLabel(code: string): string {
   return TARGET_LANGUAGE_OPTIONS.find((language) => language.code === code)?.label ?? code
+}
+
+function formatAudioTrack(track: MediaTrack): string {
+  const language = track.language ?? 'und'
+  const title = track.title ? ` · ${track.title}` : ''
+  const codec = track.codec ?? 'unknown'
+  return `${language}${title} · ${codec}`
+}
+
+function audioControlTitle(tracks: MediaTrack[]): string {
+  if (tracks.length === 0) {
+    return 'This video has no audio tracks.'
+  }
+  return 'Choose an audio track. Audio can be changed during playback.'
 }
 
 function isSelectableSubtitleTrack(track: MediaTrack, filePath: string | null): boolean {
