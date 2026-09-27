@@ -16,6 +16,12 @@ const subtitleToolsCss = readFileSync(
   ),
   'utf8',
 )
+const polishedOverlaySource = readFileSync(
+  fileURLToPath(
+    new URL('../src/renderer/src/features/playback/PolishedOverlay.tsx', import.meta.url),
+  ),
+  'utf8',
+)
 
 describe('player presentation contracts', () => {
   it('moves subtitles lower when player chrome hides while preserving the saved offset', () => {
@@ -58,6 +64,15 @@ describe('player presentation contracts', () => {
   it('keeps the obsolete saved popup-position control out of the visible settings UI', () => {
     expect(refinementCss).toMatch(
       /\.translation-settings-grid\s*>\s*label:nth-of-type\(3\)\s*\{[\s\S]*?display:\s*none;/,
+    )
+  })
+
+  it('keeps audio selection wired into the shared tracks panel without a pause gate', () => {
+    expect(polishedOverlaySource).toContain('aria-label="Audio and subtitle tracks"')
+    expect(polishedOverlaySource).toContain('aria-label="Audio track"')
+    expect(polishedOverlaySource).toContain('window.desktop.media.selectAudioTrack(trackId)')
+    expect(polishedOverlaySource).toContain(
+      'const canChangeAudioTrack = canControl && audioTracks.length > 0',
     )
   })
 })
