@@ -6,46 +6,92 @@ import {
   INSTALL_DIRECTORY_ENV,
   UPDATE_PARENT_EXE_ENV,
   UPDATE_PARENT_PID_ENV,
-  UPDATE_PARENT_STARTED_AT_ENV
+  UPDATE_PARENT_STARTED_AT_ENV,
+  type WindowsDirectoryResolver,
 } from '../src/main/update/installLaunch'
+
+const identityResolver: WindowsDirectoryResolver = (directoryPath) => directoryPath
 
 describe('updater installer launch environment', () => {
   it('derives the custom install directory from the running Windows executable', () => {
     expect(
-      currentInstallDirectory('D:\\Apps\\Subtitle Bridge Custom\\Subtitle Bridge.exe')
+      currentInstallDirectory('D:\\Apps\\Subtitle Bridge Custom\\Subtitle Bridge.exe'),
     ).toBe('D:\\Apps\\Subtitle Bridge Custom')
   })
 
-  it('uses the downloaded installer directory instead of the installed app directory', () => {
+  it('uses the physically resolved downloaded installer directory', () => {
     const installDirectory = 'C:\\Users\\Tester\\AppData\\Local\\Programs\\Subtitle Bridge'
     const installerPath =
-      'C:\\Users\\Tester\\AppData\\Roaming\\subtitle-bridge\\updates\\v1.0.6\\SubtitleBridge-Setup-x64.exe'
+      'C:\\Users\\Tester\\AppData\\Roaming\\subtitle-bridge\\updates\\v1.0.7\\SubtitleBridge-Setup-x64.exe'
+    const resolvedUpdateDirectory =
+      'C:\\Users\\Tester\\AppData\\Roaming\\subtitle-bridge\\updates\\v1.0.7'
 
-    expect(installerWorkingDirectory(installerPath, installDirectory)).toBe(
-      'C:\\Users\\Tester\\AppData\\Roaming\\subtitle-bridge\\updates\\v1.0.6'
-    )
+    expect(
+      installerWorkingDirectory(installerPath, installDirectory, (directoryPath) => {
+        if (directoryPath === installDirectory) {
+          return installDirectory
+        }
+        return resolvedUpdateDirectory
+      }),
+    ).toBe(resolvedUpdateDirectory)
   })
 
-  it('rejects an updater working directory inside the installed application tree', () => {
+  it('rejects an updater working directory lexically inside the installed application tree', () => {
     const installDirectory = 'C:\\Apps\\Subtitle Bridge'
 
     expect(() =>
       installerWorkingDirectory(
         'C:\\Apps\\Subtitle Bridge\\updates\\SubtitleBridge-Setup-x64.exe',
-        installDirectory
-      )
+        installDirectory,
+        identityResolver,
+      ),
     ).toThrow('working directory must be outside')
+  })
+
+  it('rejects a junction that looks external but resolves inside the install tree', () => {
+    const installDirectory = 'D:\\Apps\\Subtitle Bridge Custom'
+    const externalAlias = 'C:\\Users\\Tester\\Downloads\\SubtitleBridgeUpdate'
+    const installerPath = `${externalAlias}\\SubtitleBridge-Setup-x64.exe`
+
+    expect(() =>
+      installerWorkingDirectory(installerPath, installDirectory, (directoryPath) => {
+        if (directoryPath.toLowerCase() === externalAlias.toLowerCase()) {
+          return 'D:\\Apps\\Subtitle Bridge Custom\\updates\\v1.0.7'
+        }
+        return installDirectory
+      }),
+    ).toThrow('working directory must be outside')
+  })
+
+  it('fails closed when a physical updater path cannot be resolved', () => {
+    const installDirectory = 'C:\\Apps\\Subtitle Bridge'
+    const installerPath = 'C:\\Users\\Tester\\Downloads\\SubtitleBridge-Setup-x64.exe'
+
+    expect(() =>
+      installerWorkingDirectory(installerPath, installDirectory, () => {
+        throw new Error('resolution failed')
+      }),
+    ).toThrow('could not be resolved safely')
+  })
+
+  it('rejects a resolver result that is not an absolute Windows path', () => {
+    const installDirectory = 'C:\\Apps\\Subtitle Bridge'
+    const installerPath = 'C:\\Users\\Tester\\Downloads\\SubtitleBridge-Setup-x64.exe'
+
+    expect(() =>
+      installerWorkingDirectory(installerPath, installDirectory, () => 'relative-directory'),
+    ).toThrow('could not be resolved safely')
   })
 
   it('passes a complete updater process identity to setup', () => {
     const customInstallDirectory = 'D:\\Apps\\Subtitle Bridge Custom'
-    const executablePath = customInstallDirectory + '\\Subtitle Bridge.exe'
+    const executablePath = `${customInstallDirectory}\\Subtitle Bridge.exe`
     const environment = createInstallerEnvironment(
       customInstallDirectory,
       executablePath,
       { PATH: 'C:\\Windows\\System32' },
       4242,
-      1_700_000_000_123
+      1_700_000_000_123,
     )
 
     expect(environment[INSTALL_DIRECTORY_ENV]).toBe(customInstallDirectory)
@@ -57,7 +103,7 @@ describe('updater installer launch environment', () => {
 
   it('overrides inherited updater handoff values case-insensitively', () => {
     const installDirectory = 'E:\\Portable\\Subtitle Bridge'
-    const executablePath = installDirectory + '\\Subtitle Bridge.exe'
+    const executablePath = `${installDirectory}\\Subtitle Bridge.exe`
     const environment = createInstallerEnvironment(
       installDirectory,
       executablePath,
@@ -66,10 +112,10 @@ describe('updater installer launch environment', () => {
         subtitle_bridge_update_parent_pid: '999',
         subtitle_bridge_update_parent_exe: 'C:\\Wrong\\Other.exe',
         subtitle_bridge_update_parent_started_at_ms: '1',
-        PATH: 'C:\\Windows'
+        PATH: 'C:\\Windows',
       },
       1234,
-      1_700_000_000_456
+      1_700_000_000_456,
     )
 
     expect(environment[INSTALL_DIRECTORY_ENV]).toBe(installDirectory)
@@ -84,16 +130,16 @@ describe('updater installer launch environment', () => {
 
   it('rejects invalid process identity values', () => {
     const installDirectory = 'C:\\Subtitle Bridge'
-    const executablePath = installDirectory + '\\Subtitle Bridge.exe'
+    const executablePath = `${installDirectory}\\Subtitle Bridge.exe`
 
     expect(() => currentInstallDirectory('Subtitle Bridge.exe')).toThrow(
-      'executable path is invalid'
+      'executable path is invalid',
     )
     expect(() =>
-      createInstallerEnvironment('Subtitle Bridge', executablePath, {}, 1, 1)
+      createInstallerEnvironment('Subtitle Bridge', executablePath, {}, 1, 1),
     ).toThrow('install directory is invalid')
     expect(() =>
-      createInstallerEnvironment(installDirectory, 'Subtitle Bridge.exe', {}, 1, 1)
+      createInstallerEnvironment(installDirectory, 'Subtitle Bridge.exe', {}, 1, 1),
     ).toThrow('executable path is invalid')
     expect(() =>
       createInstallerEnvironment(
@@ -101,14 +147,14 @@ describe('updater installer launch environment', () => {
         'D:\\Other\\Subtitle Bridge.exe',
         {},
         1,
-        1
-      )
+        1,
+      ),
     ).toThrow('outside the install directory')
     expect(() =>
-      createInstallerEnvironment(installDirectory, executablePath, {}, 0, 1)
+      createInstallerEnvironment(installDirectory, executablePath, {}, 0, 1),
     ).toThrow('process ID is invalid')
     expect(() =>
-      createInstallerEnvironment(installDirectory, executablePath, {}, 1, 0)
+      createInstallerEnvironment(installDirectory, executablePath, {}, 1, 0),
     ).toThrow('process start time is invalid')
   })
 })
