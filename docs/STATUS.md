@@ -195,9 +195,12 @@ Scope:
 - add a narrow `selectAudioTrack` media IPC/preload API;
 - validate that requested IDs belong to a current audio track;
 - switch mpv's `aid` property without requiring playback to pause;
-- add an Audio selector to the existing Tracks panel with language/title/codec labels;
+- consolidate subtitle source selection, external subtitle loading, delay, size, and vertical position into the bottom CC/Tracks panel;
+- remove the separate top-right Subtitles button while preserving drag/drop subtitle loading;
+- add Audio below the subtitle controls in that same CC/Tracks panel;
+- move playback speed from the bottom bar into the gear/Settings panel as a simple option list;
 - support local MKV/MP4 and HTTP/HTTPS/Stremio playback through the shared mpv path;
-- preserve all existing subtitle behavior.
+- preserve subtitle extraction, timing, translation, and external-subtitle behavior.
 
 Release gate:
 
