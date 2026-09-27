@@ -7,6 +7,7 @@ import {
   subtitleRecoveryMessage,
   subtitleRecoveryNoticeDuration,
   SUBTITLE_RECOVERY_NOTICE_MS,
+  SubtitleRecoveryNoticeCoordinator,
   SurfaceGestureCoordinator
 } from '../src/renderer/src/features/playback/playerInteraction'
 
@@ -107,6 +108,80 @@ describe('video-surface gestures', () => {
     expect(isInteractiveSurfaceTarget(fakeTarget('DIV', ['.overlay-topline']))).toBe(true)
     expect(isInteractiveSurfaceTarget(fakeTarget('svg', ['.player-controls']))).toBe(true)
     expect(isInteractiveSurfaceTarget(fakeTarget('DIV', []))).toBe(false)
+  })
+})
+
+describe('subtitle recovery notice lifecycle', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('dismisses a missing-subtitle notice after the configured timeout', () => {
+    vi.useFakeTimers()
+    const visibility: boolean[] = []
+    const coordinator = new SubtitleRecoveryNoticeCoordinator((visible) => visibility.push(visible))
+
+    coordinator.update('video-a\\0missing', SUBTITLE_RECOVERY_NOTICE_MS)
+    expect(visibility).toEqual([true])
+
+    vi.advanceTimersByTime(SUBTITLE_RECOVERY_NOTICE_MS - 1)
+    expect(visibility).toEqual([true])
+
+    vi.advanceTimersByTime(1)
+    expect(visibility).toEqual([true, false])
+  })
+
+  it('keeps extraction status visible until the state changes', () => {
+    vi.useFakeTimers()
+    const visibility: boolean[] = []
+    const coordinator = new SubtitleRecoveryNoticeCoordinator((visible) => visibility.push(visible))
+
+    coordinator.update('video-a\\0extracting', null)
+    vi.advanceTimersByTime(SUBTITLE_RECOVERY_NOTICE_MS * 2)
+
+    expect(visibility).toEqual([true])
+  })
+
+  it('restarts the timeout when a new video or recovery state arrives', () => {
+    vi.useFakeTimers()
+    const visibility: boolean[] = []
+    const coordinator = new SubtitleRecoveryNoticeCoordinator((visible) => visibility.push(visible))
+
+    coordinator.update('video-a\\0missing', SUBTITLE_RECOVERY_NOTICE_MS)
+    vi.advanceTimersByTime(2_500)
+    coordinator.update('video-b\\0missing', SUBTITLE_RECOVERY_NOTICE_MS)
+    vi.advanceTimersByTime(2_000)
+
+    expect(visibility).toEqual([true, true])
+
+    coordinator.update('video-b\\0unsupported', SUBTITLE_RECOVERY_NOTICE_MS)
+    vi.advanceTimersByTime(SUBTITLE_RECOVERY_NOTICE_MS)
+
+    expect(visibility).toEqual([true, true, true, false])
+  })
+
+  it('hides and cancels the timer when an external subtitle replaces the recovery state', () => {
+    vi.useFakeTimers()
+    const visibility: boolean[] = []
+    const coordinator = new SubtitleRecoveryNoticeCoordinator((visible) => visibility.push(visible))
+
+    coordinator.update('video-a\\0missing', SUBTITLE_RECOVERY_NOTICE_MS)
+    vi.advanceTimersByTime(1_000)
+    coordinator.update(null, null)
+    vi.advanceTimersByTime(SUBTITLE_RECOVERY_NOTICE_MS)
+
+    expect(visibility).toEqual([true, false])
+  })
+
+  it('cancels pending notice work on unmount cleanup', () => {
+    vi.useFakeTimers()
+    const visibility: boolean[] = []
+    const coordinator = new SubtitleRecoveryNoticeCoordinator((visible) => visibility.push(visible))
+
+    coordinator.update('video-a\\0error', SUBTITLE_RECOVERY_NOTICE_MS)
+    coordinator.dispose()
+    vi.advanceTimersByTime(SUBTITLE_RECOVERY_NOTICE_MS)
+
+    expect(visibility).toEqual([true])
+    expect(vi.getTimerCount()).toBe(0)
   })
 })
 
