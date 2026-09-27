@@ -85,7 +85,7 @@ describe('player presentation contracts', () => {
   it('keeps the CC panel compact and expands subtitle settings only on demand', () => {
     expect(subtitleToolsSource).not.toContain('subtitle-tools-toggle')
     expect(subtitleToolsSource).not.toContain('Subtitle controls')
-    expect(polishedOverlaySource).toContain('className="compact-tracks-panel')
+    expect(polishedOverlaySource).toContain("' compact-tracks-panel'")
     expect(polishedOverlaySource).toContain('Choose subtitle file')
     expect(polishedOverlaySource).toContain('Subtitle settings')
     expect(polishedOverlaySource).toContain('aria-expanded={subtitleSettingsOpen}')
