@@ -1,5 +1,10 @@
 .overlay-probe .subtitle-overlay {
   bottom: calc(112px + var(--subtitle-position-offset, 0px));
+  transition: bottom 180ms ease;
+}
+
+.overlay-probe.chrome-hidden .subtitle-overlay {
+  bottom: calc(32px + var(--subtitle-position-offset, 0px));
 }
 
 .overlay-probe .subtitle-text {
@@ -287,6 +292,10 @@
     bottom: calc(104px + var(--subtitle-position-offset, 0px));
   }
 
+  .overlay-probe.chrome-hidden .subtitle-overlay {
+    bottom: calc(24px + var(--subtitle-position-offset, 0px));
+  }
+
   .subtitle-tools-chrome {
     top: 12px;
     right: 12px;
@@ -302,6 +311,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .overlay-probe .subtitle-overlay,
   .subtitle-tools-chrome {
     transition: none;
   }
