@@ -750,7 +750,7 @@ export function PolishedOverlay(): React.JSX.Element {
       >
         {panel ? (
           <section
-            className="player-panel"
+            className={`player-panel${panel === 'tracks' ? ' compact-tracks-panel' : ''}`}
             ref={panelRef}
             tabIndex={-1}
             aria-label={
@@ -761,24 +761,20 @@ export function PolishedOverlay(): React.JSX.Element {
                   : 'Settings'
             }
           >
-            <div className="panel-heading">
-              <span>
-                {panel === 'tracks'
-                  ? 'Subtitles & audio'
-                  : panel === 'help'
-                    ? 'Keyboard shortcuts'
-                    : 'Settings'}
-              </span>
-              <button
-                className="icon-button"
-                type="button"
-                aria-label="Close panel"
-                title="Close (Esc)"
-                onClick={closePanel}
-              >
-                <PlayerIcon name="close" />
-              </button>
-            </div>
+            {panel !== 'tracks' ? (
+              <div className="panel-heading">
+                <span>{panel === 'help' ? 'Keyboard shortcuts' : 'Settings'}</span>
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label="Close panel"
+                  title="Close (Esc)"
+                  onClick={closePanel}
+                >
+                  <PlayerIcon name="close" />
+                </button>
+              </div>
+            ) : null}
             {settingsOpen ? (
               <>
                 <section className="playback-settings-section" aria-label="Playback settings">
