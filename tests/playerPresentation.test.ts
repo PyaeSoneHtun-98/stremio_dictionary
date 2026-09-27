@@ -10,11 +10,30 @@ const refinementCss = readFileSync(
   fileURLToPath(new URL('../src/renderer/src/features/playback/PlayerRefinement.css', import.meta.url)),
   'utf8',
 )
+const subtitleToolsCss = readFileSync(
+  fileURLToPath(
+    new URL('../src/renderer/src/features/playback/SubtitleToolsOverlay.css', import.meta.url),
+  ),
+  'utf8',
+)
 
 describe('player presentation contracts', () => {
-  it('keeps clickable subtitle targets stationary when chrome hides or reveals', () => {
-    expect(refinementCss).not.toMatch(/\.chrome-hidden\s+\.subtitle-overlay\s*\{/)
-    expect(playerCss).toMatch(/\.subtitle-overlay\s*\{[\s\S]*?bottom:\s*112px;/)
+  it('moves subtitles lower when player chrome hides while preserving the saved offset', () => {
+    expect(subtitleToolsCss).toMatch(
+      /\.overlay-probe \.subtitle-overlay\s*\{[\s\S]*?bottom:\s*calc\(112px \+ var\(--subtitle-position-offset, 0px\)\);[\s\S]*?transition:\s*bottom 180ms ease;/,
+    )
+    expect(subtitleToolsCss).toMatch(
+      /\.overlay-probe\.chrome-hidden \.subtitle-overlay\s*\{[\s\S]*?bottom:\s*calc\(32px \+ var\(--subtitle-position-offset, 0px\)\);/,
+    )
+    expect(subtitleToolsCss).toMatch(
+      /@media \(max-width: 720px\)[\s\S]*?\.overlay-probe \.subtitle-overlay\s*\{[\s\S]*?bottom:\s*calc\(104px \+ var\(--subtitle-position-offset, 0px\)\);/,
+    )
+    expect(subtitleToolsCss).toMatch(
+      /@media \(max-width: 720px\)[\s\S]*?\.overlay-probe\.chrome-hidden \.subtitle-overlay\s*\{[\s\S]*?bottom:\s*calc\(24px \+ var\(--subtitle-position-offset, 0px\)\);/,
+    )
+    expect(subtitleToolsCss).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.overlay-probe \.subtitle-overlay,[\s\S]*?\.subtitle-tools-chrome\s*\{[\s\S]*?transition:\s*none;/,
+    )
   })
 
   it('elevates the popup containing layer above player controls', () => {
