@@ -1526,9 +1526,12 @@ function TranslationSettingsPanel({
               { value: 'google', label: 'Google Translate' },
             ]}
             onChange={(value) => {
-              onUpdate({
-                provider: value as TranslationSettingsSnapshot['provider'],
-              })
+              const provider = value as TranslationSettingsSnapshot['provider']
+              onUpdate(
+                provider === 'local-dictionary'
+                  ? { provider, targetLanguage: 'my' }
+                  : { provider },
+              )
             }}
           />
         </div>
@@ -1538,7 +1541,10 @@ function TranslationSettingsPanel({
           <AppSelect
             ariaLabel="Target language"
             value={settings.targetLanguage}
-            options={TARGET_LANGUAGE_OPTIONS.map((language) => ({
+            options={(settings.provider === 'local-dictionary'
+              ? TARGET_LANGUAGE_OPTIONS.filter((language) => language.code === 'my')
+              : TARGET_LANGUAGE_OPTIONS
+            ).map((language) => ({
               value: language.code,
               label: language.label,
             }))}
@@ -1572,13 +1578,6 @@ function TranslationSettingsPanel({
           <span>Pause automatically when I click a word</span>
         </label>
       </div>
-
-      {settings.provider === 'local-dictionary' && settings.targetLanguage !== 'my' ? (
-        <div className="translation-settings-note">
-          The offline dictionary currently contains Burmese only. Choose Burmese for offline lookup
-          or use a provider that supports the selected language.
-        </div>
-      ) : null}
 
       {settings.provider === 'google' ? (
         <div className="translation-google-section">
