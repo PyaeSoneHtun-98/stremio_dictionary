@@ -12,7 +12,10 @@ import type {
   TranslationRuntimeSettings,
   TranslationRuntimeSettingsSource
 } from './TranslationService'
-import { normalizeTargetLanguage } from './settingsValidation'
+import {
+  normalizeTargetLanguage,
+  normalizeTargetLanguageForProvider
+} from './settingsValidation'
 
 interface PersistedTranslationSettings {
   version: 1
@@ -124,9 +127,10 @@ export class TranslationSettingsStore implements TranslationRuntimeSettingsSourc
       next.encryptedApiKey = update.apiKey ? this.encryptApiKey(update.apiKey) : null
     }
 
-    if (next.provider === 'local-dictionary') {
-      next.targetLanguage = 'my'
-    }
+    next.targetLanguage = normalizeTargetLanguageForProvider(
+      next.provider,
+      next.targetLanguage
+    )
 
     await persistSettings(this.filePath, next)
     this.state = next
@@ -176,7 +180,7 @@ function sanitizePersistedSettings(value: unknown): StoredState {
 
   return {
     provider,
-    targetLanguage: provider === 'local-dictionary' ? 'my' : targetLanguage,
+    targetLanguage: normalizeTargetLanguageForProvider(provider, targetLanguage),
     popupPosition,
     autoPauseOnWordClick:
       typeof raw.autoPauseOnWordClick === 'boolean'
