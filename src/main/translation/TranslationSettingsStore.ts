@@ -124,6 +124,10 @@ export class TranslationSettingsStore implements TranslationRuntimeSettingsSourc
       next.encryptedApiKey = update.apiKey ? this.encryptApiKey(update.apiKey) : null
     }
 
+    if (next.provider === 'local-dictionary') {
+      next.targetLanguage = 'my'
+    }
+
     await persistSettings(this.filePath, next)
     this.state = next
   }
@@ -172,7 +176,7 @@ function sanitizePersistedSettings(value: unknown): StoredState {
 
   return {
     provider,
-    targetLanguage,
+    targetLanguage: provider === 'local-dictionary' ? 'my' : targetLanguage,
     popupPosition,
     autoPauseOnWordClick:
       typeof raw.autoPauseOnWordClick === 'boolean'
