@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_TRANSLATION_SETTINGS } from '../src/shared/settings'
 import {
   normalizeTargetLanguage,
   normalizeTranslationSettingsUpdate
 } from '../src/main/translation/settingsValidation'
 
 describe('translation settings validation', () => {
+  it('defaults automatic pause on word click to enabled', () => {
+    expect(DEFAULT_TRANSLATION_SETTINGS.autoPauseOnWordClick).toBe(true)
+  })
+
   it('accepts and normalizes supported settings fields', () => {
     expect(
       normalizeTranslationSettingsUpdate({
