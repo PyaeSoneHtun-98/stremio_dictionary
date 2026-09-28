@@ -8,7 +8,7 @@
 }
 
 .translation-settings-heading {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .translation-settings-heading strong {
@@ -26,7 +26,7 @@
 .translation-settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .translation-settings-grid label,
@@ -702,10 +702,22 @@ html.overlay-mode #root {
 
 .translation-settings-panel {
   margin-top: 10px;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid rgb(255 255 255 / 0.065);
   border-radius: 15px;
   background: rgb(255 255 255 / 0.028);
+}
+
+.translation-settings-panel > :first-child {
+  margin-top: 0;
+}
+
+.translation-settings-panel > :last-child {
+  margin-bottom: 0;
+}
+
+.translation-settings-grid .translation-popup-position-setting {
+  display: none;
 }
 
 .settings-section-heading {
