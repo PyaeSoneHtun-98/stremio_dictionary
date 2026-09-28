@@ -1522,8 +1522,8 @@ function TranslationSettingsPanel({
             ariaLabel="Translation provider"
             value={settings.provider}
             options={[
-              { value: 'local-dictionary', label: 'Local dictionary (offline)' },
-              { value: 'google', label: 'Google Translation (optional)' },
+              { value: 'local-dictionary', label: 'Offline dictionary' },
+              { value: 'google', label: 'Google Translate' },
             ]}
             onChange={(value) => {
               onUpdate({
@@ -1581,44 +1581,51 @@ function TranslationSettingsPanel({
       ) : null}
 
       {settings.provider === 'google' ? (
-        <div className="translation-api-key-row">
-          <label>
-            <span>Google API key</span>
+        <div className="translation-google-section">
+          <span className="translation-google-label">Google API key</span>
+          <div className="translation-api-key-control">
             <input
               type="password"
               value={apiKeyDraft}
               autoComplete="off"
-              placeholder={settings.apiKeyConfigured ? '•••••••• saved securely' : 'Enter API key'}
+              aria-label="Google API key"
+              placeholder={settings.apiKeyConfigured ? 'Saved API key' : 'Enter API key'}
               onChange={(event) => {
                 onApiKeyDraftChange(event.currentTarget.value)
               }}
             />
-          </label>
-          <button
-            type="button"
-            className="control-button"
-            disabled={!apiKeyDraft.trim()}
-            onClick={onSaveApiKey}
-          >
-            Save key
-          </button>
+            <button
+              type="button"
+              className="translation-inline-action"
+              disabled={!apiKeyDraft.trim()}
+              onClick={onSaveApiKey}
+            >
+              Save
+            </button>
+          </div>
           {settings.apiKeyConfigured ? (
-            <button type="button" className="control-button" onClick={onClearApiKey}>
-              Clear key
+            <button
+              type="button"
+              className="translation-text-action"
+              onClick={onClearApiKey}
+            >
+              Remove saved key
             </button>
           ) : null}
         </div>
       ) : null}
 
       <div className="translation-cache-row">
-        <span>Session translation cache: {settings.cacheEntries} entries</span>
+        <span>
+          Session cache <strong>{settings.cacheEntries}</strong>
+        </span>
         <button
           type="button"
-          className="control-button"
+          className="translation-text-action"
           disabled={settings.cacheEntries === 0}
           onClick={onClearCache}
         >
-          Clear cache
+          Clear
         </button>
       </div>
     </section>
