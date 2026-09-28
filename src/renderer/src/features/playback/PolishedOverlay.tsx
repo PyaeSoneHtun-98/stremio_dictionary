@@ -45,7 +45,15 @@ const EMPTY_STATE: PlaybackSnapshot = {
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 1, 1.5, 2]
+const MIN_SUBTITLE_DELAY = -20
+const MAX_SUBTITLE_DELAY = 20
 const SUBTITLE_DELAY_STEP = 0.1
+const MIN_SUBTITLE_FONT_SCALE = 0.7
+const MAX_SUBTITLE_FONT_SCALE = 1.6
+const SUBTITLE_FONT_SCALE_STEP = 0.05
+const MIN_SUBTITLE_VERTICAL_OFFSET = -24
+const MAX_SUBTITLE_VERTICAL_OFFSET = 240
+const SUBTITLE_VERTICAL_OFFSET_STEP = 4
 const SUBTITLE_DELAY_NOTICE_MS = 1600
 const TARGET_LANGUAGE_OPTIONS = [
   { code: 'my', label: 'Burmese' },
@@ -869,66 +877,146 @@ export function PolishedOverlay(): React.JSX.Element {
 
                   {subtitleSettingsOpen ? (
                     <div className="compact-subtitle-settings">
-                      <label>
-                        <span>
-                          Delay <output>{formatSubtitleDelay(subtitleDelay)}</output>
-                        </span>
-                        <input
-                          type="range"
-                          min={-20}
-                          max={20}
-                          step={SUBTITLE_DELAY_STEP}
-                          value={subtitleDelay}
-                          disabled={!canControl}
-                          aria-label="Subtitle delay"
-                          onChange={(event) =>
-                            void runControl(() =>
-                              window.desktop.media.setSubtitleDelay(
-                                roundSubtitleDelay(Number(event.currentTarget.value)),
-                              ),
-                            )
-                          }
-                        />
-                      </label>
+                      <div className="compact-stepper-row">
+                        <span>Delay</span>
+                        <div className="compact-stepper">
+                          <button
+                            type="button"
+                            aria-label="Decrease subtitle delay"
+                            disabled={!canControl || subtitleDelay <= MIN_SUBTITLE_DELAY}
+                            onClick={() =>
+                              void runControl(() =>
+                                window.desktop.media.setSubtitleDelay(
+                                  roundSubtitleDelay(
+                                    Math.max(
+                                      MIN_SUBTITLE_DELAY,
+                                      subtitleDelay - SUBTITLE_DELAY_STEP,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            }
+                          >
+                            −
+                          </button>
+                          <output aria-label="Subtitle delay">
+                            {formatSubtitleDelay(subtitleDelay)}
+                          </output>
+                          <button
+                            type="button"
+                            aria-label="Increase subtitle delay"
+                            disabled={!canControl || subtitleDelay >= MAX_SUBTITLE_DELAY}
+                            onClick={() =>
+                              void runControl(() =>
+                                window.desktop.media.setSubtitleDelay(
+                                  roundSubtitleDelay(
+                                    Math.min(
+                                      MAX_SUBTITLE_DELAY,
+                                      subtitleDelay + SUBTITLE_DELAY_STEP,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
 
-                      <label>
-                        <span>
-                          Size <output>{Math.round(subtitlePreferences.fontScale * 100)}%</output>
-                        </span>
-                        <input
-                          type="range"
-                          min={0.7}
-                          max={1.6}
-                          step={0.05}
-                          value={subtitlePreferences.fontScale}
-                          aria-label="Subtitle font size"
-                          onChange={(event) =>
-                            void updateSubtitlePreferences({
-                              fontScale: Number(event.currentTarget.value),
-                            })
-                          }
-                        />
-                      </label>
+                      <div className="compact-stepper-row">
+                        <span>Size</span>
+                        <div className="compact-stepper">
+                          <button
+                            type="button"
+                            aria-label="Decrease subtitle size"
+                            disabled={
+                              subtitlePreferences.fontScale <= MIN_SUBTITLE_FONT_SCALE
+                            }
+                            onClick={() =>
+                              void updateSubtitlePreferences({
+                                fontScale: roundSubtitlePreference(
+                                  Math.max(
+                                    MIN_SUBTITLE_FONT_SCALE,
+                                    subtitlePreferences.fontScale - SUBTITLE_FONT_SCALE_STEP,
+                                  ),
+                                ),
+                              })
+                            }
+                          >
+                            −
+                          </button>
+                          <output aria-label="Subtitle font size">
+                            {Math.round(subtitlePreferences.fontScale * 100)}%
+                          </output>
+                          <button
+                            type="button"
+                            aria-label="Increase subtitle size"
+                            disabled={
+                              subtitlePreferences.fontScale >= MAX_SUBTITLE_FONT_SCALE
+                            }
+                            onClick={() =>
+                              void updateSubtitlePreferences({
+                                fontScale: roundSubtitlePreference(
+                                  Math.min(
+                                    MAX_SUBTITLE_FONT_SCALE,
+                                    subtitlePreferences.fontScale + SUBTITLE_FONT_SCALE_STEP,
+                                  ),
+                                ),
+                              })
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
 
-                      <label>
-                        <span>
-                          Position{' '}
-                          <output>{formatSubtitlePosition(subtitlePreferences.verticalOffset)}</output>
-                        </span>
-                        <input
-                          type="range"
-                          min={-24}
-                          max={240}
-                          step={4}
-                          value={subtitlePreferences.verticalOffset}
-                          aria-label="Subtitle vertical position"
-                          onChange={(event) =>
-                            void updateSubtitlePreferences({
-                              verticalOffset: Number(event.currentTarget.value),
-                            })
-                          }
-                        />
-                      </label>
+                      <div className="compact-stepper-row">
+                        <span>Position</span>
+                        <div className="compact-stepper">
+                          <button
+                            type="button"
+                            aria-label="Move subtitles lower"
+                            disabled={
+                              subtitlePreferences.verticalOffset <=
+                              MIN_SUBTITLE_VERTICAL_OFFSET
+                            }
+                            onClick={() =>
+                              void updateSubtitlePreferences({
+                                verticalOffset: Math.max(
+                                  MIN_SUBTITLE_VERTICAL_OFFSET,
+                                  subtitlePreferences.verticalOffset -
+                                    SUBTITLE_VERTICAL_OFFSET_STEP,
+                                ),
+                              })
+                            }
+                          >
+                            −
+                          </button>
+                          <output aria-label="Subtitle vertical position">
+                            {formatSubtitlePosition(subtitlePreferences.verticalOffset)}
+                          </output>
+                          <button
+                            type="button"
+                            aria-label="Move subtitles higher"
+                            disabled={
+                              subtitlePreferences.verticalOffset >=
+                              MAX_SUBTITLE_VERTICAL_OFFSET
+                            }
+                            onClick={() =>
+                              void updateSubtitlePreferences({
+                                verticalOffset: Math.min(
+                                  MAX_SUBTITLE_VERTICAL_OFFSET,
+                                  subtitlePreferences.verticalOffset +
+                                    SUBTITLE_VERTICAL_OFFSET_STEP,
+                                ),
+                              })
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ) : null}
                 </section>
@@ -1490,6 +1578,10 @@ function formatSubtitleDelay(seconds: number): string {
 
 function roundSubtitleDelay(value: number): number {
   return Math.round(value * 10) / 10
+}
+
+function roundSubtitlePreference(value: number): number {
+  return Math.round(value * 100) / 100
 }
 
 function formatSubtitlePosition(value: number): string {
