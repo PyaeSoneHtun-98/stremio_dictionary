@@ -1153,7 +1153,6 @@ kbd {
 .translation-settings-panel {
   position: static;
   width: auto;
-  padding: 0;
 }
 @media (max-width: 720px) {
   .overlay-topline {
