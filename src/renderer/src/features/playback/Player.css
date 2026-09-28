@@ -1085,9 +1085,6 @@ kbd {
   .control-right-controls {
     gap: 2px;
   }
-  .playback-center-controls .play-button {
-    margin: 0;
-  }
   .volume-control {
     width: 104px;
     gap: 6px;
