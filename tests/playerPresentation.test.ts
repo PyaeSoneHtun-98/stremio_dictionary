@@ -78,6 +78,21 @@ describe('player presentation contracts', () => {
     )
   })
 
+  it('shows only Burmese as the offline dictionary target language', () => {
+    expect(polishedOverlaySource).toContain(
+      "settings.provider === 'local-dictionary'",
+    )
+    expect(polishedOverlaySource).toContain(
+      "TARGET_LANGUAGE_OPTIONS.filter((language) => language.code === 'my')",
+    )
+    expect(polishedOverlaySource).toContain(
+      "provider === 'local-dictionary'\n                  ? { provider, targetLanguage: 'my' }",
+    )
+    expect(polishedOverlaySource).not.toContain(
+      'The offline dictionary currently contains Burmese only.',
+    )
+  })
+
   it('keeps the Google translation view compact and integrated', () => {
     expect(polishedOverlaySource).toContain("{ value: 'google', label: 'Google Translate' }")
     expect(polishedOverlaySource).toContain('className="translation-google-section"')
