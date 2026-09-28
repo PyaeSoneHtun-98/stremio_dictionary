@@ -159,6 +159,34 @@ describe('player presentation contracts', () => {
     )
   })
 
+  it('keeps the main player chrome compact and floating', () => {
+    expect(playerCss).toMatch(
+      /\.player-controls\s*\{[\s\S]*?inset:\s*auto 12px 10px;[\s\S]*?padding:\s*9px 12px 8px;[\s\S]*?border-radius:\s*17px;[\s\S]*?backdrop-filter:\s*blur\(18px\)/,
+    )
+    expect(playerCss).toMatch(
+      /\.overlay-topline\s*\{[\s\S]*?top:\s*12px;[\s\S]*?left:\s*14px;[\s\S]*?border-radius:\s*999px;[\s\S]*?backdrop-filter:\s*blur\(14px\)/,
+    )
+    expect(playerCss).toMatch(
+      /\.icon-button,[\s\S]*?\.translation-popup-close\s*\{[\s\S]*?flex:\s*0 0 34px;[\s\S]*?width:\s*34px;[\s\S]*?height:\s*34px;/,
+    )
+    expect(playerCss).toMatch(
+      /\.play-button\s*\{[\s\S]*?flex-basis:\s*42px;[\s\S]*?width:\s*42px;[\s\S]*?height:\s*42px;/,
+    )
+  })
+
+  it('uses a lighter timeline and smaller volume footprint', () => {
+    expect(playerCss).toMatch(
+      /\.timeline-slider::-webkit-slider-runnable-track\s*\{[\s\S]*?height:\s*2px;/,
+    )
+    expect(playerCss).toMatch(
+      /\.timeline-slider::-webkit-slider-thumb\s*\{[\s\S]*?height:\s*10px;[\s\S]*?width:\s*10px;/,
+    )
+    expect(playerCss).toMatch(
+      /\.volume-control\s*\{[\s\S]*?width:\s*96px;[\s\S]*?gap:\s*7px;/,
+    )
+    expect(polishedOverlaySource).not.toContain('className="volume-value"')
+  })
+
   it('uses one thin app-colored scrollbar style across launcher and player surfaces', () => {
     expect(globalCss).toMatch(/\*::-webkit-scrollbar\s*\{[\s\S]*?width:\s*8px;[\s\S]*?height:\s*8px;/)
     expect(globalCss).toMatch(
