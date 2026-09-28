@@ -904,31 +904,31 @@ export function PolishedOverlay(): React.JSX.Element {
                 <section className="compact-tracks-section" aria-label="Subtitle controls">
                   <div className="compact-section-title">Subtitles</div>
 
-                  <label className="compact-track-control">
-                    <span className="sr-only">Subtitle track</span>
-                    <select
-                      aria-label="Embedded subtitle track"
+                  <div className="compact-track-control">
+                    <AppSelect
+                      ariaLabel="Embedded subtitle track"
                       value={state.subtitle.trackId === null ? '' : String(state.subtitle.trackId)}
                       disabled={!canChangeSubtitleTrack}
-                      onChange={(event) => {
-                        const trackId = Number(event.currentTarget.value)
+                      options={
+                        subtitleTracks.length === 0
+                          ? [{ value: '', label: 'No text tracks', disabled: true }]
+                          : [
+                              ...(state.subtitle.trackId === null
+                                ? [{ value: '', label: 'Select subtitle track', disabled: true }]
+                                : []),
+                              ...subtitleTracks.map((track) => ({
+                                value: String(track.id),
+                                label: formatSubtitleTrack(track, state.filePath),
+                                disabled: !isSelectableSubtitleTrack(track, state.filePath),
+                              })),
+                            ]
+                      }
+                      onChange={(value) => {
+                        const trackId = Number(value)
                         void runControl(() => window.desktop.media.selectSubtitleTrack(trackId))
                       }}
-                    >
-                      {supportedSubtitleTracks.length === 0 ? (
-                        <option value="">No text tracks</option>
-                      ) : null}
-                      {subtitleTracks.map((track) => (
-                        <option
-                          value={track.id}
-                          key={track.id}
-                          disabled={!isSelectableSubtitleTrack(track, state.filePath)}
-                        >
-                          {formatSubtitleTrack(track, state.filePath)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    />
+                  </div>
 
                   <button
                     type="button"
@@ -1097,28 +1097,30 @@ export function PolishedOverlay(): React.JSX.Element {
 
                 <section className="compact-tracks-section compact-audio-section" aria-label="Audio controls">
                   <div className="compact-section-title">Audio</div>
-                  <label className="compact-track-control">
-                    <span className="sr-only">Audio track</span>
-                    <select
-                      aria-label="Audio track"
+                  <div className="compact-track-control">
+                    <AppSelect
+                      ariaLabel="Audio track"
                       value={selectedAudioTrack ? String(selectedAudioTrack.id) : ''}
                       disabled={!canChangeAudioTrack}
-                      onChange={(event) => {
-                        const trackId = Number(event.currentTarget.value)
+                      options={
+                        audioTracks.length === 0
+                          ? [{ value: '', label: 'No audio tracks', disabled: true }]
+                          : [
+                              ...(!selectedAudioTrack
+                                ? [{ value: '', label: 'Select audio track', disabled: true }]
+                                : []),
+                              ...audioTracks.map((track) => ({
+                                value: String(track.id),
+                                label: formatAudioTrack(track),
+                              })),
+                            ]
+                      }
+                      onChange={(value) => {
+                        const trackId = Number(value)
                         void runControl(() => window.desktop.media.selectAudioTrack(trackId))
                       }}
-                    >
-                      {audioTracks.length === 0 ? <option value="">No audio tracks</option> : null}
-                      {audioTracks.length > 0 && !selectedAudioTrack ? (
-                        <option value="">Select audio track</option>
-                      ) : null}
-                      {audioTracks.map((track) => (
-                        <option value={track.id} key={track.id}>
-                          {formatAudioTrack(track)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    />
+                  </div>
                 </section>
               </>
             ) : null}
@@ -1156,116 +1158,121 @@ export function PolishedOverlay(): React.JSX.Element {
         </div>
 
         <div className="control-row">
-          <button
-            type="button"
-            className="icon-button play-button"
-            aria-label={playing ? 'Pause' : 'Play'}
-            title={playing ? 'Pause (Space)' : 'Play (Space)'}
-            disabled={!canControl}
-            onClick={() => {
-              void runControl(() => window.desktop.media.setPaused(playing))
-            }}
-          >
-            <PlayerIcon name={playing ? 'pause' : 'play'} />
-          </button>
+          <div className="control-left-controls">
+            <label className="volume-control" title="Volume">
+              <PlayerIcon name="volume" />
+              <span className="sr-only">Volume</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={Math.round(state.volume)}
+                aria-label="Volume"
+                disabled={!state.filePath || ['error', 'unavailable'].includes(state.status)}
+                onChange={(event) => {
+                  void runControl(() =>
+                    window.desktop.media.setVolume(Number(event.currentTarget.value)),
+                  )
+                }}
+              />
+              <output className="volume-value">{Math.round(state.volume)}%</output>
+            </label>
+          </div>
 
-          <button
-            type="button"
-            className="icon-button skip-button"
-            disabled={!canControl}
-            aria-label="Back 5 seconds"
-            title="Back 5 seconds (←)"
-            onClick={() =>
-              void runControl(() => window.desktop.media.seek(Math.max(0, currentTime - 5)))
-            }
-          >
-            <PlayerIcon name="back" />
-            <small>5</small>
-          </button>
-          <button
-            type="button"
-            className="icon-button skip-button"
-            disabled={!canControl}
-            aria-label="Forward 5 seconds"
-            title="Forward 5 seconds (→)"
-            onClick={() =>
-              void runControl(() =>
-                window.desktop.media.seek(
-                  Math.min(duration || Number.MAX_SAFE_INTEGER, currentTime + 5),
-                ),
-              )
-            }
-          >
-            <PlayerIcon name="forward" />
-            <small>5</small>
-          </button>
-          <label className="volume-control" title="Volume">
-            <PlayerIcon name="volume" />
-            <span className="sr-only">Volume</span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={Math.round(state.volume)}
-              aria-label="Volume"
-              disabled={!state.filePath || ['error', 'unavailable'].includes(state.status)}
-              onChange={(event) => {
-                void runControl(() =>
-                  window.desktop.media.setVolume(Number(event.currentTarget.value)),
-                )
+          <div className="playback-center-controls" aria-label="Playback controls">
+            <button
+              type="button"
+              className="icon-button skip-button"
+              disabled={!canControl}
+              aria-label="Back 5 seconds"
+              title="Back 5 seconds (←)"
+              onClick={() =>
+                void runControl(() => window.desktop.media.seek(Math.max(0, currentTime - 5)))
+              }
+            >
+              <PlayerIcon name="back" />
+              <small>5</small>
+            </button>
+            <button
+              type="button"
+              className="icon-button play-button"
+              aria-label={playing ? 'Pause' : 'Play'}
+              title={playing ? 'Pause (Space)' : 'Play (Space)'}
+              disabled={!canControl}
+              onClick={() => {
+                void runControl(() => window.desktop.media.setPaused(playing))
               }}
-            />
-            <output className="volume-value">{Math.round(state.volume)}%</output>
-          </label>
+            >
+              <PlayerIcon name={playing ? 'pause' : 'play'} />
+            </button>
+            <button
+              type="button"
+              className="icon-button skip-button"
+              disabled={!canControl}
+              aria-label="Forward 5 seconds"
+              title="Forward 5 seconds (→)"
+              onClick={() =>
+                void runControl(() =>
+                  window.desktop.media.seek(
+                    Math.min(duration || Number.MAX_SAFE_INTEGER, currentTime + 5),
+                  ),
+                )
+              }
+            >
+              <PlayerIcon name="forward" />
+              <small>5</small>
+            </button>
+          </div>
 
-          <span className="control-spacer" />
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Open video"
-            title="Open video"
-            onClick={() =>
-              void runControl(async () => {
-                const result = await window.desktop.media.openVideo()
-                if (result.error) throw new Error(result.error)
-              })
-            }
-          >
-            <PlayerIcon name="folder" />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            data-panel-trigger
-            aria-label="Audio and subtitle tracks"
-            title="Audio and subtitle tracks"
-            aria-expanded={panel === 'tracks'}
-            onClick={(event) => togglePanel('tracks', event.currentTarget)}
-          >
-            <PlayerIcon name="keyboard" />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            data-panel-trigger
-            aria-label="Settings"
-            title="Settings"
-            aria-expanded={settingsOpen}
-            onClick={(event) => togglePanel('settings', event.currentTarget)}
-          >
-            <PlayerIcon name="settings" />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            disabled={!state.filePath}
-            aria-label="Toggle fullscreen"
-            title="Fullscreen (F)"
-            onClick={() => void runControl(() => window.desktop.media.toggleFullscreen())}
-          >
-            <PlayerIcon name="fullscreen" />
-          </button>
+          <div className="control-right-controls">
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Open video"
+              title="Open video"
+              onClick={() =>
+                void runControl(async () => {
+                  const result = await window.desktop.media.openVideo()
+                  if (result.error) throw new Error(result.error)
+                })
+              }
+            >
+              <PlayerIcon name="folder" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              data-panel-trigger
+              aria-label="Audio and subtitle tracks"
+              title="Audio and subtitle tracks"
+              aria-expanded={panel === 'tracks'}
+              onClick={(event) => togglePanel('tracks', event.currentTarget)}
+            >
+              <PlayerIcon name="keyboard" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              data-panel-trigger
+              aria-label="Settings"
+              title="Settings"
+              aria-expanded={settingsOpen}
+              onClick={(event) => togglePanel('settings', event.currentTarget)}
+            >
+              <PlayerIcon name="settings" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              disabled={!state.filePath}
+              aria-label="Toggle fullscreen"
+              title="Fullscreen (F)"
+              onClick={() => void runControl(() => window.desktop.media.toggleFullscreen())}
+            >
+              <PlayerIcon name="fullscreen" />
+            </button>
+          </div>
         </div>
       </div>
     </main>
@@ -1389,6 +1396,98 @@ function TranslationPopup({
   )
 }
 
+interface AppSelectOption {
+  value: string
+  label: string
+  disabled?: boolean
+}
+
+function AppSelect({
+  ariaLabel,
+  value,
+  options,
+  disabled = false,
+  onChange,
+}: {
+  ariaLabel: string
+  value: string
+  options: AppSelectOption[]
+  disabled?: boolean
+  onChange: (value: string) => void
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const selected = options.find((option) => option.value === value) ?? options[0]
+
+  useEffect(() => {
+    if (!open) return
+
+    const onPointerDown = (event: PointerEvent): void => {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
+        setOpen(false)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+
+    window.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div className="app-select" ref={rootRef}>
+      <button
+        type="button"
+        className="app-select-trigger"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault()
+            setOpen(true)
+          }
+        }}
+      >
+        <span>{selected?.label ?? 'Select'}</span>
+        <span className="app-select-chevron" aria-hidden="true" />
+      </button>
+
+      {open ? (
+        <div className="app-select-menu" role="listbox" aria-label={ariaLabel}>
+          {options.map((option) => (
+            <button
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              className={option.value === value ? 'is-selected' : ''}
+              disabled={option.disabled}
+              key={option.value || option.label}
+              onClick={() => {
+                if (option.disabled) return
+                onChange(option.value)
+                setOpen(false)
+              }}
+            >
+              <span>{option.label}</span>
+              {option.value === value ? <span className="app-select-check">✓</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function TranslationSettingsPanel({
   settings,
   apiKeyDraft,
@@ -1418,38 +1517,39 @@ function TranslationSettingsPanel({
       {error ? <div className="translation-settings-error">{error}</div> : null}
 
       <div className="translation-settings-grid">
-        <label>
+        <div className="translation-settings-field">
           <span>Provider</span>
-          <select
+          <AppSelect
+            ariaLabel="Translation provider"
             value={settings.provider}
-            onChange={(event) => {
+            options={[
+              { value: 'local-dictionary', label: 'Local dictionary (offline)' },
+              { value: 'google', label: 'Google Translation (optional)' },
+            ]}
+            onChange={(value) => {
               onUpdate({
-                provider: event.currentTarget.value as TranslationSettingsSnapshot['provider'],
+                provider: value as TranslationSettingsSnapshot['provider'],
               })
             }}
-          >
-            <option value="local-dictionary">Local dictionary (offline)</option>
-            <option value="google">Google Translation (optional)</option>
-          </select>
-        </label>
+          />
+        </div>
 
-        <label>
+        <div className="translation-settings-field">
           <span>Target language</span>
-          <select
+          <AppSelect
+            ariaLabel="Target language"
             value={settings.targetLanguage}
-            onChange={(event) => {
-              onUpdate({ targetLanguage: event.currentTarget.value })
+            options={TARGET_LANGUAGE_OPTIONS.map((language) => ({
+              value: language.code,
+              label: language.label,
+            }))}
+            onChange={(value) => {
+              onUpdate({ targetLanguage: value })
             }}
-          >
-            {TARGET_LANGUAGE_OPTIONS.map((language) => (
-              <option value={language.code} key={language.code}>
-                {language.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+        </div>
 
-        <label>
+        <label className="translation-popup-position-setting">
           <span>Popup position</span>
           <select
             value={settings.popupPosition}
