@@ -89,7 +89,8 @@ export function PolishedOverlay(): React.JSX.Element {
   )
   const [loadingExternalSubtitle, setLoadingExternalSubtitle] = useState(false)
   const [subtitleSettingsOpen, setSubtitleSettingsOpen] = useState(false)
-  const [panel, setPanel] = useState<'settings' | 'tracks' | 'help' | null>(null)
+  const [settingsSection, setSettingsSection] = useState<'speed' | 'shortcuts' | null>(null)
+  const [panel, setPanel] = useState<'settings' | 'tracks' | null>(null)
   const settingsOpen = panel === 'settings'
   const [controlsHovered, setControlsHovered] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -97,13 +98,17 @@ export function PolishedOverlay(): React.JSX.Element {
   const panelRef = useRef<HTMLElement | null>(null)
   const closePanel = useCallback((): void => {
     setSubtitleSettingsOpen(false)
+    setSettingsSection(null)
     setPanel(null)
     panelTrigger.current?.focus()
   }, [])
-  const togglePanel = (next: 'settings' | 'tracks' | 'help', trigger: HTMLElement): void => {
+  const togglePanel = (next: 'settings' | 'tracks', trigger: HTMLElement): void => {
     panelTrigger.current = trigger
     if (next !== 'tracks' || panel === 'tracks') {
       setSubtitleSettingsOpen(false)
+    }
+    if (next !== 'settings' || panel === 'settings') {
+      setSettingsSection(null)
     }
     setPanel((current) => (current === next ? null : next))
   }
@@ -762,17 +767,11 @@ export function PolishedOverlay(): React.JSX.Element {
             className={`player-panel${panel === 'tracks' ? ' compact-tracks-panel' : ''}`}
             ref={panelRef}
             tabIndex={-1}
-            aria-label={
-              panel === 'tracks'
-                ? 'Audio and subtitle tracks'
-                : panel === 'help'
-                  ? 'Keyboard shortcuts'
-                  : 'Settings'
-            }
+            aria-label={panel === 'tracks' ? 'Audio and subtitle tracks' : 'Settings'}
           >
             {panel !== 'tracks' ? (
               <div className="panel-heading">
-                <span>{panel === 'help' ? 'Keyboard shortcuts' : 'Settings'}</span>
+                <span>Settings</span>
                 <button
                   className="icon-button"
                   type="button"
@@ -786,23 +785,96 @@ export function PolishedOverlay(): React.JSX.Element {
             ) : null}
             {settingsOpen ? (
               <>
-                <section className="playback-settings-section" aria-label="Playback settings">
-                  <div className="settings-section-heading">Playback speed</div>
-                  <div className="playback-speed-menu">
-                    {SPEED_OPTIONS.map((speed) => (
-                      <button
-                        type="button"
-                        key={speed}
-                        className={Math.abs(state.speed - speed) < 0.001 ? 'is-selected' : ''}
-                        aria-pressed={Math.abs(state.speed - speed) < 0.001}
-                        disabled={!canControl}
-                        onClick={() => void runControl(() => window.desktop.media.setSpeed(speed))}
-                      >
-                        {speed}×
-                      </button>
-                    ))}
-                  </div>
+                <section className="compact-settings-menu" aria-label="Player settings">
+                  <button
+                    type="button"
+                    className="compact-menu-button"
+                    aria-expanded={settingsSection === 'speed'}
+                    onClick={() =>
+                      setSettingsSection((current) => (current === 'speed' ? null : 'speed'))
+                    }
+                  >
+                    <span>Playback speed</span>
+                    <span>{state.speed}×</span>
+                  </button>
+
+                  {settingsSection === 'speed' ? (
+                    <div className="playback-speed-menu">
+                      {SPEED_OPTIONS.map((speed) => (
+                        <button
+                          type="button"
+                          key={speed}
+                          className={Math.abs(state.speed - speed) < 0.001 ? 'is-selected' : ''}
+                          aria-pressed={Math.abs(state.speed - speed) < 0.001}
+                          disabled={!canControl}
+                          onClick={() => void runControl(() => window.desktop.media.setSpeed(speed))}
+                        >
+                          {speed}×
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    className="compact-menu-button"
+                    aria-expanded={settingsSection === 'shortcuts'}
+                    onClick={() =>
+                      setSettingsSection((current) => (current === 'shortcuts' ? null : 'shortcuts'))
+                    }
+                  >
+                    <span>Keyboard shortcuts</span>
+                    <span aria-hidden="true">{settingsSection === 'shortcuts' ? '−' : '+'}</span>
+                  </button>
+
+                  {settingsSection === 'shortcuts' ? (
+                    <dl className="shortcut-list compact-shortcut-list">
+                      <div>
+                        <dt>Play / pause</dt>
+                        <dd>
+                          <kbd>Space</kbd> / <kbd>K</kbd>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Seek 5 seconds</dt>
+                        <dd>
+                          <kbd>←</kbd> <kbd>→</kbd>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Volume</dt>
+                        <dd>
+                          <kbd>↑</kbd> <kbd>↓</kbd>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Subtitle delay</dt>
+                        <dd>
+                          <kbd>G</kbd> / <kbd>H</kbd>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Fullscreen</dt>
+                        <dd>
+                          <kbd>F</kbd>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Select word</dt>
+                        <dd>
+                          <kbd>Tab</kbd> / <kbd>Enter</kbd>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Close</dt>
+                        <dd>
+                          <kbd>Esc</kbd>
+                        </dd>
+                      </div>
+                    </dl>
+                  ) : null}
                 </section>
+
                 <TranslationSettingsPanel
                   settings={translationSettings}
                   apiKeyDraft={apiKeyDraft}
@@ -1048,52 +1120,6 @@ export function PolishedOverlay(): React.JSX.Element {
                 </section>
               </>
             ) : null}
-            {panel === 'help' ? (
-              <dl className="shortcut-list">
-                <div>
-                  <dt>Play / pause</dt>
-                  <dd>
-                    click video / <kbd>Space</kbd> / <kbd>K</kbd>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Seek 5 seconds</dt>
-                  <dd>
-                    <kbd>←</kbd> <kbd>→</kbd>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Volume</dt>
-                  <dd>
-                    <kbd>↑</kbd> <kbd>↓</kbd>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Subtitle delay</dt>
-                  <dd>
-                    earlier <kbd>G</kbd> · later <kbd>H</kbd>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Fullscreen</dt>
-                  <dd>
-                    <kbd>F</kbd> / double-click video
-                  </dd>
-                </div>
-                <div>
-                  <dt>Navigate / select word</dt>
-                  <dd>
-                    <kbd>Tab</kbd> / <kbd>Enter</kbd>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Dismiss popup / panel</dt>
-                  <dd>
-                    <kbd>Esc</kbd>
-                  </dd>
-                </div>
-              </dl>
-            ) : null}
           </section>
         ) : null}
 
@@ -1215,7 +1241,7 @@ export function PolishedOverlay(): React.JSX.Element {
             aria-expanded={panel === 'tracks'}
             onClick={(event) => togglePanel('tracks', event.currentTarget)}
           >
-            <PlayerIcon name="captions" />
+            <PlayerIcon name="keyboard" />
           </button>
           <button
             type="button"
@@ -1227,17 +1253,6 @@ export function PolishedOverlay(): React.JSX.Element {
             onClick={(event) => togglePanel('settings', event.currentTarget)}
           >
             <PlayerIcon name="settings" />
-          </button>
-          <button
-            type="button"
-            className="icon-button help-button"
-            data-panel-trigger
-            aria-label="Keyboard shortcuts"
-            title="Keyboard shortcuts"
-            aria-expanded={panel === 'help'}
-            onClick={(event) => togglePanel('help', event.currentTarget)}
-          >
-            <PlayerIcon name="keyboard" />
           </button>
           <button
             type="button"
