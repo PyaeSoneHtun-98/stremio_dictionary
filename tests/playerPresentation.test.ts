@@ -73,8 +73,17 @@ describe('player presentation contracts', () => {
 
   it('keeps the obsolete saved popup-position control out of the visible settings UI', () => {
     expect(polishedOverlaySource).toContain('className="translation-popup-position-setting"')
-    expect(refinementCss).toMatch(
-      /\.translation-popup-position-setting\s*\{[\s\S]*?display:\s*none;/,
+    expect(playerCss).toMatch(
+      /\.translation-settings-grid \.translation-popup-position-setting\s*\{[\s\S]*?display:\s*none;/,
+    )
+  })
+
+  it('keeps visible translation settings content padded inside its card', () => {
+    expect(playerCss).toMatch(
+      /\.translation-settings-panel\s*\{[\s\S]*?padding:\s*14px;[\s\S]*?border-radius:\s*15px;/,
+    )
+    expect(playerCss).toMatch(
+      /\.translation-settings-grid\s*\{[\s\S]*?gap:\s*10px;/,
     )
   })
 
