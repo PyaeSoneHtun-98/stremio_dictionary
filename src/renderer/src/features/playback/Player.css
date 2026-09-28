@@ -134,18 +134,28 @@ html.overlay-mode #root {
 }
 .overlay-topline {
   position: absolute;
-  inset: 0 0 auto;
+  top: 12px;
+  left: 14px;
   display: flex;
+  width: max-content;
+  max-width: min(520px, calc(100vw - 28px));
   align-items: center;
-  gap: 16px;
-  padding: 22px 28px 48px;
-  background: linear-gradient(#080e14bd, transparent);
+  gap: 9px;
+  padding: 7px 10px;
+  border: 1px solid rgb(255 255 255 / 0.09);
+  border-radius: 999px;
+  background: rgb(8 14 20 / 0.56);
+  box-shadow:
+    0 8px 24px rgb(0 0 0 / 0.24),
+    inset 0 1px 0 rgb(255 255 255 / 0.05);
+  backdrop-filter: blur(14px) saturate(125%);
+  -webkit-backdrop-filter: blur(14px) saturate(125%);
   transition: opacity 180ms ease;
   pointer-events: auto;
 }
 .overlay-topline strong {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 520;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -153,9 +163,9 @@ html.overlay-mode #root {
 .overlay-status {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -267,9 +277,18 @@ html.overlay-mode #root {
 .player-controls {
   position: absolute;
   z-index: 30;
-  inset: auto 0 0;
-  padding: 24px 28px 16px;
-  background: linear-gradient(transparent, #080d15bd 35%, #080d15ee);
+  inset: auto 12px 10px;
+  padding: 9px 12px 8px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 17px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.035), transparent 42%),
+    rgb(7 13 19 / 0.68);
+  box-shadow:
+    0 16px 42px rgb(0 0 0 / 0.34),
+    inset 0 1px 0 rgb(255 255 255 / 0.05);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
   transition: opacity 180ms ease;
   pointer-events: auto;
 }
@@ -283,12 +302,12 @@ html.overlay-mode #root {
 }
 .timeline-row {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 56px;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
   align-items: center;
-  gap: 12px;
-  font-size: 11px;
+  gap: 8px;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
+  color: rgb(219 229 224 / 0.68);
 }
 .timeline-row span:last-child {
   text-align: right;
@@ -296,7 +315,7 @@ html.overlay-mode #root {
 .player-controls input[type="range"] {
   accent-color: var(--accent);
   cursor: pointer;
-  height: 22px;
+  height: 18px;
   margin: 0;
   min-width: 0;
   width: 100%;
@@ -306,32 +325,32 @@ html.overlay-mode #root {
   background: transparent;
 }
 .timeline-slider::-webkit-slider-runnable-track {
-  height: 3px;
-  border-radius: 4px;
+  height: 2px;
+  border-radius: 999px;
   background: linear-gradient(
     to right,
     var(--accent) var(--seek-progress),
-    #ffffff4a var(--seek-progress)
+    rgb(255 255 255 / 0.24) var(--seek-progress)
   );
 }
 .timeline-slider::-webkit-slider-thumb {
   appearance: none;
-  height: 13px;
-  width: 13px;
+  height: 10px;
+  width: 10px;
   border-radius: 50%;
   background: var(--accent);
-  margin-top: -5px;
-  box-shadow: 0 0 0 3px #b5e6d11a;
+  margin-top: -4px;
+  box-shadow: 0 0 0 2px rgb(181 230 209 / 0.12);
 }
 .timeline-slider:hover::-webkit-slider-runnable-track {
-  height: 4px;
+  height: 3px;
 }
 .control-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
-  margin-top: 5px;
+  gap: 10px;
+  margin-top: 2px;
 }
 
 .control-left-controls {
@@ -343,7 +362,7 @@ html.overlay-mode #root {
 .control-right-controls {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 3px;
 }
 
 .playback-center-controls {
@@ -359,12 +378,12 @@ html.overlay-mode #root {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 40px;
-  width: 40px;
-  height: 40px;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 11px;
+  border-radius: 10px;
   background: transparent;
   color: #e4eae7;
   cursor: pointer;
@@ -386,9 +405,13 @@ html.overlay-mode #root {
   cursor: not-allowed;
 }
 .play-button {
+  flex-basis: 42px;
+  width: 42px;
+  height: 42px;
   background: var(--accent);
   color: #13251d;
   border-radius: 50%;
+  box-shadow: 0 6px 18px rgb(181 230 209 / 0.16);
 }
 .play-button:hover {
   background: #d5f6e7;
@@ -405,18 +428,17 @@ html.overlay-mode #root {
 .volume-control {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 160px;
-  padding-left: 8px;
+  gap: 7px;
+  width: 96px;
+  min-width: 0;
+  padding: 0 5px;
 }
 .volume-control svg {
   flex-shrink: 0;
-  width: 19px;
+  width: 17px;
 }
-.volume-value {
-  font-size: 10px;
-  min-width: 30px;
-  color: var(--muted);
+.volume-control input[type="range"] {
+  width: 68px;
 }
 .player-controls option {
   background: #152029;
@@ -1069,28 +1091,45 @@ kbd {
   padding: 0;
 }
 @media (max-width: 720px) {
+  .overlay-topline {
+    top: 8px;
+    left: 8px;
+    max-width: calc(100vw - 16px);
+  }
   .player-controls {
-    padding: 24px 16px 12px;
+    inset: auto 7px 7px;
+    padding: 8px 9px 7px;
+    border-radius: 15px;
+  }
+  .timeline-row {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    gap: 6px;
+    font-size: 9px;
   }
   .control-row {
-    gap: 5px;
+    gap: 4px;
   }
   .playback-center-controls,
   .control-right-controls {
-    gap: 2px;
+    gap: 1px;
   }
   .volume-control {
-    width: 104px;
-    gap: 6px;
-    padding: 0;
+    width: 72px;
+    gap: 4px;
+    padding: 0 2px;
   }
-  .volume-value {
-    display: none;
+  .volume-control input[type="range"] {
+    width: 48px;
   }
   .icon-button {
-    width: 36px;
-    height: 36px;
-    flex-basis: 36px;
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+  .play-button {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
   }
   .subtitle-overlay {
     left: 16px;
