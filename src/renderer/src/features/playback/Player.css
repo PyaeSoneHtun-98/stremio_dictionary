@@ -824,31 +824,56 @@ html.overlay-mode #root {
 
 .compact-subtitle-settings {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   border-top: 1px solid #ffffff0d;
   padding-top: 10px;
 }
 
-.compact-subtitle-settings label {
-  display: grid;
-  gap: 5px;
+.compact-stepper-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   color: #adbdb5;
   font-size: 11px;
 }
 
-.compact-subtitle-settings label > span {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
+.compact-stepper {
+  display: grid;
+  grid-template-columns: 30px minmax(72px, auto) 30px;
+  align-items: center;
+  gap: 4px;
 }
 
-.compact-subtitle-settings output {
+.compact-stepper button {
+  width: 30px;
+  height: 28px;
+  border: 1px solid #ffffff18;
+  border-radius: 7px;
+  padding: 0;
+  background: #ffffff08;
+  color: #edf5f1;
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.compact-stepper button:hover:not(:disabled) {
+  background: #ffffff14;
+  color: var(--accent);
+}
+
+.compact-stepper button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.compact-stepper output {
   color: #d8e8e0;
   font-variant-numeric: tabular-nums;
-}
-
-.compact-subtitle-settings input[type="range"] {
-  margin: 0;
+  text-align: center;
+  white-space: nowrap;
 }
 .shortcut-list {
   margin: 0;
