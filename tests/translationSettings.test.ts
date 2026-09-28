@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_TRANSLATION_SETTINGS } from '../src/shared/settings'
 import {
   normalizeTargetLanguage,
+  normalizeTargetLanguageForProvider,
   normalizeTranslationSettingsUpdate
 } from '../src/main/translation/settingsValidation'
 
@@ -41,6 +42,12 @@ describe('translation settings validation', () => {
     expect(normalizeTargetLanguage(' MY ')).toBe('my')
     expect(normalizeTargetLanguage('zh-CN')).toBe('zh-cn')
     expect(() => normalizeTargetLanguage('../secret')).toThrow('valid target language code')
+  })
+
+  it('forces the offline dictionary target language to Burmese', () => {
+    expect(normalizeTargetLanguageForProvider('local-dictionary', 'ja')).toBe('my')
+    expect(normalizeTargetLanguageForProvider('local-dictionary', 'zh-cn')).toBe('my')
+    expect(normalizeTargetLanguageForProvider('google', 'JA')).toBe('ja')
   })
 
   it('turns a blank API key into an explicit clear operation', () => {
