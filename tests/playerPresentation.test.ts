@@ -78,6 +78,24 @@ describe('player presentation contracts', () => {
     )
   })
 
+  it('keeps the Google translation view compact and integrated', () => {
+    expect(polishedOverlaySource).toContain("{ value: 'google', label: 'Google Translate' }")
+    expect(polishedOverlaySource).toContain('className="translation-google-section"')
+    expect(polishedOverlaySource).toContain('className="translation-api-key-control"')
+    expect(polishedOverlaySource).toContain('className="translation-inline-action"')
+    expect(polishedOverlaySource).toContain('className="translation-text-action"')
+    expect(polishedOverlaySource).toContain('Session cache <strong>{settings.cacheEntries}</strong>')
+    expect(playerCss).toMatch(
+      /\.translation-google-section\s*\{[\s\S]*?padding:\s*10px;[\s\S]*?border-radius:\s*12px;/,
+    )
+    expect(playerCss).toMatch(
+      /\.translation-api-key-control\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) auto;/,
+    )
+    expect(playerCss).toMatch(
+      /\.translation-inline-action\s*\{[\s\S]*?min-width:\s*56px;[\s\S]*?height:\s*36px;/,
+    )
+  })
+
   it('keeps visible translation settings content padded inside its card', () => {
     expect(playerCss).toMatch(
       /\.translation-settings-panel\s*\{[\s\S]*?padding:\s*14px;[\s\S]*?border-radius:\s*15px;/,
