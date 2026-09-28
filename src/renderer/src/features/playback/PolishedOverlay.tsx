@@ -1176,7 +1176,6 @@ export function PolishedOverlay(): React.JSX.Element {
                   )
                 }}
               />
-              <output className="volume-value">{Math.round(state.volume)}%</output>
             </label>
           </div>
 
