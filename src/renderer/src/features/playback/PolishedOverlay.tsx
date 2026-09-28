@@ -1180,7 +1180,7 @@ export function PolishedOverlay(): React.JSX.Element {
             </label>
           </div>
 
-          <div className="playback-center-controls" aria-label="Playback controls">
+          <div className="playback-center-controls" role="group" aria-label="Playback controls">
             <button
               type="button"
               className="icon-button skip-button"
