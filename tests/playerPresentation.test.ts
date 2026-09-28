@@ -2,6 +2,10 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
+const globalCss = readFileSync(
+  fileURLToPath(new URL('../src/renderer/src/styles.css', import.meta.url)),
+  'utf8',
+)
 const playerCss = readFileSync(
   fileURLToPath(new URL('../src/renderer/src/features/playback/Player.css', import.meta.url)),
   'utf8',
@@ -124,5 +128,16 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).toContain("settingsSection === 'shortcuts'")
     expect(polishedOverlaySource).toContain('className="shortcut-list compact-shortcut-list"')
     expect(polishedOverlaySource).not.toContain('className="speed-control"')
+  })
+
+  it('uses one thin app-colored scrollbar style across launcher and player surfaces', () => {
+    expect(globalCss).toMatch(/\*::-webkit-scrollbar\s*\{[\s\S]*?width:\s*8px;[\s\S]*?height:\s*8px;/)
+    expect(globalCss).toMatch(
+      /\*::-webkit-scrollbar-thumb\s*\{[\s\S]*?border-radius:\s*999px;[\s\S]*?background:\s*rgb\(126 168 150 \/ 0\.52\);/,
+    )
+    expect(globalCss).toMatch(
+      /\*::-webkit-scrollbar-thumb:hover\s*\{[\s\S]*?background:\s*rgb\(181 230 209 \/ 0\.72\);/,
+    )
+    expect(globalCss).toContain('scrollbar-width: thin')
   })
 })
