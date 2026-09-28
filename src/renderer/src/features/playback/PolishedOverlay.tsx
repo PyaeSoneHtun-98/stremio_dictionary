@@ -120,6 +120,8 @@ export function PolishedOverlay(): React.JSX.Element {
         event.target instanceof Element &&
         !event.target.closest('.player-panel, [data-panel-trigger]')
       ) {
+        setSubtitleSettingsOpen(false)
+        setSettingsSection(null)
         setPanel(null)
       }
     }
