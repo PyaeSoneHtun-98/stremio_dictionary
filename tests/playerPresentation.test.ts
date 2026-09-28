@@ -90,9 +90,16 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).toContain('Subtitle settings')
     expect(polishedOverlaySource).toContain('aria-expanded={subtitleSettingsOpen}')
     expect(polishedOverlaySource).toContain('{subtitleSettingsOpen ? (')
+    expect(polishedOverlaySource).toContain('aria-label="Decrease subtitle delay"')
+    expect(polishedOverlaySource).toContain('aria-label="Increase subtitle delay"')
+    expect(polishedOverlaySource).toContain('aria-label="Decrease subtitle size"')
+    expect(polishedOverlaySource).toContain('aria-label="Increase subtitle size"')
+    expect(polishedOverlaySource).toContain('aria-label="Move subtitles lower"')
+    expect(polishedOverlaySource).toContain('aria-label="Move subtitles higher"')
     expect(polishedOverlaySource).toContain('aria-label="Subtitle delay"')
     expect(polishedOverlaySource).toContain('aria-label="Subtitle font size"')
     expect(polishedOverlaySource).toContain('aria-label="Subtitle vertical position"')
+    expect(polishedOverlaySource).not.toContain('type="range"\n                          min={-20}')
     expect(polishedOverlaySource).toContain('aria-label="Audio track"')
     expect(polishedOverlaySource).not.toContain(
       'Text subtitles are clickable. Image subtitles are listed as unsupported.',
