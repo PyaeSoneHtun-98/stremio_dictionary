@@ -72,14 +72,15 @@ describe('player presentation contracts', () => {
   })
 
   it('keeps the obsolete saved popup-position control out of the visible settings UI', () => {
+    expect(polishedOverlaySource).toContain('className="translation-popup-position-setting"')
     expect(refinementCss).toMatch(
-      /\.translation-settings-grid\s*>\s*label:nth-of-type\(3\)\s*\{[\s\S]*?display:\s*none;/,
+      /\.translation-popup-position-setting\s*\{[\s\S]*?display:\s*none;/,
     )
   })
 
   it('keeps audio selection wired into the shared tracks panel without a pause gate', () => {
     expect(polishedOverlaySource).toContain('aria-label="Audio and subtitle tracks"')
-    expect(polishedOverlaySource).toContain('aria-label="Audio track"')
+    expect(polishedOverlaySource).toContain('ariaLabel="Audio track"')
     expect(polishedOverlaySource).toContain('window.desktop.media.selectAudioTrack(trackId)')
     expect(polishedOverlaySource).toContain(
       'const canChangeAudioTrack = canControl && audioTracks.length > 0',
@@ -104,7 +105,7 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).toContain('aria-label="Subtitle font size"')
     expect(polishedOverlaySource).toContain('aria-label="Subtitle vertical position"')
     expect(polishedOverlaySource).not.toContain('type="range"\n                          min={-20}')
-    expect(polishedOverlaySource).toContain('aria-label="Audio track"')
+    expect(polishedOverlaySource).toContain('ariaLabel="Audio track"')
     expect(polishedOverlaySource).not.toContain(
       'Text subtitles are clickable. Image subtitles are listed as unsupported.',
     )
@@ -128,6 +129,34 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).toContain("settingsSection === 'shortcuts'")
     expect(polishedOverlaySource).toContain('className="shortcut-list compact-shortcut-list"')
     expect(polishedOverlaySource).not.toContain('className="speed-control"')
+  })
+
+  it('uses in-app dropdown menus instead of native visible selects', () => {
+    expect(polishedOverlaySource).toContain('function AppSelect({')
+    expect(polishedOverlaySource).toContain('className="app-select-trigger"')
+    expect(polishedOverlaySource).toContain('className="app-select-menu"')
+    expect(polishedOverlaySource).toContain('role="listbox"')
+    expect(polishedOverlaySource).toContain('ariaLabel="Translation provider"')
+    expect(polishedOverlaySource).toContain('ariaLabel="Target language"')
+    expect(polishedOverlaySource).toContain('ariaLabel="Embedded subtitle track"')
+    expect(polishedOverlaySource).toContain('ariaLabel="Audio track"')
+    expect(playerCss).toMatch(
+      /\.app-select-menu\s*\{[\s\S]*?background:\s*#101c24;[\s\S]*?box-shadow:/,
+    )
+  })
+
+  it('centers back, play-pause, and forward controls independently of side controls', () => {
+    expect(polishedOverlaySource).toMatch(
+      /className="playback-center-controls"[\s\S]*?name="back"[\s\S]*?className="icon-button play-button"[\s\S]*?name=\{playing \? 'pause' : 'play'\}[\s\S]*?name="forward"/,
+    )
+    expect(polishedOverlaySource).toContain('className="control-left-controls"')
+    expect(polishedOverlaySource).toContain('className="control-right-controls"')
+    expect(playerCss).toMatch(
+      /\.control-row\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) auto minmax\(0, 1fr\);/,
+    )
+    expect(playerCss).toMatch(
+      /\.playback-center-controls\s*\{[\s\S]*?justify-self:\s*center;/,
+    )
   })
 
   it('uses one thin app-colored scrollbar style across launcher and player surfaces', () => {
