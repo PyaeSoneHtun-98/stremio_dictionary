@@ -106,9 +106,23 @@ describe('player presentation contracts', () => {
     )
   })
 
-  it('keeps playback speed inside settings instead of the bottom control row', () => {
-    expect(polishedOverlaySource).toContain('className="playback-speed-menu"')
+  it('uses the keyboard icon for tracks and removes the standalone shortcuts button', () => {
+    expect(polishedOverlaySource).toMatch(
+      /aria-label="Audio and subtitle tracks"[\s\S]*?<PlayerIcon name="keyboard" \/>/,
+    )
+    expect(polishedOverlaySource).not.toContain("panel === 'help'")
+    expect(polishedOverlaySource).not.toContain("togglePanel('help'")
+    expect(polishedOverlaySource).not.toContain('className="icon-button help-button"')
+  })
+
+  it('keeps playback speed and keyboard shortcuts as collapsible settings rows', () => {
     expect(polishedOverlaySource).toContain('aria-label="Settings"')
+    expect(polishedOverlaySource).toContain('<span>Playback speed</span>')
+    expect(polishedOverlaySource).toContain("settingsSection === 'speed'")
+    expect(polishedOverlaySource).toContain('className="playback-speed-menu"')
+    expect(polishedOverlaySource).toContain('<span>Keyboard shortcuts</span>')
+    expect(polishedOverlaySource).toContain("settingsSection === 'shortcuts'")
+    expect(polishedOverlaySource).toContain('className="shortcut-list compact-shortcut-list"')
     expect(polishedOverlaySource).not.toContain('className="speed-control"')
   })
 })
