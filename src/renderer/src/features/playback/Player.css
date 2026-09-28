@@ -28,6 +28,7 @@
 }
 
 .translation-settings-grid label,
+.translation-settings-field,
 .translation-api-key-row label {
   display: grid;
   min-width: 0;
@@ -326,10 +327,35 @@ html.overlay-mode #root {
   height: 4px;
 }
 .control-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-top: 5px;
+}
+
+.control-left-controls {
+  min-width: 0;
+  justify-self: start;
+}
+
+.playback-center-controls,
+.control-right-controls {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-top: 5px;
+}
+
+.playback-center-controls {
+  justify-self: center;
+}
+
+.control-right-controls {
+  justify-self: end;
+}
+
+.playback-center-controls .play-button {
+  margin: 0 3px;
 }
 .icon-button,
 .translation-popup-close {
@@ -366,7 +392,6 @@ html.overlay-mode #root {
   background: var(--accent);
   color: #13251d;
   border-radius: 50%;
-  margin-right: 5px;
 }
 .play-button:hover {
   background: #d5f6e7;
@@ -395,9 +420,6 @@ html.overlay-mode #root {
   font-size: 10px;
   min-width: 30px;
   color: var(--muted);
-}
-.control-spacer {
-  flex: 1;
 }
 .player-controls option {
   background: #152029;
@@ -801,20 +823,129 @@ html.overlay-mode #root {
   font-weight: 650;
 }
 
-.compact-track-control {
-  display: block;
+.app-select {
+  position: relative;
+  width: 100%;
 }
 
-.compact-track-control select {
+.app-select-trigger {
+  display: flex;
   width: 100%;
-  height: 36px;
-  border: 1px solid #ffffff20;
-  border-radius: 8px;
-  padding: 0 9px;
-  background: #18252d;
-  color: #f5f8f6;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgb(181 230 209 / 0.18);
+  border-radius: 9px;
+  padding: 0 10px;
+  background: #16232b;
+  color: #f1f6f3;
+  cursor: pointer;
   font: inherit;
   font-size: 11px;
+  text-align: left;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.app-select-trigger > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-select-trigger:hover:not(:disabled) {
+  border-color: rgb(181 230 209 / 0.36);
+  background: #1a2a32;
+}
+
+.app-select-trigger[aria-expanded="true"] {
+  border-color: rgb(181 230 209 / 0.72);
+  box-shadow: 0 0 0 2px rgb(181 230 209 / 0.1);
+}
+
+.app-select-trigger:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.app-select-chevron {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  margin: -3px 2px 0 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 120ms ease;
+}
+
+.app-select-trigger[aria-expanded="true"] .app-select-chevron {
+  margin-top: 3px;
+  transform: rotate(225deg);
+}
+
+.app-select-menu {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 5px);
+  right: 0;
+  left: 0;
+  display: grid;
+  max-height: 220px;
+  overflow: auto;
+  gap: 2px;
+  border: 1px solid rgb(181 230 209 / 0.2);
+  border-radius: 10px;
+  padding: 5px;
+  background: #101c24;
+  box-shadow:
+    0 16px 42px rgb(0 0 0 / 0.48),
+    inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.app-select-menu button {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: transparent;
+  color: #e9f1ed;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+}
+
+.app-select-menu button:hover:not(:disabled) {
+  background: rgb(181 230 209 / 0.1);
+}
+
+.app-select-menu button.is-selected {
+  background: rgb(181 230 209 / 0.13);
+  color: #c9f2e0;
+}
+
+.app-select-menu button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.app-select-check {
+  color: #b5e6d1;
+  font-weight: 700;
+}
+
+.compact-track-control {
+  display: block;
 }
 
 .compact-menu-button {
@@ -948,7 +1079,14 @@ kbd {
     padding: 24px 16px 12px;
   }
   .control-row {
-    gap: 3px;
+    gap: 5px;
+  }
+  .playback-center-controls,
+  .control-right-controls {
+    gap: 2px;
+  }
+  .playback-center-controls .play-button {
+    margin: 0;
   }
   .volume-control {
     width: 104px;
