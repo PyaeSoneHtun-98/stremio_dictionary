@@ -182,7 +182,7 @@ describe('player presentation contracts', () => {
       /\.timeline-slider::-webkit-slider-thumb\s*\{[\s\S]*?height:\s*10px;[\s\S]*?width:\s*10px;/,
     )
     expect(playerCss).toMatch(
-      /\.volume-control\s*\{[\s\S]*?width:\s*96px;[\s\S]*?gap:\s*7px;/,
+      /\.volume-control\s*\{[\s\S]*?gap:\s*7px;[\s\S]*?width:\s*96px;/,
     )
     expect(polishedOverlaySource).not.toContain('className="volume-value"')
   })
