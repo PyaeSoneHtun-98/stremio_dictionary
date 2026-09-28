@@ -187,6 +187,27 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).not.toContain('className="volume-value"')
   })
 
+  it('uses modern glass popovers and card-style menu sections', () => {
+    expect(playerCss).toMatch(
+      /\.player-panel\s*\{[\s\S]*?width:\s*min\(336px,[\s\S]*?border-radius:\s*20px;[\s\S]*?backdrop-filter:\s*blur\(24px\)/,
+    )
+    expect(playerCss).toMatch(
+      /\.compact-settings-menu\s*\{[\s\S]*?border-radius:\s*15px;[\s\S]*?background:\s*rgb\(255 255 255 \/ 0\.026\);/,
+    )
+    expect(playerCss).toMatch(
+      /\.compact-tracks-section\s*\{[\s\S]*?border-radius:\s*14px;[\s\S]*?background:\s*rgb\(255 255 255 \/ 0\.026\);/,
+    )
+    expect(playerCss).toMatch(
+      /\.playback-speed-menu\s*\{[\s\S]*?grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\);/,
+    )
+    expect(playerCss).toMatch(
+      /\.app-select-trigger\s*\{[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*11px;[\s\S]*?background:\s*rgb\(4 10 14 \/ 0\.42\);/,
+    )
+    expect(playerCss).toMatch(
+      /\.app-select-menu\s*\{[\s\S]*?border-radius:\s*14px;[\s\S]*?backdrop-filter:\s*blur\(20px\)/,
+    )
+  })
+
   it('uses one thin app-colored scrollbar style across launcher and player surfaces', () => {
     expect(globalCss).toMatch(/\*::-webkit-scrollbar\s*\{[\s\S]*?width:\s*8px;[\s\S]*?height:\s*8px;/)
     expect(globalCss).toMatch(
