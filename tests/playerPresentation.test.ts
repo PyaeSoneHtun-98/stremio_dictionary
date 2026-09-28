@@ -141,7 +141,7 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).toContain('ariaLabel="Embedded subtitle track"')
     expect(polishedOverlaySource).toContain('ariaLabel="Audio track"')
     expect(playerCss).toMatch(
-      /\.app-select-menu\s*\{[\s\S]*?background:\s*#101c24;[\s\S]*?box-shadow:/,
+      /\.app-select-menu\s*\{[\s\S]*?background:[\s\S]*?rgb\(10 18 24 \/ 0\.94\);[\s\S]*?box-shadow:/,
     )
   })
 
