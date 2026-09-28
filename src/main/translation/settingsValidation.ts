@@ -61,6 +61,16 @@ export function normalizeTranslationSettingsUpdate(value: unknown): TranslationS
   return update
 }
 
+export function normalizeTargetLanguageForProvider(
+  provider: TranslationProviderId,
+  value: string
+): string {
+  if (provider === 'local-dictionary') {
+    return 'my'
+  }
+  return normalizeTargetLanguage(value)
+}
+
 export function normalizeTargetLanguage(value: string): string {
   const language = value.trim().toLowerCase()
   if (!language || language.length > MAX_LANGUAGE_CODE_LENGTH) {
