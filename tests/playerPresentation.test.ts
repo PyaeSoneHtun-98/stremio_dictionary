@@ -85,6 +85,9 @@ describe('player presentation contracts', () => {
     expect(playerCss).toMatch(
       /\.translation-settings-grid\s*\{[\s\S]*?gap:\s*10px;/,
     )
+    expect(playerCss).not.toMatch(
+      /\.translation-settings-panel\s*\{[^}]*padding:\s*0\s*;[^}]*\}/,
+    )
   })
 
   it('keeps audio selection wired into the shared tracks panel without a pause gate', () => {
