@@ -140,7 +140,6 @@ export function PolishedOverlay(): React.JSX.Element {
     }
   }, [])
   const [settingsError, setSettingsError] = useState<string | null>(null)
-  const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [controlError, setControlError] = useState<string | null>(null)
   const [doubleClickIntervalMs, setDoubleClickIntervalMs] = useState(500)
   const [subtitleDelayNotice, setSubtitleDelayNotice] = useState<number | null>(null)
@@ -274,9 +273,17 @@ export function PolishedOverlay(): React.JSX.Element {
 
     void window.desktop.translation
       .getSettings()
-      .then((settings) => {
+      .then(async (settings) => {
+        const supportedSettings =
+          settings.provider === 'local-dictionary' && settings.targetLanguage === 'my'
+            ? settings
+            : await window.desktop.translation.updateSettings({
+                provider: 'local-dictionary',
+                targetLanguage: 'my',
+              })
+
         if (active) {
-          setTranslationSettings(settings)
+          setTranslationSettings(supportedSettings)
         }
       })
       .catch((error: unknown) => {
@@ -554,15 +561,6 @@ export function PolishedOverlay(): React.JSX.Element {
       setTranslationSettings(nextSettings)
     } catch (error) {
       setSettingsError(translationErrorMessage(error))
-    }
-  }
-
-  const saveApiKey = async (): Promise<void> => {
-    if (!apiKeyDraft.trim()) {
-      return
-    }
-    if (await updateTranslationSettings({ apiKey: apiKeyDraft })) {
-      setApiKeyDraft('')
     }
   }
 
@@ -879,18 +877,9 @@ export function PolishedOverlay(): React.JSX.Element {
 
                 <TranslationSettingsPanel
                   settings={translationSettings}
-                  apiKeyDraft={apiKeyDraft}
                   error={settingsError}
-                  onApiKeyDraftChange={setApiKeyDraft}
                   onUpdate={(update) => {
                     void updateTranslationSettings(update)
-                  }}
-                  onSaveApiKey={() => {
-                    void saveApiKey()
-                  }}
-                  onClearApiKey={() => {
-                    setApiKeyDraft('')
-                    void updateTranslationSettings({ apiKey: null })
                   }}
                   onClearCache={() => {
                     void clearTranslationCache()
@@ -1489,21 +1478,13 @@ function AppSelect({
 
 function TranslationSettingsPanel({
   settings,
-  apiKeyDraft,
   error,
-  onApiKeyDraftChange,
   onUpdate,
-  onSaveApiKey,
-  onClearApiKey,
   onClearCache,
 }: {
   settings: TranslationSettingsSnapshot
-  apiKeyDraft: string
   error: string | null
-  onApiKeyDraftChange: (value: string) => void
   onUpdate: (update: TranslationSettingsUpdate) => void
-  onSaveApiKey: () => void
-  onClearApiKey: () => void
   onClearCache: () => void
 }): React.JSX.Element {
   return (
@@ -1515,104 +1496,27 @@ function TranslationSettingsPanel({
 
       {error ? <div className="translation-settings-error">{error}</div> : null}
 
-      <div className="translation-settings-grid">
-        <div className="translation-settings-field">
-          <span>Provider</span>
-          <AppSelect
-            ariaLabel="Translation provider"
-            value={settings.provider}
-            options={[
-              { value: 'local-dictionary', label: 'Offline dictionary' },
-              { value: 'google', label: 'Google Translate' },
-            ]}
-            onChange={(value) => {
-              const provider = value as TranslationSettingsSnapshot['provider']
-              onUpdate(
-                provider === 'local-dictionary'
-                  ? { provider, targetLanguage: 'my' }
-                  : { provider },
-              )
-            }}
-          />
+      <div className="translation-settings-summary" aria-label="Translation configuration">
+        <div>
+          <span>Dictionary</span>
+          <strong>Offline</strong>
         </div>
-
-        <div className="translation-settings-field">
-          <span>Target language</span>
-          <AppSelect
-            ariaLabel="Target language"
-            value={settings.targetLanguage}
-            options={(settings.provider === 'local-dictionary'
-              ? TARGET_LANGUAGE_OPTIONS.filter((language) => language.code === 'my')
-              : TARGET_LANGUAGE_OPTIONS
-            ).map((language) => ({
-              value: language.code,
-              label: language.label,
-            }))}
-            onChange={(value) => {
-              onUpdate({ targetLanguage: value })
-            }}
-          />
+        <div>
+          <span>Language</span>
+          <strong>Burmese</strong>
         </div>
-
-        <label className="translation-popup-position-setting">
-          <span>Popup position</span>
-          <select
-            value={settings.popupPosition}
-            onChange={(event) => {
-              onUpdate({ popupPosition: event.currentTarget.value as 'above' | 'below' })
-            }}
-          >
-            <option value="below">Below subtitle</option>
-            <option value="above">Above subtitle</option>
-          </select>
-        </label>
-
-        <label className="translation-settings-check">
-          <input
-            type="checkbox"
-            checked={settings.autoPauseOnWordClick}
-            onChange={(event) => {
-              onUpdate({ autoPauseOnWordClick: event.currentTarget.checked })
-            }}
-          />
-          <span>Pause automatically when I click a word</span>
-        </label>
       </div>
 
-      {settings.provider === 'google' ? (
-        <div className="translation-google-section">
-          <span className="translation-google-label">Google API key</span>
-          <div className="translation-api-key-control">
-            <input
-              type="password"
-              value={apiKeyDraft}
-              autoComplete="off"
-              aria-label="Google API key"
-              placeholder={settings.apiKeyConfigured ? 'Saved API key' : 'Enter API key'}
-              onChange={(event) => {
-                onApiKeyDraftChange(event.currentTarget.value)
-              }}
-            />
-            <button
-              type="button"
-              className="translation-inline-action"
-              disabled={!apiKeyDraft.trim()}
-              onClick={onSaveApiKey}
-            >
-              Save
-            </button>
-          </div>
-          {settings.apiKeyConfigured ? (
-            <button
-              type="button"
-              className="translation-text-action"
-              onClick={onClearApiKey}
-            >
-              Remove saved key
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      <label className="translation-settings-check">
+        <input
+          type="checkbox"
+          checked={settings.autoPauseOnWordClick}
+          onChange={(event) => {
+            onUpdate({ autoPauseOnWordClick: event.currentTarget.checked })
+          }}
+        />
+        <span>Pause automatically when I click a word</span>
+      </label>
 
       <div className="translation-cache-row">
         <span>
