@@ -1496,9 +1496,8 @@ function TranslationSettingsPanel({
 
       {error ? <div className="translation-settings-error">{error}</div> : null}
 
-      <div
+      <fieldset
         className="translation-settings-summary"
-        role="group"
         aria-label="Translation configuration"
       >
         <div>
@@ -1509,7 +1508,7 @@ function TranslationSettingsPanel({
           <span>Language</span>
           <strong>Burmese</strong>
         </div>
-      </div>
+      </fieldset>
 
       <label className="translation-settings-check">
         <input
