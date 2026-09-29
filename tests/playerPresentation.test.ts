@@ -71,52 +71,32 @@ describe('player presentation contracts', () => {
     )
   })
 
-  it('keeps the obsolete saved popup-position control out of the visible settings UI', () => {
-    expect(polishedOverlaySource).toContain('className="translation-popup-position-setting"')
-    expect(playerCss).toMatch(
-      /\.translation-settings-grid \.translation-popup-position-setting\s*\{[\s\S]*?display:\s*none;/,
-    )
+  it('hides the unverified Google translation UI for this release', () => {
+    expect(polishedOverlaySource).not.toContain('Google Translate')
+    expect(polishedOverlaySource).not.toContain('Google API key')
+    expect(polishedOverlaySource).not.toContain('translation-google-section')
+    expect(polishedOverlaySource).not.toContain('ariaLabel="Translation provider"')
+    expect(polishedOverlaySource).not.toContain('ariaLabel="Target language"')
   })
 
-  it('shows only Burmese as the offline dictionary target language', () => {
+  it('shows the supported offline Burmese translation configuration only', () => {
+    expect(polishedOverlaySource).toContain('className="translation-settings-summary"')
+    expect(polishedOverlaySource).toContain('<strong>Offline</strong>')
+    expect(polishedOverlaySource).toContain('<strong>Burmese</strong>')
     expect(polishedOverlaySource).toContain(
-      "settings.provider === 'local-dictionary'",
+      "settings.provider === 'local-dictionary' && settings.targetLanguage === 'my'",
     )
     expect(polishedOverlaySource).toContain(
-      "TARGET_LANGUAGE_OPTIONS.filter((language) => language.code === 'my')",
-    )
-    expect(polishedOverlaySource).toContain(
-      "provider === 'local-dictionary'\n                  ? { provider, targetLanguage: 'my' }",
-    )
-    expect(polishedOverlaySource).not.toContain(
-      'The offline dictionary currently contains Burmese only.',
-    )
-  })
-
-  it('keeps the Google translation view compact and integrated', () => {
-    expect(polishedOverlaySource).toContain("{ value: 'google', label: 'Google Translate' }")
-    expect(polishedOverlaySource).toContain('className="translation-google-section"')
-    expect(polishedOverlaySource).toContain('className="translation-api-key-control"')
-    expect(polishedOverlaySource).toContain('className="translation-inline-action"')
-    expect(polishedOverlaySource).toContain('className="translation-text-action"')
-    expect(polishedOverlaySource).toContain('Session cache <strong>{settings.cacheEntries}</strong>')
-    expect(playerCss).toMatch(
-      /\.translation-google-section\s*\{[\s\S]*?padding:\s*10px;[\s\S]*?border-radius:\s*12px;/,
+      "provider: 'local-dictionary',\n                targetLanguage: 'my'",
     )
     expect(playerCss).toMatch(
-      /\.translation-api-key-control\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) auto;/,
-    )
-    expect(playerCss).toMatch(
-      /\.translation-inline-action\s*\{[\s\S]*?min-width:\s*56px;[\s\S]*?height:\s*36px;/,
+      /\.translation-settings-summary\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/,
     )
   })
 
   it('keeps visible translation settings content padded inside its card', () => {
     expect(playerCss).toMatch(
       /\.translation-settings-panel\s*\{[\s\S]*?padding:\s*14px;[\s\S]*?border-radius:\s*15px;/,
-    )
-    expect(playerCss).toMatch(
-      /\.translation-settings-grid\s*\{[\s\S]*?gap:\s*10px;/,
     )
     expect(playerCss).not.toMatch(
       /\.translation-settings-panel\s*\{[^}]*padding:\s*0\s*;[^}]*\}/,
@@ -181,8 +161,6 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).toContain('className="app-select-trigger"')
     expect(polishedOverlaySource).toContain('className="app-select-menu"')
     expect(polishedOverlaySource).toContain('role="listbox"')
-    expect(polishedOverlaySource).toContain('ariaLabel="Translation provider"')
-    expect(polishedOverlaySource).toContain('ariaLabel="Target language"')
     expect(polishedOverlaySource).toContain('ariaLabel="Embedded subtitle track"')
     expect(polishedOverlaySource).toContain('ariaLabel="Audio track"')
     expect(playerCss).toMatch(
