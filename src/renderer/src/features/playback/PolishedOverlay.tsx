@@ -1496,7 +1496,11 @@ function TranslationSettingsPanel({
 
       {error ? <div className="translation-settings-error">{error}</div> : null}
 
-      <div className="translation-settings-summary" aria-label="Translation configuration">
+      <div
+        className="translation-settings-summary"
+        role="group"
+        aria-label="Translation configuration"
+      >
         <div>
           <span>Dictionary</span>
           <strong>Offline</strong>
