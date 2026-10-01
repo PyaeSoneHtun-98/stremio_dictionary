@@ -87,6 +87,7 @@ export function PolishedOverlay(): React.JSX.Element {
   const [subtitlePreferences, setSubtitlePreferences] = useState<SubtitlePreferencesSnapshot>(
     DEFAULT_SUBTITLE_PREFERENCES,
   )
+  const [subtitlePreferencesSaving, setSubtitlePreferencesSaving] = useState(false)
   const [loadingExternalSubtitle, setLoadingExternalSubtitle] = useState(false)
   const [subtitleSettingsOpen, setSubtitleSettingsOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<'speed' | 'shortcuts' | null>(null)
@@ -182,6 +183,7 @@ export function PolishedOverlay(): React.JSX.Element {
   const currentCueId = useRef<string | null>(null)
   const currentSubtitleTrackId = useRef<number | null>(null)
   const translationRequestVersion = useRef(0)
+  const subtitlePreferencesUpdatePending = useRef(false)
   const stateRef = useRef<PlaybackSnapshot>(EMPTY_STATE)
   const surfaceGestureCoordinator = useMemo(
     () =>
@@ -273,17 +275,9 @@ export function PolishedOverlay(): React.JSX.Element {
 
     void window.desktop.translation
       .getSettings()
-      .then(async (settings) => {
-        const supportedSettings =
-          settings.provider === 'local-dictionary' && settings.targetLanguage === 'my'
-            ? settings
-            : await window.desktop.translation.updateSettings({
-                provider: 'local-dictionary',
-                targetLanguage: 'my',
-              })
-
+      .then((settings) => {
         if (active) {
-          setTranslationSettings(supportedSettings)
+          setTranslationSettings(settings)
         }
       })
       .catch((error: unknown) => {
@@ -567,11 +561,20 @@ export function PolishedOverlay(): React.JSX.Element {
   const updateSubtitlePreferences = async (
     update: SubtitlePreferencesUpdate,
   ): Promise<void> => {
+    if (subtitlePreferencesUpdatePending.current) {
+      return
+    }
+
+    subtitlePreferencesUpdatePending.current = true
+    setSubtitlePreferencesSaving(true)
     setControlError(null)
     try {
       setSubtitlePreferences(await window.desktop.media.updateSubtitlePreferences(update))
     } catch (error) {
       setControlError(controlErrorMessage(error, 'Could not save subtitle preferences.'))
+    } finally {
+      subtitlePreferencesUpdatePending.current = false
+      setSubtitlePreferencesSaving(false)
     }
   }
 
@@ -994,6 +997,7 @@ export function PolishedOverlay(): React.JSX.Element {
                             type="button"
                             aria-label="Decrease subtitle size"
                             disabled={
+                              subtitlePreferencesSaving ||
                               subtitlePreferences.fontScale <= MIN_SUBTITLE_FONT_SCALE
                             }
                             onClick={() =>
@@ -1016,6 +1020,7 @@ export function PolishedOverlay(): React.JSX.Element {
                             type="button"
                             aria-label="Increase subtitle size"
                             disabled={
+                              subtitlePreferencesSaving ||
                               subtitlePreferences.fontScale >= MAX_SUBTITLE_FONT_SCALE
                             }
                             onClick={() =>
@@ -1041,8 +1046,9 @@ export function PolishedOverlay(): React.JSX.Element {
                             type="button"
                             aria-label="Move subtitles lower"
                             disabled={
+                              subtitlePreferencesSaving ||
                               subtitlePreferences.verticalOffset <=
-                              MIN_SUBTITLE_VERTICAL_OFFSET
+                                MIN_SUBTITLE_VERTICAL_OFFSET
                             }
                             onClick={() =>
                               void updateSubtitlePreferences({
@@ -1063,8 +1069,9 @@ export function PolishedOverlay(): React.JSX.Element {
                             type="button"
                             aria-label="Move subtitles higher"
                             disabled={
+                              subtitlePreferencesSaving ||
                               subtitlePreferences.verticalOffset >=
-                              MAX_SUBTITLE_VERTICAL_OFFSET
+                                MAX_SUBTITLE_VERTICAL_OFFSET
                             }
                             onClick={() =>
                               void updateSubtitlePreferences({
