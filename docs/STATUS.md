@@ -200,13 +200,15 @@ Scope:
 - add Audio below the subtitle controls in that same CC/Tracks panel;
 - move playback speed from the bottom bar into the gear/Settings panel as a simple option list;
 - support local MKV/MP4 and HTTP/HTTPS/Stremio playback through the shared mpv path;
-- preserve subtitle extraction, timing, translation, and external-subtitle behavior.
+- preserve subtitle extraction, timing, translation, and external-subtitle behavior;
+- hide the unverified Google Translate UI for v1.0.7 and enforce Offline dictionary → Burmese as the effective main-process runtime translation scope.
 
-Release gate:
+Validation status:
 
-- exact-head CI;
-- manual Windows validation with representative multi-audio playback;
-- Codex review of the exact reviewed head with no unresolved P1/P2/P3;
+- Windows manual acceptance passed on reviewed head `b4e0209d6ede0af6e386ee2afcad09e0773d5105`, including the current player UI and representative multi-audio switching;
+- CI #571 passed `validate` and `package-windows` on that reviewed head;
+- Codex reviewed that exact head with no P1/P2 findings and three P3 findings: failed hidden-Google migration could leave Google active, dropdown clipping inside the scrollable player panel, and repeated subtitle-preference steps could lose increments;
+- those three P3s are fixed on the branch and require exact-head CI plus Codex re-review before merge;
 - merge before preparing v1.0.7.
 
 ## Later work
