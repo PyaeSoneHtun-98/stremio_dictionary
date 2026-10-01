@@ -269,6 +269,7 @@ export function disposeMediaIpc(): void {
   ipcMain.removeHandler(SEEK_CHANNEL)
   ipcMain.removeHandler(SET_VOLUME_CHANNEL)
   ipcMain.removeHandler(SET_SPEED_CHANNEL)
+  ipcMain.removeHandler(SELECT_AUDIO_TRACK_CHANNEL)
   ipcMain.removeHandler(SET_SUBTITLE_DELAY_CHANNEL)
   ipcMain.removeHandler(ADJUST_SUBTITLE_DELAY_CHANNEL)
   ipcMain.removeHandler(SELECT_SUBTITLE_TRACK_CHANNEL)
