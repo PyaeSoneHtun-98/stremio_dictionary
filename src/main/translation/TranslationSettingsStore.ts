@@ -14,7 +14,8 @@ import type {
 } from './TranslationService'
 import {
   normalizeTargetLanguage,
-  normalizeTargetLanguageForProvider
+  normalizeTargetLanguageForProvider,
+  releaseTranslationScope
 } from './settingsValidation'
 
 interface PersistedTranslationSettings {
@@ -96,7 +97,10 @@ export class TranslationSettingsStore implements TranslationRuntimeSettingsSourc
     try {
       const raw = await readFile(this.filePath, 'utf8')
       const parsed = JSON.parse(raw) as unknown
-      this.state = sanitizePersistedSettings(parsed)
+      this.state = {
+        ...sanitizePersistedSettings(parsed),
+        ...releaseTranslationScope()
+      }
     } catch (error) {
       if (isMissingFileError(error)) {
         this.state = { ...DEFAULT_STATE }
@@ -131,6 +135,8 @@ export class TranslationSettingsStore implements TranslationRuntimeSettingsSourc
       next.provider,
       next.targetLanguage
     )
+
+    Object.assign(next, releaseTranslationScope())
 
     await persistSettings(this.filePath, next)
     this.state = next
