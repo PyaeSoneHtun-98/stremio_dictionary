@@ -101,7 +101,7 @@ The default translation provider is `LocalDictionaryProvider`.
 
 The frozen v1.0 corpus is AI-authored and has passed structural and targeted quality audits, but it has not received exhaustive native/bilingual editorial review of every entry.
 
-`GoogleTranslationProvider` remains optional. Provider credentials must be protected with the existing secure settings behavior and must never be written to diagnostics.
+`GoogleTranslationProvider` remains in the backend for future live validation, but **v1.0.7 does not expose or activate it in the user interface**. The effective v1.0.7 runtime translation scope is enforced in the main process as Offline dictionary → Burmese before translation requests are handled, so stale persisted Google/provider-language settings cannot keep network translation active. Existing credential storage remains dormant and protected by the secure settings behavior; credentials must never be written to diagnostics.
 
 ## Desktop and IPC model
 
