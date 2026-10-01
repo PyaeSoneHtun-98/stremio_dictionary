@@ -32,6 +32,10 @@ const subtitleToolsSource = readFileSync(
   ),
   'utf8',
 )
+const mediaIpcSource = readFileSync(
+  fileURLToPath(new URL('../src/main/media/ipc.ts', import.meta.url)),
+  'utf8',
+)
 
 describe('player presentation contracts', () => {
   it('moves subtitles lower when player chrome hides while preserving the saved offset', () => {
@@ -83,11 +87,9 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).toContain('className="translation-settings-summary"')
     expect(polishedOverlaySource).toContain('<strong>Offline</strong>')
     expect(polishedOverlaySource).toContain('<strong>Burmese</strong>')
-    expect(polishedOverlaySource).toContain(
-      "settings.provider === 'local-dictionary' && settings.targetLanguage === 'my'",
-    )
-    expect(polishedOverlaySource).toContain(
-      "provider: 'local-dictionary',\n                targetLanguage: 'my'",
+    expect(polishedOverlaySource).toContain('setTranslationSettings(settings)')
+    expect(polishedOverlaySource).not.toContain(
+      "await window.desktop.translation.updateSettings({\n                provider: 'local-dictionary'",
     )
     expect(playerCss).toMatch(
       /\.translation-settings-summary\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/,
@@ -154,6 +156,37 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).toContain("settingsSection === 'shortcuts'")
     expect(polishedOverlaySource).toContain('className="shortcut-list compact-shortcut-list"')
     expect(polishedOverlaySource).not.toContain('className="speed-control"')
+  })
+
+  it('keeps custom dropdown options in panel flow so they remain scroll-reachable', () => {
+    expect(playerCss).toMatch(
+      /\.app-select-menu\s*\{[\s\S]*?position:\s*static;[\s\S]*?margin-top:\s*6px;/,
+    )
+    expect(playerCss).not.toMatch(
+      /\.app-select-menu\s*\{[^}]*position:\s*absolute;/,
+    )
+  })
+
+  it('blocks repeated subtitle preference steps while a save is pending', () => {
+    expect(polishedOverlaySource).toContain(
+      'const subtitlePreferencesUpdatePending = useRef(false)',
+    )
+    expect(polishedOverlaySource).toContain(
+      'if (subtitlePreferencesUpdatePending.current)',
+    )
+    expect(polishedOverlaySource).toContain('setSubtitlePreferencesSaving(true)')
+    expect(polishedOverlaySource).toContain('setSubtitlePreferencesSaving(false)')
+    expect(polishedOverlaySource).toContain(
+      'subtitlePreferencesSaving ||\n                              subtitlePreferences.fontScale',
+    )
+    expect(polishedOverlaySource).toContain(
+      'subtitlePreferencesSaving ||\n                              subtitlePreferences.verticalOffset',
+    )
+  })
+
+  it('removes the audio-track IPC handler during media IPC disposal', () => {
+    expect(mediaIpcSource).toContain('ipcMain.handle(SELECT_AUDIO_TRACK_CHANNEL')
+    expect(mediaIpcSource).toContain('ipcMain.removeHandler(SELECT_AUDIO_TRACK_CHANNEL)')
   })
 
   it('uses in-app dropdown menus instead of native visible selects', () => {
