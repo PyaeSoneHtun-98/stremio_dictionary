@@ -3,7 +3,8 @@ import { DEFAULT_TRANSLATION_SETTINGS } from '../src/shared/settings'
 import {
   normalizeTargetLanguage,
   normalizeTargetLanguageForProvider,
-  normalizeTranslationSettingsUpdate
+  normalizeTranslationSettingsUpdate,
+  releaseTranslationScope
 } from '../src/main/translation/settingsValidation'
 
 describe('translation settings validation', () => {
@@ -48,6 +49,13 @@ describe('translation settings validation', () => {
     expect(normalizeTargetLanguageForProvider('local-dictionary', 'ja')).toBe('my')
     expect(normalizeTargetLanguageForProvider('local-dictionary', 'zh-cn')).toBe('my')
     expect(normalizeTargetLanguageForProvider('google', 'JA')).toBe('ja')
+  })
+
+  it('forces the v1.0.7 effective translation scope to offline Burmese', () => {
+    expect(releaseTranslationScope()).toEqual({
+      provider: 'local-dictionary',
+      targetLanguage: 'my'
+    })
   })
 
   it('turns a blank API key into an explicit clear operation', () => {
