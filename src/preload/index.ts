@@ -52,6 +52,8 @@ const desktopBridge: DesktopBridge = {
   },
   translation: {
     translateWord: (request) => ipcRenderer.invoke('translation:translate-word', request),
+    getReportAvailability: () => ipcRenderer.invoke('translation:report-availability'),
+    reportDictionaryIssue: (request) => ipcRenderer.invoke('translation:report-dictionary', request),
     getSettings: () => ipcRenderer.invoke('translation:get-settings'),
     updateSettings: (update) => ipcRenderer.invoke('translation:update-settings', update),
     clearCache: () => ipcRenderer.invoke('translation:clear-cache')

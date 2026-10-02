@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`5eff60111cdc1c0d29cb9ce7486740a65ccddc10`
+`efa3c4119361a748f8175b922c21244bf18be3fd`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -15,6 +15,12 @@ PR #64 / Issue #63 subsequently changed missing/unsupported/subtitle-error recov
 Issue #65 / PR #66 completed the updater post-review hardening: physical path resolution, real Windows junction regression coverage, updater spawn-option tests, and subtitle notice timer lifecycle tests. Exact-head PR CI and merged-master CI passed.
 
 Issue #67 / PR #68 fixed player subtitle positioning so the shared interactive subtitle overlay stays raised above visible controls and moves toward the bottom after chrome hides. A real Stremio-stream development test passed, Codex reported no P1/P2/P3 findings, and merged-master CI #514 passed.
+
+Issue #69 / PR #70 is now squash-merged at the stable master above. It adds the shared audio selector
+and consolidated player panels, and enforces Offline dictionary → Burmese for v1.0.7. Windows manual
+acceptance passed on `b4e0209d6ede0af6e386ee2afcad09e0773d5105`; its three P3 review findings were
+resolved on `99195f83037d3b6dadb112c1e6fdb22b56b8f2b9`, which passed CI #578 and follow-up review
+with no unresolved P1/P2/P3. Issue #69 is closed/completed. Dormant Google backend support remains.
 
 Current stable capabilities include:
 
@@ -179,37 +185,41 @@ Production artifact: `src/main/translation/data/phrases.json`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
-## Active work — Issue #69 audio track selector
+## Active work — Issue #71 dictionary report icon
 
 Branch:
 
-`feat/issue-69-audio-track-selector`
+`codex/issue-71-dictionary-reports`
 
-Draft PR:
-
-`#70`
+The focused player Draft PR is opened from this branch; Supabase code stays in the separate
+`D:\Projects\subtitle-report-service` project.
 
 Scope:
 
-- use the existing mpv `track-list` audio metadata already present in `PlaybackSnapshot.tracks`;
-- add a narrow `selectAudioTrack` media IPC/preload API;
-- validate that requested IDs belong to a current audio track;
-- switch mpv's `aid` property without requiring playback to pause;
-- consolidate subtitle source selection, external subtitle loading, delay, size, and vertical position into the bottom CC/Tracks panel;
-- remove the separate top-right Subtitles button while preserving drag/drop subtitle loading;
-- add Audio below the subtitle controls in that same CC/Tracks panel;
-- move playback speed from the bottom bar into the gear/Settings panel as a simple option list;
-- support local MKV/MP4 and HTTP/HTTPS/Stremio playback through the shared mpv path;
-- preserve subtitle extraction, timing, translation, and external-subtitle behavior;
-- hide the unverified Google Translate UI for v1.0.7 and enforce Offline dictionary → Burmese as the effective main-process runtime translation scope.
+- one flag icon with tooltip and accessible label, with no report form or extra visible card text;
+- explicit missing-word or existing-entry/phrase reports for manual dictionary review;
+- structured dictionary-miss IPC result, distinct from general lookup errors;
+- main-process HTTPS submission, safe retry receipts, session deduplication, bounded requests,
+  response validation, and shutdown cleanup;
+- no automatic lookup collection, subtitle context, media paths, stream URLs, credentials, or term logs;
+- public build-time endpoint configuration with no Supabase code/credentials packaged in the player;
+- separate backend with private reports, atomic grouping/counts, idempotency, and hourly quota;
+- app rename/icon and dictionary changes remain out of scope.
 
 Validation status:
 
-- Windows manual acceptance passed on reviewed head `b4e0209d6ede0af6e386ee2afcad09e0773d5105`, including the current player UI and representative multi-audio switching;
-- CI #571 passed `validate` and `package-windows` on that reviewed head;
-- Codex reviewed that exact head with no P1/P2 findings and three P3 findings: failed hidden-Google migration could leave Google active, dropdown clipping inside the scrollable player panel, and repeated subtitle-preference steps could lose increments;
-- those three P3s are fixed on the branch and require exact-head CI plus Codex re-review before merge;
-- merge before preparing v1.0.7.
+- local `npm run check` passed with 232 tests, dictionary verification, type checking, lint, and builds;
+- 18 new player tests exercise actual React button events/lifecycle, HTTPS behavior, IPC validation,
+  preload routing, and cleanup;
+- the separate backend passes 10 Node tests, including the actual SQL migration, database roles/RLS,
+  grouped counts, retry receipts, quota, rollback, handler validation, and server-only credential use;
+- Supabase project creation, migration deployment, hosted endpoint configuration, and real submission
+  acceptance are pending owner setup;
+- real Windows playback/manual icon acceptance, exact-head CI, and final review are still pending;
+- the feature stays Draft and must not be described as ready for release until those gates complete.
+
+Setup guide: `D:\Projects\subtitle-report-service\README.md`.
+Player contract/configuration: [DICTIONARY_REPORTING.md](DICTIONARY_REPORTING.md).
 
 ## Later work
 

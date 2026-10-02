@@ -3,11 +3,15 @@ import type { TranslationRequest } from '../../shared/translation'
 import { TranslationService } from './TranslationService'
 import { TranslationSettingsStore } from './TranslationSettingsStore'
 import { normalizeTranslationSettingsUpdate } from './settingsValidation'
+import { DictionaryReportClient } from './DictionaryReportClient'
+import { MissingDictionaryEntryError } from './MissingDictionaryEntryError'
 
 const TRANSLATE_WORD_CHANNEL = 'translation:translate-word'
 const GET_SETTINGS_CHANNEL = 'translation:get-settings'
 const UPDATE_SETTINGS_CHANNEL = 'translation:update-settings'
 const CLEAR_CACHE_CHANNEL = 'translation:clear-cache'
+const REPORT_AVAILABILITY_CHANNEL = 'translation:report-availability'
+const REPORT_DICTIONARY_CHANNEL = 'translation:report-dictionary'
 const MAX_WORD_LENGTH = 120
 const MAX_CONTEXT_LENGTH = 600
 const MAX_CONTEXT_TOKENS = 16
@@ -15,6 +19,7 @@ const MAX_CONTEXT_TOKEN_LENGTH = 120
 
 let settingsStore: TranslationSettingsStore | null = null
 let service: TranslationService | null = null
+let reportClient: DictionaryReportClient | null = null
 let registered = false
 
 export function registerTranslationIpc(): void {
@@ -25,11 +30,25 @@ export function registerTranslationIpc(): void {
   registered = true
   settingsStore = new TranslationSettingsStore()
   service = new TranslationService(settingsStore)
+  reportClient = new DictionaryReportClient(process.env.SUBTITLE_BRIDGE_REPORT_ENDPOINT ?? '')
 
   ipcMain.handle(TRANSLATE_WORD_CHANNEL, async (_event, value: unknown) => {
     const request = normalizeTranslationRequest(value)
-    return requireService().translate(request)
+    try {
+      return await requireService().translate(request)
+    } catch (error) {
+      if (error instanceof MissingDictionaryEntryError) {
+        return { kind: 'missing', message: error.message }
+      }
+      throw error
+    }
   })
+
+  ipcMain.handle(REPORT_AVAILABILITY_CHANNEL, () => reportClient?.available ?? false)
+  ipcMain.handle(
+    REPORT_DICTIONARY_CHANNEL,
+    (_event, value: unknown) => reportClient?.submit(value) ?? { ok: false, reason: 'unavailable' },
+  )
 
   ipcMain.handle(GET_SETTINGS_CHANNEL, async () => {
     const activeService = requireService()
@@ -69,6 +88,10 @@ export function disposeTranslationIpc(): void {
   ipcMain.removeHandler(GET_SETTINGS_CHANNEL)
   ipcMain.removeHandler(UPDATE_SETTINGS_CHANNEL)
   ipcMain.removeHandler(CLEAR_CACHE_CHANNEL)
+  ipcMain.removeHandler(REPORT_AVAILABILITY_CHANNEL)
+  ipcMain.removeHandler(REPORT_DICTIONARY_CHANNEL)
+  reportClient?.dispose()
+  reportClient = null
   service = null
   settingsStore = null
   registered = false
@@ -158,7 +181,7 @@ export function normalizeTranslationRequest(value: unknown): TranslationRequest 
     ...(context ? { context } : {}),
     ...(contextTokens && clickedTokenIndex !== undefined
       ? { contextTokens, clickedTokenIndex }
-      : {})
+      : {}),
   }
 }
 

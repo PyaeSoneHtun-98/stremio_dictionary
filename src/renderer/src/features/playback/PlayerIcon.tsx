@@ -10,8 +10,12 @@ export type PlayerIconName =
   | 'back'
   | 'forward'
   | 'keyboard'
+  | 'flag'
+  | 'check'
 
 const paths: Record<PlayerIconName, string> = {
+  flag: 'M5 21V3M5 4c4-4 10 4 14 0v10c-4 4-10-4-14 0',
+  check: 'm5 12 4 4 10-10',
   play: 'm9 5 11 7-11 7Z',
   pause: 'M8 5v14M16 5v14',
   volume: 'M11 4 6 8H3v8h3l5 4ZM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14',
