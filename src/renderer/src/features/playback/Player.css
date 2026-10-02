@@ -577,6 +577,35 @@ html.overlay-mode #root {
 .translation-popup-close svg {
   width: 17px;
 }
+.translation-report-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #a1b6ac;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.translation-report-button svg {
+  width: 16px;
+  height: 16px;
+}
+.translation-report-button:hover:not(:disabled) {
+  color: #d2f4e4;
+  background: #ffffff12;
+}
+.translation-report-button:focus-visible {
+  outline: 2px solid #b5e6d1;
+  outline-offset: 2px;
+}
+.translation-report-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 .translation-phrase-detected {
   display: flex;
   flex-direction: column;

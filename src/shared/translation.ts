@@ -71,3 +71,6 @@ export interface TranslationResult {
   provider: string
   targetLanguage: string
 }
+
+// A serializable miss survives Electron IPC; other failures still reject the lookup.
+export type TranslationLookupResponse = TranslationResult | { kind: 'missing'; message: string }

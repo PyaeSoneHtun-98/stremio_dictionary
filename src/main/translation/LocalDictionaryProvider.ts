@@ -3,6 +3,7 @@ import { LEGACY_COMPATIBILITY_ALIASES } from './legacyCompatibilityAliases'
 import type { TranslationProvider } from './TranslationProvider'
 import { LOCAL_DICTIONARY, type LocalDictionaryEntry } from './localDictionary'
 import { findLocalPhraseMatch } from './PhraseMatcher'
+import { MissingDictionaryEntryError } from './MissingDictionaryEntryError'
 
 // The production corpus plus the small structured core supplement are immutable for the lifetime
 // of the Electron main process. Build the lookup index once at module load.
@@ -50,7 +51,7 @@ export class LocalDictionaryProvider implements TranslationProvider {
       }
     }
 
-    throw new Error(`No offline Burmese translation is available for “${originalWord}” yet.`)
+    throw new MissingDictionaryEntryError()
   }
 }
 

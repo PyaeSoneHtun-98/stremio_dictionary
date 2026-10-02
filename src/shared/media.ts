@@ -1,5 +1,6 @@
 import type { TranslationSettingsSnapshot, TranslationSettingsUpdate } from './settings'
-import type { TranslationRequest, TranslationResult } from './translation'
+import type { TranslationRequest, TranslationLookupResponse } from './translation'
+import type { DictionaryReportRequest, DictionaryReportOutcome } from './dictionaryReport'
 import type { UpdateBridge } from './update'
 
 export type PlaybackStatus =
@@ -143,7 +144,9 @@ export interface DesktopBridge {
     disableHandoff: () => Promise<StremioHandoffResult>
   }
   translation: {
-    translateWord: (request: TranslationRequest) => Promise<TranslationResult>
+    translateWord: (request: TranslationRequest) => Promise<TranslationLookupResponse>
+    getReportAvailability: () => Promise<boolean>
+    reportDictionaryIssue: (request: DictionaryReportRequest) => Promise<DictionaryReportOutcome>
     getSettings: () => Promise<TranslationSettingsSnapshot>
     updateSettings: (update: TranslationSettingsUpdate) => Promise<TranslationSettingsSnapshot>
     clearCache: () => Promise<TranslationSettingsSnapshot>

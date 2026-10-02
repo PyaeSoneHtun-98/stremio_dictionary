@@ -1,5 +1,8 @@
 name: CI
 
+env:
+  SUBTITLE_BRIDGE_REPORT_ENDPOINT: ${{ vars.SUBTITLE_BRIDGE_REPORT_ENDPOINT }}
+
 on:
   pull_request:
   push:
