@@ -191,7 +191,9 @@ Branch:
 
 `codex/issue-71-dictionary-reports`
 
-The focused player Draft PR is opened from this branch; Supabase code stays in the separate
+Draft PR: [#72](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/72).
+
+Supabase code stays in the separate
 `D:\Projects\subtitle-report-service` project.
 
 Scope:
