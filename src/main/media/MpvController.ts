@@ -159,6 +159,11 @@ export class MpvController {
     this.sendCommand(['set_property', 'speed', nextSpeed])
   }
 
+  selectAudioTrack(trackId: number): void {
+    this.assertControllable()
+    this.sendCommand(audioTrackSelectionCommand(this.state.tracks, trackId))
+  }
+
   setSubtitleDelay(seconds: number): void {
     this.assertControllable()
     const nextDelay = normalizeSubtitleDelay(seconds)
@@ -887,6 +892,25 @@ export class MpvController {
     this.state = { ...this.state, ...patch }
     this.onState(this.getState())
   }
+}
+
+export function audioTrackSelectionCommand(
+  tracks: readonly MediaTrack[],
+  trackId: number
+): unknown[] {
+  if (!Number.isSafeInteger(trackId)) {
+    throw new Error('Invalid audio track.')
+  }
+
+  const track = tracks.find(
+    (candidate) => candidate.type === 'audio' && candidate.id === trackId
+  )
+
+  if (!track) {
+    throw new Error('That audio track is no longer available.')
+  }
+
+  return ['set_property', 'aid', track.id]
 }
 
 function chooseSubtitleTrack(tracks: MediaTrack[]): MediaTrack | null {

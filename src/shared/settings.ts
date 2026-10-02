@@ -22,7 +22,7 @@ export const DEFAULT_TRANSLATION_SETTINGS: TranslationSettingsSnapshot = {
   provider: 'local-dictionary',
   targetLanguage: 'my',
   popupPosition: 'below',
-  autoPauseOnWordClick: false,
+  autoPauseOnWordClick: true,
   apiKeyConfigured: false,
   cacheEntries: 0
 }

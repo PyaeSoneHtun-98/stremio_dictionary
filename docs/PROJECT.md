@@ -40,6 +40,8 @@ click word → translation provider → Burmese popup
 
 For local files with a supported embedded text track, subtitle extraction reads the complete selected track and normalizes it into cues. Local MP4 files do not need an embedded subtitle track to play; users can load an external SRT/ASS/SSA file through the existing subtitle picker or drag/drop path. The existing overlay uses cue timing to show synchronized clickable text.
 
+mpv also exposes local audio tracks through the shared track list. Subtitle Bridge can select among those audio tracks during playback by setting mpv's `aid` property; audio switching does not require the subtitle pause gate.
+
 ### HTTP/HTTPS network streams
 
 Network streams, including Stremio's local `http://127.0.0.1:11470/...` stream URLs, use a different subtitle path.
@@ -59,6 +61,8 @@ click word → Burmese translation
 ```
 
 Do not use FFmpeg full-track extraction for Stremio/torrent-backed network playback. That approach was manually tested and can remain stuck on `Loading subtitles...` while FFmpeg waits to scan the complete stream. Network playback therefore uses mpv live subtitle properties while mpv's own subtitle rendering stays hidden.
+
+When mpv exposes multiple audio tracks for an HTTP/HTTPS or Stremio stream, the same shared audio selector can switch them without changing the live-subtitle path.
 
 ## Subtitle support
 
@@ -97,7 +101,7 @@ The default translation provider is `LocalDictionaryProvider`.
 
 The frozen v1.0 corpus is AI-authored and has passed structural and targeted quality audits, but it has not received exhaustive native/bilingual editorial review of every entry.
 
-`GoogleTranslationProvider` remains optional. Provider credentials must be protected with the existing secure settings behavior and must never be written to diagnostics.
+`GoogleTranslationProvider` remains in the backend for future live validation, but **v1.0.7 does not expose or activate it in the user interface**. The effective v1.0.7 runtime translation scope is enforced in the main process as Offline dictionary → Burmese before translation requests are handled, so stale persisted Google/provider-language settings cannot keep network translation active. Existing credential storage remains dormant and protected by the secure settings behavior; credentials must never be written to diagnostics.
 
 ## Desktop and IPC model
 

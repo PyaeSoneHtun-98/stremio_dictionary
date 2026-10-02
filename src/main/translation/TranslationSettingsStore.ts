@@ -12,7 +12,11 @@ import type {
   TranslationRuntimeSettings,
   TranslationRuntimeSettingsSource
 } from './TranslationService'
-import { normalizeTargetLanguage } from './settingsValidation'
+import {
+  normalizeTargetLanguage,
+  normalizeTargetLanguageForProvider,
+  releaseTranslationScope
+} from './settingsValidation'
 
 interface PersistedTranslationSettings {
   version: 1
@@ -93,7 +97,10 @@ export class TranslationSettingsStore implements TranslationRuntimeSettingsSourc
     try {
       const raw = await readFile(this.filePath, 'utf8')
       const parsed = JSON.parse(raw) as unknown
-      this.state = sanitizePersistedSettings(parsed)
+      this.state = {
+        ...sanitizePersistedSettings(parsed),
+        ...releaseTranslationScope()
+      }
     } catch (error) {
       if (isMissingFileError(error)) {
         this.state = { ...DEFAULT_STATE }
@@ -123,6 +130,13 @@ export class TranslationSettingsStore implements TranslationRuntimeSettingsSourc
     if (update.apiKey !== undefined) {
       next.encryptedApiKey = update.apiKey ? this.encryptApiKey(update.apiKey) : null
     }
+
+    next.targetLanguage = normalizeTargetLanguageForProvider(
+      next.provider,
+      next.targetLanguage
+    )
+
+    Object.assign(next, releaseTranslationScope())
 
     await persistSettings(this.filePath, next)
     this.state = next
@@ -172,7 +186,7 @@ function sanitizePersistedSettings(value: unknown): StoredState {
 
   return {
     provider,
-    targetLanguage,
+    targetLanguage: normalizeTargetLanguageForProvider(provider, targetLanguage),
     popupPosition,
     autoPauseOnWordClick:
       typeof raw.autoPauseOnWordClick === 'boolean'

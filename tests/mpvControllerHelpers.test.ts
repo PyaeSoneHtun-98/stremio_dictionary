@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  audioTrackSelectionCommand,
   mpvPipePath,
   playbackStartupUserMessage,
 } from '../src/main/media/MpvController'
@@ -31,5 +32,63 @@ describe('mpv controller safety helpers', () => {
     expect(playbackStartupUserMessage(missing)).toBe(
       'The video player runtime is missing. Reinstall Subtitle Bridge and try again.'
     )
+  })
+
+  it('builds an mpv aid command only for a current audio track', () => {
+    const tracks = [
+      {
+        id: 1,
+        type: 'video' as const,
+        codec: 'h264',
+        language: null,
+        title: null,
+        selected: true,
+        subtitleKind: null,
+        ffIndex: 0,
+      },
+      {
+        id: 2,
+        type: 'audio' as const,
+        codec: 'aac',
+        language: 'eng',
+        title: 'English',
+        selected: true,
+        subtitleKind: null,
+        ffIndex: 1,
+      },
+      {
+        id: 3,
+        type: 'audio' as const,
+        codec: 'aac',
+        language: 'jpn',
+        title: 'Japanese',
+        selected: false,
+        subtitleKind: null,
+        ffIndex: 2,
+      },
+      {
+        id: 4,
+        type: 'subtitle' as const,
+        codec: 'ass',
+        language: 'eng',
+        title: 'English',
+        selected: false,
+        subtitleKind: 'text' as const,
+        ffIndex: 3,
+      },
+    ]
+
+    expect(audioTrackSelectionCommand(tracks, 3)).toEqual(['set_property', 'aid', 3])
+    expect(() => audioTrackSelectionCommand(tracks, 4)).toThrow(
+      'That audio track is no longer available.',
+    )
+    expect(() => audioTrackSelectionCommand(tracks, 99)).toThrow(
+      'That audio track is no longer available.',
+    )
+  })
+
+  it('rejects non-integer audio track ids before sending them to mpv', () => {
+    expect(() => audioTrackSelectionCommand([], 1.5)).toThrow('Invalid audio track.')
+    expect(() => audioTrackSelectionCommand([], Number.NaN)).toThrow('Invalid audio track.')
   })
 })

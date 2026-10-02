@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`e41f88ff8b8004f78a7802729549843d22ebf72d`
+`5eff60111cdc1c0d29cb9ce7486740a65ccddc10`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -12,7 +12,9 @@ v1.0.6 fixed the real in-app updater install-directory lock. The affected Window
 
 PR #64 / Issue #63 subsequently changed missing/unsupported/subtitle-error recovery text into a four-second notice while keeping active subtitle loading status persistent. PR CI #506 and merged-master CI #507 passed, and the MP4 manual acceptance test passed.
 
-A post-merge Codex review of PR #61 and PR #64 reported no P1/P2 findings. It found one P3 junction-containment gap plus three P4 test/documentation gaps; Issue #65 is the focused hardening follow-up before v1.0.7.
+Issue #65 / PR #66 completed the updater post-review hardening: physical path resolution, real Windows junction regression coverage, updater spawn-option tests, and subtitle notice timer lifecycle tests. Exact-head PR CI and merged-master CI passed.
+
+Issue #67 / PR #68 fixed player subtitle positioning so the shared interactive subtitle overlay stays raised above visible controls and moves toward the bottom after chrome hides. A real Stremio-stream development test passed, Codex reported no P1/P2/P3 findings, and merged-master CI #514 passed.
 
 Current stable capabilities include:
 
@@ -22,6 +24,7 @@ Current stable capabilities include:
 - clickable embedded SRT/ASS/SSA dialogue;
 - native external SRT/ASS/SSA picker plus drag-and-drop loading;
 - subtitle delay, size, and position controls, including G/H 0.1-second delay shortcuts with temporary on-screen feedback;
+- dynamic subtitle positioning that moves lower when player controls hide while preserving the saved vertical offset;
 - temporary recovery notices for missing/unsupported/error subtitle states;
 - centered stream buffering/loading feedback that distinguishes manual pause from cache/seek stalls;
 - single-click video-surface play/pause and Windows-system-aware double-click fullscreen;
@@ -176,27 +179,36 @@ Production artifact: `src/main/translation/data/phrases.json`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
-## Active work — Issue #65 post-review hardening
+## Active work — Issue #69 audio track selector
 
 Branch:
 
-`fix/issue-65-post-review-hardening`
+`feat/issue-69-audio-track-selector`
 
-This follow-up addresses the Codex review of merged PR #61 and PR #64.
+Draft PR:
+
+`#70`
 
 Scope:
 
-- resolve updater install and download directories to physical Windows paths before containment checks so a junction cannot bypass the working-directory safety boundary;
-- fail closed if either physical directory cannot be resolved safely;
-- directly test the spawn options used by update IPC;
-- exercise the subtitle recovery notice timer lifecycle with fake timers, including dismissal, persistent extraction, video/state changes, external-subtitle replacement, and unmount cleanup;
-- keep playback, dictionary, updater trust, rollback, and Stremio behavior unchanged.
+- use the existing mpv `track-list` audio metadata already present in `PlaybackSnapshot.tracks`;
+- add a narrow `selectAudioTrack` media IPC/preload API;
+- validate that requested IDs belong to a current audio track;
+- switch mpv's `aid` property without requiring playback to pause;
+- consolidate subtitle source selection, external subtitle loading, delay, size, and vertical position into the bottom CC/Tracks panel;
+- remove the separate top-right Subtitles button while preserving drag/drop subtitle loading;
+- add Audio below the subtitle controls in that same CC/Tracks panel;
+- move playback speed from the bottom bar into the gear/Settings panel as a simple option list;
+- support local MKV/MP4 and HTTP/HTTPS/Stremio playback through the shared mpv path;
+- preserve subtitle extraction, timing, translation, and external-subtitle behavior;
+- hide the unverified Google Translate UI for v1.0.7 and enforce Offline dictionary → Burmese as the effective main-process runtime translation scope.
 
-Release gate:
+Validation status:
 
-- exact-head CI;
-- Codex re-review of the exact PR head with no unresolved P1/P2/P3;
-- targeted Windows/manual acceptance as needed;
+- Windows manual acceptance passed on reviewed head `b4e0209d6ede0af6e386ee2afcad09e0773d5105`, including the current player UI and representative multi-audio switching;
+- CI #571 passed `validate` and `package-windows` on that reviewed head;
+- Codex reviewed that exact head with no P1/P2 findings and three P3 findings: failed hidden-Google migration could leave Google active, dropdown clipping inside the scrollable player panel, and repeated subtitle-preference steps could lose increments;
+- those three P3s are fixed on the branch and require exact-head CI plus Codex re-review before merge;
 - merge before preparing v1.0.7.
 
 ## Later work

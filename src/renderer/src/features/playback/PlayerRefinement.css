@@ -16,7 +16,7 @@
 }
 
 /* The popup is now centered. Keep the legacy saved setting compatible but out of the UI. */
-.translation-settings-grid > label:nth-of-type(3) {
+.translation-popup-position-setting {
   display: none;
 }
 

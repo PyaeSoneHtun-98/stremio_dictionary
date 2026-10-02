@@ -33,6 +33,7 @@ const SET_PAUSED_CHANNEL = 'media:set-paused'
 const SEEK_CHANNEL = 'media:seek'
 const SET_VOLUME_CHANNEL = 'media:set-volume'
 const SET_SPEED_CHANNEL = 'media:set-speed'
+const SELECT_AUDIO_TRACK_CHANNEL = 'media:select-audio-track'
 const SET_SUBTITLE_DELAY_CHANNEL = 'media:set-subtitle-delay'
 const ADJUST_SUBTITLE_DELAY_CHANNEL = 'media:adjust-subtitle-delay'
 const SELECT_SUBTITLE_TRACK_CHANNEL = 'media:select-subtitle-track'
@@ -152,6 +153,13 @@ export function registerMediaIpc(): void {
   ipcMain.handle(SET_SPEED_CHANNEL, (_event, speed: unknown) => {
     controller.setSpeed(requireFiniteNumber(speed, 'playback speed'))
   })
+  ipcMain.handle(SELECT_AUDIO_TRACK_CHANNEL, (_event, trackId: unknown) => {
+    const value = requireFiniteNumber(trackId, 'audio track')
+    if (!Number.isSafeInteger(value)) {
+      throw new Error('Invalid audio track.')
+    }
+    controller.selectAudioTrack(value)
+  })
   ipcMain.handle(SET_SUBTITLE_DELAY_CHANNEL, (_event, seconds: unknown) => {
     controller.setSubtitleDelay(requireFiniteNumber(seconds, 'subtitle delay'))
   })
@@ -261,6 +269,7 @@ export function disposeMediaIpc(): void {
   ipcMain.removeHandler(SEEK_CHANNEL)
   ipcMain.removeHandler(SET_VOLUME_CHANNEL)
   ipcMain.removeHandler(SET_SPEED_CHANNEL)
+  ipcMain.removeHandler(SELECT_AUDIO_TRACK_CHANNEL)
   ipcMain.removeHandler(SET_SUBTITLE_DELAY_CHANNEL)
   ipcMain.removeHandler(ADJUST_SUBTITLE_DELAY_CHANNEL)
   ipcMain.removeHandler(SELECT_SUBTITLE_TRACK_CHANNEL)

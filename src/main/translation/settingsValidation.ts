@@ -9,6 +9,19 @@ const POPUP_POSITIONS = new Set<TranslationPopupPosition>(['above', 'below'])
 const MAX_API_KEY_LENGTH = 512
 const MAX_LANGUAGE_CODE_LENGTH = 32
 
+export const RELEASE_TRANSLATION_PROVIDER: TranslationProviderId = 'local-dictionary'
+export const RELEASE_TRANSLATION_TARGET_LANGUAGE = 'my'
+
+export function releaseTranslationScope(): {
+  provider: TranslationProviderId
+  targetLanguage: string
+} {
+  return {
+    provider: RELEASE_TRANSLATION_PROVIDER,
+    targetLanguage: RELEASE_TRANSLATION_TARGET_LANGUAGE
+  }
+}
+
 export function normalizeTranslationSettingsUpdate(value: unknown): TranslationSettingsUpdate {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('Invalid translation settings.')
@@ -59,6 +72,16 @@ export function normalizeTranslationSettingsUpdate(value: unknown): TranslationS
   }
 
   return update
+}
+
+export function normalizeTargetLanguageForProvider(
+  provider: TranslationProviderId,
+  value: string
+): string {
+  if (provider === 'local-dictionary') {
+    return 'my'
+  }
+  return normalizeTargetLanguage(value)
 }
 
 export function normalizeTargetLanguage(value: string): string {
