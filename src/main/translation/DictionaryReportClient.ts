@@ -16,15 +16,19 @@ interface Submission {
 export function validateReportEndpoint(value: string): string | null {
   try {
     const url = new URL(value)
+    const approvedRoute =
+      (/^[a-z0-9-]+\.supabase\.co$/.test(url.hostname) &&
+        url.pathname === '/functions/v1/report-dictionary') ||
+      (url.hostname === 'subtitle-report-service.vercel.app' &&
+        url.pathname === '/api/report-dictionary')
     if (
       url.protocol !== 'https:' ||
-      !/^[a-z0-9-]+\.supabase\.co$/.test(url.hostname) ||
+      !approvedRoute ||
       url.port ||
       url.username ||
       url.password ||
       url.search ||
-      url.hash ||
-      url.pathname !== '/functions/v1/report-dictionary'
+      url.hash
     )
       return null
     return url.href

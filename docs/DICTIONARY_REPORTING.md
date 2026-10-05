@@ -18,14 +18,16 @@ The player only knows the versioned HTTPS request contract described below.
 After deploying that project, set the public URL in `.env.local` for development:
 
 ```dotenv
-SUBTITLE_BRIDGE_REPORT_ENDPOINT=https://YOUR_PROJECT_REF.supabase.co/functions/v1/report-dictionary
+SUBTITLE_BRIDGE_REPORT_ENDPOINT=https://subtitle-report-service.vercel.app/api/report-dictionary
 ```
 
 For CI and official release builds, set the repository Actions variable
 `SUBTITLE_BRIDGE_REPORT_ENDPOINT` to the same URL. Both workflows embed this at build time.
 Rebuild/restart after changing it. Packaged builds do not depend on runtime environment variables.
-Only an HTTPS `*.supabase.co/functions/v1/report-dictionary` URL without credentials, custom port,
-query, or fragment is accepted. Missing/invalid configuration disables the icon and causes no
+Approved routes are the exact official Vercel hostname/path above or a direct
+`https://PROJECT_REF.supabase.co/functions/v1/report-dictionary` URL. Other Vercel deployments,
+admin routes, credentials, custom ports, queries, and fragments are rejected.
+Missing/invalid configuration disables the icon and causes no
 network activity. No Supabase SDK, public key, service key, database password, or login goes in the app.
 
 ## Request contract
@@ -65,10 +67,27 @@ request ID exists only for retry deduplication. Terms and requests never enter a
 Lookup remains fully offline; reporting failures do not change playback, subtitles, selection, or
 automatic-pause settings.
 
+## Separate owner interface
+
+[The owner dashboard](https://subtitle-report-service.vercel.app) is hosted in the separate backend
+project. It supports word/phrase search, type/status filters, grouped counts, pagination, and manual
+review statuses. Report reads and status changes require the configured owner's verified Supabase
+Auth identity; server keys stay in Vercel's private environment. The browser does not contact Supabase
+directly. Owner setup is documented in `D:\Projects\subtitle-report-service\VERCEL_SETUP.md`.
+
+The Vercel reporting relay uses the same seven-field body and receipt UUID. The existing Supabase
+function still owns validation, private storage, deduplication, and quota. Vercel is an additional
+hosting processor, with no additional identity fields in reports.
+
 ## Acceptance still needed before release
 
-- Create the owner-managed Supabase project, apply its migration, and deploy the function.
-- Configure the public endpoint in development and official build settings.
+- Owner project `axcpqizzmjwdwwpdaggf` is linked, the migration is applied, and the function is
+  deployed. The development endpoint is configured; official build configuration remains pending.
+- The direct Supabase hostname remains unreachable on the tested network. On 2026-10-05 the exact
+  Vercel production endpoint was verified without VPN: health/dashboard HTTP 200, reporting GET
+  HTTP 405, two identical synthetic-report POSTs HTTP 202, and live database receipt/count of 1.
+- Configure the owner Auth user/UID and private server key; verify real owner login, report browsing,
+  non-owner denial, and manual status changes on the deployed dashboard.
 - Confirm real submissions appear in the private table, including canonical phrase/headword reports.
 - Confirm failed/offline submissions offer retry and duplicate retries count only once.
 - Test the icon in real Windows playback and at small window sizes; confirm clicking it does not

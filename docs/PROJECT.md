@@ -137,6 +137,12 @@ separate `D:\Projects\subtitle-report-service` project. Only the public endpoint
 time; no Supabase credentials or SDK are distributed in the app. Unconfigured builds disable the
 icon. Lookup stays fully offline, and reporting does not change playback or automatic-pause behavior.
 
+Because the direct Supabase hostname is unreachable on the tested connection, the official endpoint
+is the separate Vercel reporting relay at `https://subtitle-report-service.vercel.app/api/report-dictionary`.
+It forwards the same validated report body/receipt to the existing Supabase function. That deployment
+also has a private owner dashboard for browsing and reviewing reports; its owner authentication and
+database credentials remain in the backend project. The player has no admin interface.
+
 This is an explicit user submission, not automatic lookup telemetry. Only the term, report category,
 fixed Burmese target, app/dictionary versions, and random retry receipt ID are sent. Subtitle context,
 translations, media paths, stream URLs, user/device identifiers, and credentials are excluded. Report

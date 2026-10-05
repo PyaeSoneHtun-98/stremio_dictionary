@@ -13,8 +13,10 @@ const accepted = () => Response.json({ ok: true }, { status: 202 })
 afterEach(() => vi.useRealTimers())
 
 describe('dictionary report HTTPS client', () => {
-  it('accepts only the configured HTTPS Supabase function without credentials or redirects', () => {
+  it('accepts only approved HTTPS reporting routes without credentials or redirects', () => {
     expect(validateReportEndpoint(endpoint)).toBe(endpoint)
+    const relay = 'https://subtitle-report-service.vercel.app/api/report-dictionary'
+    expect(validateReportEndpoint(relay)).toBe(relay)
     for (const value of [
       'http://exampleproject.supabase.co/functions/v1/report-dictionary',
       'https://exampleproject.supabase.co.evil.test/functions/v1/report-dictionary',
@@ -23,6 +25,13 @@ describe('dictionary report HTTPS client', () => {
       'https://user:secret@exampleproject.supabase.co/functions/v1/report-dictionary',
       'https://exampleproject.supabase.co:8443/functions/v1/report-dictionary',
       'https://exampleproject.supabase.co/rest/v1/dictionary_reports',
+      'https://other-project.vercel.app/api/report-dictionary',
+      'https://subtitle-report-service.vercel.app.evil.test/api/report-dictionary',
+      'https://subtitle-report-service.vercel.app/api/admin',
+      'https://subtitle-report-service.vercel.app/functions/v1/report-dictionary',
+      `${relay}?key=secret`,
+      `${relay}#fragment`,
+      'http://subtitle-report-service.vercel.app/api/report-dictionary',
     ])
       expect(validateReportEndpoint(value)).toBeNull()
   })
