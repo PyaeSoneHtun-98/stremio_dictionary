@@ -300,8 +300,13 @@ Player report transport follow-up on 2026-10-05:
 - direct IPC tests verify Electron transport is used even if Node fetch fails, and pending Electron
   requests are aborted on disposal. The local validation suite passes 233 tests;
 - synthetic probe results contain only controlled outcomes/status/timing, never real report words,
-  credentials, media targets, or request bodies. Real player acceptance still requires a restart and
-  flag retry; no successful player submission is claimed yet.
+  credentials, media targets, or request bodies;
+- owner fully restarted the development app and confirmed the flag now shows `Reported`. This
+  verifies the previously failing user submission flow at code head
+  `5818bcab4f6bf99c83c1f5df5af2255d188fa126`; the full missing/existing/phrase, retry, narrow-window,
+  and playback acceptance checklist remains pending;
+- CI #583 passed validate at that head. Windows packaging still fails on the separately tracked
+  pinned FFmpeg archive HTTP 404 (Issue #73), before packaging/install acceptance runs.
 
 Setup guide: `D:\Projects\subtitle-report-service\README.md`.
 Player contract/configuration: [DICTIONARY_REPORTING.md](DICTIONARY_REPORTING.md).

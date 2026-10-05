@@ -91,10 +91,16 @@ hosting processor, with no additional identity fields in reports.
 - The direct Supabase hostname remains unreachable on the tested network. On 2026-10-05 the exact
   Vercel production endpoint was verified without VPN: health/dashboard HTTP 200, reporting GET
   HTTP 405, two identical synthetic-report POSTs HTTP 202, and live database receipt/count of 1.
-- Configure the owner Auth user/UID and private server key; verify real owner login, report browsing,
-  non-owner denial, and manual status changes on the deployed dashboard.
+- Owner Auth user/UID and private server key are configured. On 2026-10-05 the owner confirmed
+  real dashboard login, report browsing, and status saving. Anonymous/invalid-session denial was
+  checked live; valid non-owner denial is covered automatically but still needs live acceptance.
+- After the Electron transport fix and a full development-app restart, the owner confirmed the
+  report flag shows `Reported`. This confirms the failed submission flow works; it does not replace
+  the remaining acceptance checks below.
 - Confirm real submissions appear in the private table, including canonical phrase/headword reports.
 - Confirm failed/offline submissions offer retry and duplicate retries count only once.
 - Test the icon in real Windows playback and at small window sizes; confirm clicking it does not
   toggle playback or dismiss the popup and keyboard focus/tooltip remain usable.
-- Run exact-head CI and final review; this feature is not yet approved for merge/release.
+- CI #583 passed validate at code head `5818bcab4f6bf99c83c1f5df5af2255d188fa126`;
+  Windows packaging remains blocked by the pinned FFmpeg download HTTP 404 (Issue #73).
+  Obtain green final-head CI and final review; this feature is not yet approved for merge/release.
