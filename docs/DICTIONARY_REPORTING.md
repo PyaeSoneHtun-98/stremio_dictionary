@@ -21,6 +21,11 @@ After deploying that project, set the public URL in `.env.local` for development
 SUBTITLE_BRIDGE_REPORT_ENDPOINT=https://subtitle-report-service.vercel.app/api/report-dictionary
 ```
 
+The main-process client uses Electron's Chromium `net.fetch` network stack. Requests still omit
+cookies, reject redirects, validate the fixed approved endpoint, and use bounded timeouts/responses.
+The renderer has no general network API. An isolated Windows probe reproduced intermittent Node
+fetch connection resets while Electron networking reached the same Vercel endpoint.
+
 For CI and official release builds, set the repository Actions variable
 `SUBTITLE_BRIDGE_REPORT_ENDPOINT` to the same URL. Both workflows embed this at build time.
 Rebuild/restart after changing it. Packaged builds do not depend on runtime environment variables.

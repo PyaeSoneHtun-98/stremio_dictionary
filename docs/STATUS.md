@@ -255,14 +255,53 @@ Vercel endpoint and owner dashboard on 2026-10-05:
   or Vercel authentication bypass;
 - two POSTs of one synthetic report returned HTTP 202; the live database confirms its retry receipt
   and grouped count of 1. That synthetic test group remains in the private table;
-- private dashboard APIs fail closed until owner UID/server key are configured. Owner setup and
-  real login/read/status acceptance remain pending;
+- owner UID and privately entered server key are configured in Vercel Production and redeployed;
+  anonymous and invalid-session admin requests return HTTP 401, foreign-origin POST returns HTTP 403,
+  and public dashboard/health remain HTTP 200 without VPN. Real owner login/read/status acceptance
+  remains pending; no password or key was retrieved or sent in chat;
 - backend passes 22 tests covering actual SQL/roles, owner/non-owner sessions, cookie/CSRF boundaries,
   bounded queries/status updates, and report relay behavior;
 - dashboard layout was checked with synthetic local fixtures; this is not live owner-login acceptance;
 - the player accepts only the exact official Vercel reporting route (plus the original Supabase route),
   and local `npm run check` passed again with 232 tests. New-head CI/final review remain pending;
 - no DNS, hosts-file, firewall, or certificate validation changes were made.
+
+Owner dashboard follow-up on 2026-10-05:
+
+- owner screenshot confirmed login/session HTTP 200 but report listing HTTP 503;
+- a real Vercel storage query reproduced HTTP 401 / PostgreSQL 42501. The owner confirmed the server
+  variable held a public `sb_publishable_` key, then replaced it privately with `sb_secret_`;
+- service-role schema/table/RLS permissions were verified; public database access was not expanded;
+- the owner-requested Next.js rewrite is pushed to the separate
+  [reporting repository](https://github.com/PyaeSoneHtun-98/subtitle-report-service), Draft PR #2;
+- the new production deployment passed the actual report-list query/count parsing, and anonymous
+  access-denial and existing report-retry checks passed without VPN. Local backend validation passes
+  33 tests plus the Next.js build; responsive previews use synthetic data;
+- owner confirmed real browser login, report loading, and review-status save work on the deployed
+  Next.js app after the key fix. Backend code-head CI #3 passed. Player Windows acceptance remains
+  pending; the earlier failed dashboard attempt is not counted as successful acceptance.
+
+CI #582 at `ecc2a34aee4a10029de026e6cc5f59bdbfb22c78` passed validate, but package-windows failed
+at the existing live-runtime gate: the pinned FFmpeg archive now returns HTTP 404. An independent
+anonymous HEAD check confirms 404; packaging/install steps were skipped. [Issue #73](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/73)
+tracks that separate runtime fix. No installer/runtime changes were added to the reporting PR.
+
+Player report transport follow-up on 2026-10-05:
+
+- owner reports immediate `Couldn't send` for every word even after the backend owner UI worked;
+- the running development app and compiled main bundle use the official Vercel endpoint;
+- local Node requests reproduced `ECONNRESET` before HTTP on the public reporting/dashboard/health
+  routes. An isolated Electron comparison returned Node `ECONNRESET` and Chromium HTTP 200 for the
+  same health URL. Subsequent actual report-client synthetic POSTs succeeded with both stacks, so
+  the Node failure is intermittent; its underlying network cause is not proven;
+- the actual translation IPC now injects Electron `net.fetch` into the narrow report client. Existing
+  HTTPS validation, omitted cookies, redirect rejection, bounded responses/timeouts, retry receipts,
+  and shutdown cancellation remain in place; no renderer network capability was added;
+- direct IPC tests verify Electron transport is used even if Node fetch fails, and pending Electron
+  requests are aborted on disposal. The local validation suite passes 233 tests;
+- synthetic probe results contain only controlled outcomes/status/timing, never real report words,
+  credentials, media targets, or request bodies. Real player acceptance still requires a restart and
+  flag retry; no successful player submission is claimed yet.
 
 Setup guide: `D:\Projects\subtitle-report-service\README.md`.
 Player contract/configuration: [DICTIONARY_REPORTING.md](DICTIONARY_REPORTING.md).

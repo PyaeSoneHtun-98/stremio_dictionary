@@ -13,6 +13,8 @@ interface Submission {
   pending?: Promise<DictionaryReportOutcome>
 }
 
+type ReportFetcher = (url: string, options: RequestInit) => Promise<Response>
+
 export function validateReportEndpoint(value: string): string | null {
   try {
     const url = new URL(value)
@@ -45,7 +47,7 @@ export class DictionaryReportClient {
 
   constructor(
     endpoint: string,
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: ReportFetcher = fetch,
   ) {
     this.endpoint = validateReportEndpoint(endpoint)
   }

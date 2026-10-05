@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, net } from 'electron'
 import type { TranslationRequest } from '../../shared/translation'
 import { TranslationService } from './TranslationService'
 import { TranslationSettingsStore } from './TranslationSettingsStore'
@@ -30,7 +30,10 @@ export function registerTranslationIpc(): void {
   registered = true
   settingsStore = new TranslationSettingsStore()
   service = new TranslationService(settingsStore)
-  reportClient = new DictionaryReportClient(process.env.SUBTITLE_BRIDGE_REPORT_ENDPOINT ?? '')
+  reportClient = new DictionaryReportClient(
+    process.env.SUBTITLE_BRIDGE_REPORT_ENDPOINT ?? '',
+    net.fetch.bind(net),
+  )
 
   ipcMain.handle(TRANSLATE_WORD_CHANNEL, async (_event, value: unknown) => {
     const request = normalizeTranslationRequest(value)

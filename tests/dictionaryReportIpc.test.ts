@@ -7,9 +7,11 @@ const mock = vi.hoisted(() => ({
   removeHandler: vi.fn(),
   bridge: null as unknown,
   invoke: vi.fn(),
+  networkFetch: vi.fn(),
 }))
 
 vi.mock('electron', () => ({
+  net: { fetch: mock.networkFetch },
   ipcMain: {
     handle: (channel: string, handler: (...args: unknown[]) => unknown) =>
       mock.handlers.set(channel, handler),
@@ -48,6 +50,7 @@ beforeEach(() => {
   mock.handlers.clear()
   mock.removeHandler.mockClear()
   mock.translate.mockReset()
+  mock.networkFetch.mockReset()
   vi.stubEnv(
     'SUBTITLE_BRIDGE_REPORT_ENDPOINT',
     'https://exampleproject.supabase.co/functions/v1/report-dictionary',
@@ -73,8 +76,9 @@ describe('report IPC and preload boundaries', () => {
   })
 
   it('registers idempotently, validates at the actual handler, and cleans up both report channels', async () => {
-    const fetcher = vi.fn().mockResolvedValue(Response.json({ ok: true }, { status: 202 }))
-    vi.stubGlobal('fetch', fetcher)
+    const nodeFetch = vi.fn().mockRejectedValue(new Error('Node connection reset'))
+    vi.stubGlobal('fetch', nodeFetch)
+    const fetcher = mock.networkFetch.mockResolvedValue(Response.json({ ok: true }, { status: 202 }))
     registerTranslationIpc()
     registerTranslationIpc()
     expect(handler('translation:report-availability')()).toBe(true)
@@ -86,10 +90,37 @@ describe('report IPC and preload boundaries', () => {
     expect(fetcher).not.toHaveBeenCalled()
     expect(await report({}, { term: 'word', category: 'missing' })).toEqual({ ok: true })
     expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(nodeFetch).not.toHaveBeenCalled()
+    expect(fetcher.mock.calls[0]).toEqual([
+      'https://exampleproject.supabase.co/functions/v1/report-dictionary',
+      expect.objectContaining({
+        method: 'POST',
+        redirect: 'error',
+        credentials: 'omit',
+        signal: expect.any(AbortSignal),
+      }),
+    ])
     disposeTranslationIpc()
     expect(mock.handlers.size).toBe(0)
     expect(mock.removeHandler).toHaveBeenCalledWith('translation:report-dictionary')
     expect(mock.removeHandler).toHaveBeenCalledWith('translation:report-availability')
+  })
+
+  it('aborts an actual IPC report request through Electron networking on disposal', async () => {
+    let signal!: AbortSignal
+    mock.networkFetch.mockImplementation(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          signal = options.signal
+          signal.addEventListener('abort', () => reject(new Error('cancelled')))
+        }),
+    )
+    registerTranslationIpc()
+    const pending = handler('translation:report-dictionary')({}, { term: 'word', category: 'missing' })
+    expect(mock.networkFetch).toHaveBeenCalledTimes(1)
+    disposeTranslationIpc()
+    expect(signal.aborted).toBe(true)
+    expect(await pending).toEqual({ ok: false, reason: 'failed' })
   })
 
   it('preload exposes only the two named report operations', async () => {
