@@ -38,13 +38,15 @@ describe('Windows runtime manifest', () => {
     }
   })
 
-  it('uses the explicitly pinned LGPL shared FFmpeg build', () => {
+  it('uses the explicitly pinned month-end LGPL shared FFmpeg build', () => {
     expect(manifest.ffmpeg.archiveUrl).toContain(
-      '/autobuild-2026-09-20-13-11/ffmpeg-n8.1.2-267-gb2f422d306-win64-lgpl-shared-8.1.zip'
+      '/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-lgpl-shared-8.1.zip'
     )
     expect(manifest.ffmpeg.archiveSha256).toBe(
-      '170e3f1dd7a2099c3e9bccc47958610fe6ea3a75e84e5c46e576af4163ab10bf'
+      '3e47bda1607740550141e37c0e49d1e5182b34699f15adfd137ee266d346811a'
     )
+    expect(manifest.ffmpeg.provenance).toContain('month-end')
+    expect(manifest.ffmpeg.provenance).toContain('two years')
   })
 
   it('pins mpv to the immutable stable MSVC release asset instead of the rotating git-release', () => {
