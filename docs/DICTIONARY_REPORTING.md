@@ -104,6 +104,8 @@ hosting processor, with no additional identity fields in reports.
 - Confirm failed/offline submissions offer retry and duplicate retries count only once.
 - Test the icon in real Windows playback and at small window sizes; confirm clicking it does not
   toggle playback or dismiss the popup and keyboard focus/tooltip remain usable.
-- CI #583 passed validate at code head `5818bcab4f6bf99c83c1f5df5af2255d188fa126`;
-  Windows packaging remains blocked by the pinned FFmpeg download HTTP 404 (Issue #73).
-  Obtain green final-head CI and final review; this feature is not yet approved for merge/release.
+- Earlier CI #583–#586 passed validation but failed packaging at the expired FFmpeg pin.
+  Issue #73 / PR #74 is now merged: its final CI #588 and owner real-media acceptance passed.
+  The reporting branch includes that runtime fix. Obtain green reporting final-head CI and
+  complete the remaining reporting acceptance checks before merge; release publication remains
+  a separate approval.

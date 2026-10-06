@@ -233,7 +233,7 @@ Owner assigned implementation to Codex on 2026-10-06. Branch: `codex/issue-73-ff
 - `npm run check` passed all 214 tests/build; `npm run package:win` produced the ZIP and setup.
 - Codex reviewed implementation head `1d9c4e729ba2705b246cd415a1de3decf310bc06` with no
   unresolved P1/P2/P3 findings. [PR #74](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/74)
-  records the current exact-head CI and owner real-media acceptance results and remaining gates.
+  records the exact-head CI and owner real-media acceptance results.
 - See [RUNTIME_DEPENDENCIES.md](RUNTIME_DEPENDENCIES.md) for provenance, renewal deadline,
   and old-installer limitations.
 
@@ -254,6 +254,9 @@ Current snapshot (2026-10-06, after merging the FFmpeg fix):
 
 - report submission succeeds in the restarted development app; the deployed owner dashboard's
   login, report loading, and status saving were confirmed by the owner;
+- merged master `8842cd86945332cdd0713c1a5f22798c479a1847` is included in this branch;
+  the new combined test build contains both the bottom-right report flag and verified FFmpeg.
+  The earlier runtime-only test build intentionally had no reporting code;
 - the owner requested final review/merge and more separation between the flag and close icons,
   then specified a bottom-right flag. The card now keeps X at the top right and places the 34px
   report action in a footer after the card content, with additional card padding;
