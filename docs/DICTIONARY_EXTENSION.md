@@ -76,7 +76,14 @@ Local `npm run check` passed all 241 tests, both typechecks, corpus checks and b
 The large pinned JSON assets are checked by explicit schema/digest gates rather than Biome's
 default one-megabyte file limit.
 
-Implementation acceptance is pending until tested on the integrated build:
+The owner reported **passed** for the prepared Windows portable build at
+`e78189376d389c7cc2e8e7887503fe8363fe67cd`, in response to the requested new/corrected
+word lookup, phrase/rendering, report action and Stremio lookup checks. The optional authored
+external SRT fixture covers representative words during the first 42 seconds. Local packaging
+and both jobs of CI #594 passed at this head. This is owner-reported acceptance; no per-codec
+inventory, database-version inspection or exhaustive bilingual/IPA approval is claimed.
+
+The acceptance checklist remains available for future dataset updates:
 
 1. Click new vocabulary such as `deepfake`, `gamified`, `decluttered`, `deplatformed`, and `weatherized`.
 2. Check `wait`, `waited`, `waiting`, `love`, `loved`, `loving`, `going`, `running`, `saying`,

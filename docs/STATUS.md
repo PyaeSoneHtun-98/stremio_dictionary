@@ -245,7 +245,7 @@ PR #74 squash-merged as `8842cd86945332cdd0713c1a5f22798c479a1847`; Issue #73 is
 
 The owner selected the current 5,000-word extension after readiness validation and explicitly
 assigned implementation to Codex. Branch: `codex/issue-75-dictionary-extension`.
-Draft PR: [#76](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/76).
+PR: [#76](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/76).
 
 - Upstream snapshot: `7be581cc925e8c097cf89efdf973b1f65a62da66`, batches 061–070.
 - Separate unchanged asset: 5,000 headwords, 3,783 forms, 5,329 Burmese meanings.
@@ -259,7 +259,14 @@ Draft PR: [#76](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/76).
 - Local `npm run check` passes lint/typechecks, all corpus gates, 241 tests and production builds.
   Biome reports existing configuration/CSS warnings and skips the large pinned dictionary JSON
   assets; explicit digest/schema gates validate those assets.
-- Windows packaging, CI, independent final review and real Windows acceptance are pending.
+- Local `npm run package:win` passed. CI #594 passed validate and package-windows at
+  `e78189376d389c7cc2e8e7887503fe8363fe67cd`.
+- The owner reported "passed" for the prepared Windows test build at that same head after the
+  requested external-subtitle word/phrase/rendering, report action and Stremio lookup checks.
+  No per-codec inventory, backend database-version inspection or exhaustive editorial pass is claimed.
+- The complete final code review found no unresolved P1/P2/P3/P4 findings. It was performed by
+  the implementing Codex agent; no separate independent reviewer is claimed. This acceptance
+  record changes documentation only; final-head CI must be verified before merge.
 - Full independent bilingual/IPA editorial review remains an acknowledged dataset limitation.
 
 See [dictionary extension](DICTIONARY_EXTENSION.md) for provenance, hashes and manual checklist.
