@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`5eff60111cdc1c0d29cb9ce7486740a65ccddc10`
+`efa3c4119361a748f8175b922c21244bf18be3fd`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -179,13 +179,13 @@ Production artifact: `src/main/translation/data/phrases.json`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
-## Active work — Issue #69 audio track selector
+## Completed — Issue #69 audio track selector
 
 Branch:
 
 `feat/issue-69-audio-track-selector`
 
-Draft PR:
+Merged PR:
 
 `#70`
 
@@ -208,8 +208,36 @@ Validation status:
 - Windows manual acceptance passed on reviewed head `b4e0209d6ede0af6e386ee2afcad09e0773d5105`, including the current player UI and representative multi-audio switching;
 - CI #571 passed `validate` and `package-windows` on that reviewed head;
 - Codex reviewed that exact head with no P1/P2 findings and three P3 findings: failed hidden-Google migration could leave Google active, dropdown clipping inside the scrollable player panel, and repeated subtitle-preference steps could lose increments;
-- those three P3s are fixed on the branch and require exact-head CI plus Codex re-review before merge;
-- merge before preparing v1.0.7.
+- those three P3s were resolved at head `99195f83037d3b6dadb112c1e6fdb22b56b8f2b9`; CI #578 passed and the follow-up Codex review cleared the merge gate;
+- PR #70 is merged to master. Public v1.0.7 has not been released.
+
+## Active work — Issue #73 FFmpeg download availability
+
+Owner assigned implementation to Codex on 2026-10-06. Branch: `codex/issue-73-ffmpeg-runtime`.
+
+- The September 20 FFmpeg daily-build pin expired under BtbN's last-14-build retention policy;
+  CI #582–#586 failed the live runtime gate with HTTP 404.
+- The replacement pin is the September 30 month-end LGPL shared 8.1 build, retained upstream
+  for two years. Its downloaded hash matches upstream checksums and release asset metadata.
+- Installer transaction, cache ownership/hash verification, mpv pin, and playback logic remain
+  unchanged. Old setup executables still contain their old manifests.
+- Live Windows verification now exercises cold download, shared DLL execution, synthetic
+  embedded SRT/ASS extraction, cached provisioning with unavailable URLs, and rejection/cleanup
+  of corrupt cached/downloaded bytes. All passed locally on Windows.
+- `npm run check` passed all 214 tests/build; `npm run package:win` produced the ZIP and setup.
+- Codex reviewed implementation head `1d9c4e729ba2705b246cd415a1de3decf310bc06` with no
+  unresolved P1/P2/P3 findings. [PR #74](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/74)
+  records the current exact-head CI and owner real-media acceptance results and remaining gates.
+- See [RUNTIME_DEPENDENCIES.md](RUNTIME_DEPENDENCIES.md) for provenance, renewal deadline,
+  and old-installer limitations.
+
+## Pending separately — Issue #71 dictionary reports / Draft PR #72
+
+The opt-in report feature and separate reporting service remain on their own branches. The owner
+confirmed a successful real-app report after restarting the development app. The current report
+card moves the icon to its bottom-right footer; final real-app layout acceptance is pending.
+PR #72's latest CI #586 passed validation but failed packaging at the FFmpeg URL tracked in
+Issue #73. Merge remains pending green required CI and the documented acceptance gates.
 
 ## Later work
 
