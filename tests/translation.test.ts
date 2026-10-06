@@ -6,15 +6,19 @@ import { LocalDictionaryProvider } from '../src/main/translation/LocalDictionary
 import {
   LOCAL_DICTIONARY,
   LOCAL_DICTIONARY_DATASET,
-  PRODUCTION_LOCAL_DICTIONARY
+  PRODUCTION_LOCAL_DICTIONARY,
+  LOCAL_DICTIONARY_EXTENSION,
+  RETAINED_CORE_DICTIONARY
 } from '../src/main/translation/localDictionary'
 
 describe('LocalDictionaryProvider', () => {
-  it('loads the frozen 30,000-headword production corpus plus the structured core supplement', () => {
+  it('loads the frozen base, separate 5,000-word extension and reconciled core supplement', () => {
     expect(LOCAL_DICTIONARY_DATASET.version).toBe(1)
     expect(PRODUCTION_LOCAL_DICTIONARY).toHaveLength(30_000)
     expect(CORE_LOCAL_DICTIONARY).toHaveLength(16)
-    expect(LOCAL_DICTIONARY).toHaveLength(30_016)
+    expect(LOCAL_DICTIONARY_EXTENSION).toHaveLength(5_000)
+    expect(RETAINED_CORE_DICTIONARY).toHaveLength(14)
+    expect(LOCAL_DICTIONARY).toHaveLength(35_014)
 
     const productionHeadwords = new Set(PRODUCTION_LOCAL_DICTIONARY.map((entry) => entry.word))
     const coreHeadwords = CORE_LOCAL_DICTIONARY.map((entry) => entry.word)
@@ -92,7 +96,7 @@ describe('LocalDictionaryProvider', () => {
     })
   })
 
-  it('preserves every legacy compatibility alias that is absent from the frozen corpus forms', async () => {
+  it('keeps compatibility aliases available while reviewed exact extension entries take precedence', async () => {
     const provider = new LocalDictionaryProvider()
     const compatibilityCases = Object.entries(LEGACY_COMPATIBILITY_ALIASES).flatMap(
       ([headword, aliases]) => aliases.map((alias) => ({ alias, headword }))
@@ -104,7 +108,7 @@ describe('LocalDictionaryProvider', () => {
       await expect(provider.translate({ word: alias })).resolves.toMatchObject({
         originalWord: alias,
         dictionaryEntry: {
-          word: headword
+          word: alias === 'signed' || alias === 'signing' ? alias : headword
         },
         provider: 'local-dictionary',
         targetLanguage: 'my'

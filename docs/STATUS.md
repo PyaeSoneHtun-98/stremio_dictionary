@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`8842cd86945332cdd0713c1a5f22798c479a1847`
+`7f42d8ca395907497324d563738260ea28828195`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -16,7 +16,7 @@ Issue #65 / PR #66 completed the updater post-review hardening: physical path re
 
 Issue #67 / PR #68 fixed player subtitle positioning so the shared interactive subtitle overlay stays raised above visible controls and moves toward the bottom after chrome hides. A real Stremio-stream development test passed, Codex reported no P1/P2/P3 findings, and merged-master CI #514 passed.
 
-Issue #69 / PR #70 is now squash-merged at the stable master above. It adds the shared audio selector
+Issue #69 / PR #70 squash-merged as `efa3c4119361a748f8175b922c21244bf18be3fd`. It adds the shared audio selector
 and consolidated player panels, and enforces Offline dictionary → Burmese for v1.0.7. Windows manual
 acceptance passed on `b4e0209d6ede0af6e386ee2afcad09e0773d5105`; its three P3 review findings were
 resolved on `99195f83037d3b6dadb112c1e6fdb22b56b8f2b9`, which passed CI #578 and follow-up review
@@ -239,7 +239,35 @@ Owner assigned implementation to Codex on 2026-10-06. Branch: `codex/issue-73-ff
 
 PR #74 squash-merged as `8842cd86945332cdd0713c1a5f22798c479a1847`; Issue #73 is closed. CI #588 passed both jobs, and the owner confirmed the requested real-media test on 2026-10-06. The report flag was absent from that test build because reporting remained on PR #72.
 
-## Active work — Issue #71 dictionary report icon
+## Active work — Issue #75 dictionary extension
+
+The owner selected the current 5,000-word extension after readiness validation and explicitly
+assigned implementation to Codex. Branch: `codex/issue-75-dictionary-extension`.
+
+- Upstream snapshot: `7be581cc925e8c097cf89efdf973b1f65a62da66`, batches 061–070.
+- Separate unchanged asset: 5,000 headwords, 3,783 forms, 5,329 Burmese meanings.
+- Eleven app-level corrections reconcile `love`/`wait`, restore `waited`, and enrich the
+  ordinary senses of new canonical entries that supersede core/compatibility inflections.
+- Runtime total: 35,014 unique headwords, including 14 nonoverlapping core entries.
+- Frozen 30k and 3k-phrase artifacts stay unchanged; exact-headword and phrase-first rules remain.
+- Reports identify the combined corpus as `1.0-ext.061-070.1` using the existing backend contract.
+- Focused tests pass: all extension keys through the real tokenizer/provider, frozen/core/alias
+  availability, every overlapping key's meaning, combined ownership/schema, and all phrase variants.
+- Local `npm run check` passes lint/typechecks, all corpus gates, 241 tests and production builds.
+  Biome reports existing configuration/CSS warnings and skips the large pinned dictionary JSON
+  assets; explicit digest/schema gates validate those assets.
+- Windows packaging, CI, independent final review and real Windows acceptance are pending.
+- Full independent bilingual/IPA editorial review remains an acknowledged dataset limitation.
+
+See [dictionary extension](DICTIONARY_EXTENSION.md) for provenance, hashes and manual checklist.
+
+## Completed work — Issue #71 dictionary report icon
+
+PR #72 squash-merged as `7f42d8ca395907497324d563738260ea28828195`; Issue #71 is closed.
+Exact-head CI #591 passed both jobs. The owner confirmed reporting works in the combined build
+after intermittent Vercel reachability recovered. The underlying transient network cause is
+uncertain; normal retry feedback is preserved. The details below are historical investigation
+and validation snapshots, not current active work.
 
 Branch:
 
@@ -250,7 +278,7 @@ Draft PR: [#72](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/72).
 Supabase code stays in the separate
 `D:\Projects\subtitle-report-service` project.
 
-Current snapshot (2026-10-06, after merging the FFmpeg fix):
+Historical pre-merge snapshot (2026-10-06, after merging the FFmpeg fix):
 
 - report submission succeeds in the restarted development app; the deployed owner dashboard's
   login, report loading, and status saving were confirmed by the owner;
@@ -269,8 +297,8 @@ Current snapshot (2026-10-06, after merging the FFmpeg fix):
   and the 100-report session limit, including retries and completed receipts at capacity;
 - the full PR review found no unresolved P1/P2/P3 code defects after fixing official endpoint
   configuration. The earlier FFmpeg packaging blocker was resolved by merged PR #74 / Issue #73;
-- merge is authorized but remains gated by green final-head CI and the remaining real Windows
-  acceptance checks. The records below describe earlier investigation/validation stages.
+- merge was authorized and gated by green final-head CI and real Windows acceptance at this
+  snapshot. Both gates subsequently passed and PR #72 merged as recorded above.
 
 Scope:
 
