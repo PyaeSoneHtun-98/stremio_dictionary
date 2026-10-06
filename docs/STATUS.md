@@ -170,7 +170,9 @@ The real official in-app update acceptance passed on v1.0.6.
 
 ## Dictionary v1.0
 
-The production word dictionary remains the frozen 30,000-headword Dictionary v1.0 plus the structured core supplement and collision-checked compatibility aliases.
+Stable master uses the frozen 30,000-headword Dictionary v1.0 plus the structured core supplement
+and collision-checked compatibility aliases. Issue #75 / PR #76 adds a separate 5,000-word
+extension on its active branch; it is not yet merged or manually accepted.
 
 ## Phrase Dictionary v1.0.0
 
@@ -243,6 +245,7 @@ PR #74 squash-merged as `8842cd86945332cdd0713c1a5f22798c479a1847`; Issue #73 is
 
 The owner selected the current 5,000-word extension after readiness validation and explicitly
 assigned implementation to Codex. Branch: `codex/issue-75-dictionary-extension`.
+Draft PR: [#76](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/76).
 
 - Upstream snapshot: `7be581cc925e8c097cf89efdf973b1f65a62da66`, batches 061–070.
 - Separate unchanged asset: 5,000 headwords, 3,783 forms, 5,329 Burmese meanings.
