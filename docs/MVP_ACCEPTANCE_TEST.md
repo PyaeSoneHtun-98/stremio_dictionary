@@ -2,6 +2,10 @@
 
 This document is the release gate for **Subtitle Bridge v1.0.0** on Windows x64. It reflects the current one-click installer, installer-managed runtime dependencies, 30,000-headword Dictionary v1.0, and optional Stremio integration.
 
+For the v1.0.7 dictionary extension in Issue #75 / PR #76, also complete the
+[extension acceptance checklist](DICTIONARY_EXTENSION.md#windows-acceptance-checklist).
+Historical v1.0.0 results below do not establish acceptance of the new 5,000-word layer.
+
 The recommended normal-user flow is:
 
 ```text

@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "word": "going",
+      "pronunciation": "/ˈɡoʊɪŋ/",
+      "forms": [],
+      "meanings": [
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "ထွက်ခွာခြင်း"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "သွားသည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "love",
+      "pronunciation": "/lʌv/",
+      "forms": [
+        "loves"
+      ],
+      "meanings": [
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "ချစ်ခြင်းမေတ္တာ"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "ချစ်သည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "loved",
+      "pronunciation": "/lʌvd/",
+      "forms": [],
+      "meanings": [
+        {
+          "partOfSpeech": "adjective",
+          "burmese": [
+            "ချစ်ခင်မြတ်နိုးခံရသော"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "ချစ်ခဲ့သည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "loving",
+      "pronunciation": "/ˈlʌvɪŋ/",
+      "forms": [],
+      "meanings": [
+        {
+          "partOfSpeech": "adjective",
+          "burmese": [
+            "ချစ်ခင်ကြင်နာသော"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "ချစ်သည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "running",
+      "pronunciation": "/ˈrʌnɪŋ/",
+      "forms": [],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "ပြေးသည်",
+            "လည်ပတ်သည်",
+            "စီမံခန့်ခွဲသည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "saying",
+      "pronunciation": "/ˈseɪɪŋ/",
+      "forms": [
+        "sayings"
+      ],
+      "meanings": [
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "စကားပုံ သို့မဟုတ် အသုံးအနှုန်း"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "ပြောသည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "seeing",
+      "pronunciation": "/ˈsiɪŋ/",
+      "forms": [],
+      "meanings": [
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "မြင်တွေ့သိမြင်ခြင်း"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "မြင်သည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "signed",
+      "pronunciation": "/saɪnd/",
+      "forms": [],
+      "meanings": [
+        {
+          "partOfSpeech": "adjective",
+          "burmese": [
+            "လက်မှတ်ရေးထိုးထားသော"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "လက်မှတ်ရေးထိုးသည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "signing",
+      "pronunciation": "/ˈsaɪnɪŋ/",
+      "forms": [],
+      "meanings": [
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "လက်အမူအရာဖြင့် ဆက်သွယ်ပြောဆိုခြင်း"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "လက်မှတ်ရေးထိုးသည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "wait",
+      "pronunciation": "/weɪt/",
+      "forms": [
+        "waits",
+        "waited"
+      ],
+      "meanings": [
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "စောင့်ဆိုင်းချိန်"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "စောင့်သည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "waiting",
+      "pronunciation": "/ˈweɪtɪŋ/",
+      "forms": [],
+      "meanings": [
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "စောင့်ဆိုင်းခြင်း"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "စောင့်သည်"
+          ]
+        }
+      ]
+    }
+  ]
+}
