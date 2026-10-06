@@ -200,10 +200,12 @@ Current snapshot (2026-10-06):
 
 - report submission succeeds in the restarted development app; the deployed owner dashboard's
   login, report loading, and status saving were confirmed by the owner;
-- the owner requested final review/merge and more separation between the flag and close icons;
-  the card now has matching 34px action buttons with a 12px gap and additional padding;
-- actual-component synthetic browser previews at normal, 390px, and 320px widths check wrapping,
-  button separation, report feedback, and independent dismissal. They are not real-media acceptance;
+- the owner requested final review/merge and more separation between the flag and close icons,
+  then specified a bottom-right flag. The card now keeps X at the top right and places the 34px
+  report action in a footer after the card content, with additional card padding;
+- actual-component synthetic browser previews at normal and 320px widths check footer alignment,
+  long-card scroll reachability, wrapping, and report feedback. Earlier header-layout previews also
+  checked independent dismissal. These previews are not real-media acceptance;
 - official CI/release workflows now default to the public Vercel reporting endpoint; an optional
   Actions variable remains an override, so an absent variable no longer disables official reporting;
 - local validation passes 235 tests. New behavioral tests cover report-versus-close/pointer behavior

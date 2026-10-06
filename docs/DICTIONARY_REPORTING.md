@@ -1,6 +1,7 @@
 # Dictionary reporting
 
-Issue #71 adds an icon-only flag beside the translation card's close button.
+Issue #71 adds an icon-only flag at the bottom right of the translation card. The close button
+stays at the top right; a normal-flow footer keeps reporting separate from the card content.
 
 - A genuine dictionary miss submits the normalized lookup word with category `missing`.
 - A displayed dictionary entry submits its canonical headword with category `incorrect`.

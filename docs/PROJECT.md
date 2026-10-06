@@ -127,8 +127,8 @@ Renderer Node integration remains disabled and context isolation remains enabled
 
 ## Dictionary issue reporting
 
-Issue #71 adds a small flag icon with tooltip/accessible-label feedback beside the translation
-card's close button. Explicitly reporting a missing translation sends its normalized lookup word;
+Issue #71 adds a small flag icon with tooltip/accessible-label feedback at the bottom right of the
+translation card. Explicitly reporting a missing translation sends its normalized lookup word;
 reporting an existing translation sends the resolved canonical headword or phrase for manual review.
 Loading and general translation failures are not treated as dictionary misses.
 

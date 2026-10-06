@@ -552,11 +552,10 @@ html.overlay-mode #root {
   align-items: flex-start;
   gap: 16px;
 }
-.translation-popup-actions {
+.translation-popup-footer {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 .translation-popup-heading {
   flex: 1;

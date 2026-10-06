@@ -1332,23 +1332,15 @@ export function TranslationPopup({
                 : `English → ${languageLabel(resultLanguage)}`}
           </span>
         </div>
-        <div className="translation-popup-actions">
-          {report ? (
-            <DictionaryReportButton
-              key={`${lookupVersion}:${report.category}:${report.term}`}
-              report={report}
-            />
-          ) : null}
-          <button
-            type="button"
-            className="translation-popup-close"
-            aria-label="Close translation"
-            title="Close translation (Esc)"
-            onClick={onDismiss}
-          >
-            <PlayerIcon name="close" />
-          </button>
-        </div>
+        <button
+          type="button"
+          className="translation-popup-close"
+          aria-label="Close translation"
+          title="Close translation (Esc)"
+          onClick={onDismiss}
+        >
+          <PlayerIcon name="close" />
+        </button>
       </div>
 
       {translation.status === 'loading' ? (
@@ -1408,6 +1400,14 @@ export function TranslationPopup({
           <strong>Translation unavailable</strong>
           <span>{translation.error}</span>
           <small>Playback and subtitles still work. Try another word or try again later.</small>
+        </div>
+      ) : null}
+      {report ? (
+        <div className="translation-popup-footer">
+          <DictionaryReportButton
+            key={`${lookupVersion}:${report.category}:${report.term}`}
+            report={report}
+          />
         </div>
       ) : null}
     </div>
