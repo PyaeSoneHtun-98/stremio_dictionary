@@ -1,5 +1,8 @@
 name: Release Windows
 
+env:
+  SUBTITLE_BRIDGE_REPORT_ENDPOINT: ${{ vars.SUBTITLE_BRIDGE_REPORT_ENDPOINT || 'https://subtitle-report-service.vercel.app/api/report-dictionary' }}
+
 on:
   workflow_run:
     workflows:

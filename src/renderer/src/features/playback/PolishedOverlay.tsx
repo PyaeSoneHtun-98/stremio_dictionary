@@ -17,6 +17,7 @@ import {
 import type { TranslationResult } from '../../../../shared/translation'
 import './Player.css'
 import { PlayerIcon } from './PlayerIcon'
+import { DictionaryReportButton } from './DictionaryReportButton'
 import { usePlayerChrome } from './usePlayerChrome'
 import {
   clampPlayerValue,
@@ -75,6 +76,7 @@ type TranslationLookupState =
   | { status: 'idle' }
   | { status: 'loading'; word: string }
   | { status: 'ready'; word: string; result: TranslationResult }
+  | { status: 'missing'; word: string; error: string }
   | { status: 'error'; word: string; error: string }
 
 export function PolishedOverlay(): React.JSX.Element {
@@ -626,6 +628,10 @@ export function PolishedOverlay(): React.JSX.Element {
         if (translationRequestVersion.current !== requestVersion) {
           return
         }
+        if ('kind' in result) {
+          setTranslation({ status: 'missing', word: token.text, error: result.message })
+          return
+        }
         setTranslation({ status: 'ready', word: token.text, result })
         void refreshTranslationSettings(setTranslationSettings)
       })
@@ -738,6 +744,7 @@ export function PolishedOverlay(): React.JSX.Element {
             </div>
             {selectedWord ? (
               <TranslationPopup
+                lookupVersion={translationRequestVersion.current}
                 selectedWord={selectedWord}
                 translation={translation}
                 popupPosition={translationSettings.popupPosition}
@@ -1274,13 +1281,15 @@ export function PolishedOverlay(): React.JSX.Element {
   )
 }
 
-function TranslationPopup({
+export function TranslationPopup({
+  lookupVersion,
   selectedWord,
   translation,
   popupPosition,
   targetLanguage,
   onDismiss,
 }: {
+  lookupVersion: number
   selectedWord: SelectedWord
   translation: TranslationLookupState
   popupPosition: 'above' | 'below'
@@ -1294,6 +1303,12 @@ function TranslationPopup({
   const phraseEntry = translation.status === 'ready' ? translation.result.phraseEntry : undefined
   const phraseMatch = translation.status === 'ready' ? translation.result.phraseMatch : undefined
   const headingWord = phraseEntry?.phrase ?? dictionaryEntry?.word ?? selectedWord.text
+  const report =
+    translation.status === 'missing'
+      ? { term: selectedWord.lookupTerm, category: 'missing' as const }
+      : translation.status === 'ready' && (dictionaryEntry || phraseEntry)
+        ? { term: headingWord, category: 'incorrect' as const }
+        : null
   const resolvedFromForm =
     dictionaryEntry !== undefined &&
     selectedWord.lookupTerm.normalize('NFKC').trim().toLocaleLowerCase('en-US') !==
@@ -1380,11 +1395,19 @@ function TranslationPopup({
         )
       ) : null}
 
-      {translation.status === 'error' ? (
+      {translation.status === 'error' || translation.status === 'missing' ? (
         <div className="translation-error">
           <strong>Translation unavailable</strong>
           <span>{translation.error}</span>
           <small>Playback and subtitles still work. Try another word or try again later.</small>
+        </div>
+      ) : null}
+      {report ? (
+        <div className="translation-popup-footer">
+          <DictionaryReportButton
+            key={`${lookupVersion}:${report.category}:${report.term}`}
+            report={report}
+          />
         </div>
       ) : null}
     </div>

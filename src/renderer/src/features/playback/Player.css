@@ -549,8 +549,13 @@ html.overlay-mode #root {
 }
 .translation-popup-header {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 16px;
+}
+.translation-popup-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 .translation-popup-heading {
   flex: 1;
@@ -570,12 +575,41 @@ html.overlay-mode #root {
   letter-spacing: 0.04em;
 }
 .translation-popup-close {
-  flex-basis: 32px;
-  width: 32px;
-  height: 32px;
+  flex-basis: 34px;
+  width: 34px;
+  height: 34px;
 }
 .translation-popup-close svg {
   width: 17px;
+}
+.translation-report-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: #a1b6ac;
+  background: rgb(181 230 209 / 0.07);
+  border: 1px solid rgb(181 230 209 / 0.14);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.translation-report-button svg {
+  width: 16px;
+  height: 16px;
+}
+.translation-report-button:hover:not(:disabled) {
+  color: #d2f4e4;
+  background: #ffffff12;
+}
+.translation-report-button:focus-visible {
+  outline: 2px solid #b5e6d1;
+  outline-offset: 2px;
+}
+.translation-report-button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 .translation-phrase-detected {
   display: flex;

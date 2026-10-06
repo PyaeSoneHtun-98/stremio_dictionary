@@ -127,6 +127,32 @@ React renderer
 
 Renderer Node integration remains disabled and context isolation remains enabled.
 
+## Dictionary issue reporting
+
+Issue #71 adds a small flag icon with tooltip/accessible-label feedback at the bottom right of the
+translation card. Explicitly reporting a missing translation sends its normalized lookup word;
+reporting an existing translation sends the resolved canonical headword or phrase for manual review.
+Loading and general translation failures are not treated as dictionary misses.
+
+The player has a narrow main-process HTTPS client. All Supabase function/database code lives in the
+separate `D:\Projects\subtitle-report-service` project. Only the public endpoint is embedded at build
+time; no Supabase credentials or SDK are distributed in the app. Unconfigured builds disable the
+icon. Lookup stays fully offline, and reporting does not change playback or automatic-pause behavior.
+
+Because the direct Supabase hostname is unreachable on the tested connection, the official endpoint
+is the separate Vercel reporting relay at `https://subtitle-report-service.vercel.app/api/report-dictionary`.
+It forwards the same validated report body/receipt to the existing Supabase function. That deployment
+also has a private owner dashboard for browsing and reviewing reports; its owner authentication and
+database credentials remain in the backend project. The player has no admin interface.
+
+This is an explicit user submission, not automatic lookup telemetry. Only the term, report category,
+fixed Burmese target, app/dictionary versions, and random retry receipt ID are sent. Subtitle context,
+translations, media paths, stream URLs, user/device identifiers, and credentials are excluded. Report
+terms never enter diagnostics. No persistent offline reporting queue is used.
+
+See [dictionary reporting](DICTIONARY_REPORTING.md) for the contract, build configuration, and
+remaining live deployment/Windows acceptance steps.
+
 ## Windows update architecture
 
 The in-app updater reuses Subtitle Bridge's existing GitHub Release and rollback-safe setup pipeline rather than introducing a second installer system.
