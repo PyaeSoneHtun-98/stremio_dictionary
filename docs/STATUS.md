@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`efa3c4119361a748f8175b922c21244bf18be3fd`
+`8842cd86945332cdd0713c1a5f22798c479a1847`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -185,6 +185,60 @@ Production artifact: `src/main/translation/data/phrases.json`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
 
+## Completed — Issue #69 audio track selector
+
+Branch:
+
+`feat/issue-69-audio-track-selector`
+
+Merged PR:
+
+`#70`
+
+Scope:
+
+- use the existing mpv `track-list` audio metadata already present in `PlaybackSnapshot.tracks`;
+- add a narrow `selectAudioTrack` media IPC/preload API;
+- validate that requested IDs belong to a current audio track;
+- switch mpv's `aid` property without requiring playback to pause;
+- consolidate subtitle source selection, external subtitle loading, delay, size, and vertical position into the bottom CC/Tracks panel;
+- remove the separate top-right Subtitles button while preserving drag/drop subtitle loading;
+- add Audio below the subtitle controls in that same CC/Tracks panel;
+- move playback speed from the bottom bar into the gear/Settings panel as a simple option list;
+- support local MKV/MP4 and HTTP/HTTPS/Stremio playback through the shared mpv path;
+- preserve subtitle extraction, timing, translation, and external-subtitle behavior;
+- hide the unverified Google Translate UI for v1.0.7 and enforce Offline dictionary → Burmese as the effective main-process runtime translation scope.
+
+Validation status:
+
+- Windows manual acceptance passed on reviewed head `b4e0209d6ede0af6e386ee2afcad09e0773d5105`, including the current player UI and representative multi-audio switching;
+- CI #571 passed `validate` and `package-windows` on that reviewed head;
+- Codex reviewed that exact head with no P1/P2 findings and three P3 findings: failed hidden-Google migration could leave Google active, dropdown clipping inside the scrollable player panel, and repeated subtitle-preference steps could lose increments;
+- those three P3s were resolved at head `99195f83037d3b6dadb112c1e6fdb22b56b8f2b9`; CI #578 passed and the follow-up Codex review cleared the merge gate;
+- PR #70 is merged to master. Public v1.0.7 has not been released.
+
+## Completed — Issue #73 FFmpeg download availability
+
+Owner assigned implementation to Codex on 2026-10-06. Branch: `codex/issue-73-ffmpeg-runtime`.
+
+- The September 20 FFmpeg daily-build pin expired under BtbN's last-14-build retention policy;
+  CI #582–#586 failed the live runtime gate with HTTP 404.
+- The replacement pin is the September 30 month-end LGPL shared 8.1 build, retained upstream
+  for two years. Its downloaded hash matches upstream checksums and release asset metadata.
+- Installer transaction, cache ownership/hash verification, mpv pin, and playback logic remain
+  unchanged. Old setup executables still contain their old manifests.
+- Live Windows verification now exercises cold download, shared DLL execution, synthetic
+  embedded SRT/ASS extraction, cached provisioning with unavailable URLs, and rejection/cleanup
+  of corrupt cached/downloaded bytes. All passed locally on Windows.
+- `npm run check` passed all 214 tests/build; `npm run package:win` produced the ZIP and setup.
+- Codex reviewed implementation head `1d9c4e729ba2705b246cd415a1de3decf310bc06` with no
+  unresolved P1/P2/P3 findings. [PR #74](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/74)
+  records the current exact-head CI and owner real-media acceptance results and remaining gates.
+- See [RUNTIME_DEPENDENCIES.md](RUNTIME_DEPENDENCIES.md) for provenance, renewal deadline,
+  and old-installer limitations.
+
+PR #74 squash-merged as `8842cd86945332cdd0713c1a5f22798c479a1847`; Issue #73 is closed. CI #588 passed both jobs, and the owner confirmed the requested real-media test on 2026-10-06. The report flag was absent from that test build because reporting remained on PR #72.
+
 ## Active work — Issue #71 dictionary report icon
 
 Branch:
@@ -196,7 +250,7 @@ Draft PR: [#72](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/72).
 Supabase code stays in the separate
 `D:\Projects\subtitle-report-service` project.
 
-Current snapshot (2026-10-06):
+Current snapshot (2026-10-06, after merging the FFmpeg fix):
 
 - report submission succeeds in the restarted development app; the deployed owner dashboard's
   login, report loading, and status saving were confirmed by the owner;
@@ -211,7 +265,7 @@ Current snapshot (2026-10-06):
 - local validation passes 235 tests. New behavioral tests cover report-versus-close/pointer behavior
   and the 100-report session limit, including retries and completed receipts at capacity;
 - the full PR review found no unresolved P1/P2/P3 code defects after fixing official endpoint
-  configuration. The original CI #584 packaging failure is still tracked separately in Issue #73;
+  configuration. The earlier FFmpeg packaging blocker was resolved by merged PR #74 / Issue #73;
 - merge is authorized but remains gated by green final-head CI and the remaining real Windows
   acceptance checks. The records below describe earlier investigation/validation stages.
 

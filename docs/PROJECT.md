@@ -18,6 +18,8 @@ The product should feel like a normal media player first. Translation and subtit
 
 Release packages do not redistribute mpv or FFmpeg binaries inside the setup executable. The Windows setup provisions pinned, SHA-256-verified app-local runtime archives on first install, caches the verified archives under the user's local application data for upgrades, and the app prefers those managed runtimes. Developer overrides through `MPV_PATH` / `FFMPEG_PATH` and system `PATH` remain fallback paths.
 
+Runtime pins and upstream retention constraints are documented in [RUNTIME_DEPENDENCIES.md](RUNTIME_DEPENDENCIES.md). FFmpeg uses a BtbN month-end LGPL shared build with two-year upstream retention; daily builds expire after 14 builds and must not be used for release pins.
+
 ## Main playback architecture
 
 ### Local MKV and MP4 files
