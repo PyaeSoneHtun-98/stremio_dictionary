@@ -222,8 +222,12 @@ Owner assigned implementation to Codex on 2026-10-06. Branch: `codex/issue-73-ff
 - Installer transaction, cache ownership/hash verification, mpv pin, and playback logic remain
   unchanged. Old setup executables still contain their old manifests.
 - Live Windows verification now exercises cold download, shared DLL execution, synthetic
-  embedded SRT/ASS extraction, and cached provisioning with unavailable URLs.
-- Full validation, Windows packaging/installer CI, and final review are pending.
+  embedded SRT/ASS extraction, cached provisioning with unavailable URLs, and rejection/cleanup
+  of corrupt cached/downloaded bytes. All passed locally on Windows.
+- `npm run check` passed all 214 tests/build; `npm run package:win` produced the ZIP and setup.
+- Codex reviewed implementation head `1d9c4e729ba2705b246cd415a1de3decf310bc06` with no
+  unresolved P1/P2/P3 findings. [PR #74](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/74)
+  records the current exact-head CI and owner real-media acceptance results and remaining gates.
 - See [RUNTIME_DEPENDENCIES.md](RUNTIME_DEPENDENCIES.md) for provenance, renewal deadline,
   and old-installer limitations.
 
