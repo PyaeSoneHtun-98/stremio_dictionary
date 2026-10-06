@@ -157,4 +157,38 @@ describe('dictionary report HTTPS client', () => {
     })
     expect(fetcher).not.toHaveBeenCalled()
   })
+
+  it('caps distinct session reports while preserving retries and completed receipts', async () => {
+    const fetcher = vi.fn().mockImplementation((_url, options) =>
+      Promise.resolve(
+        JSON.parse(options.body).term === 'retry'
+          ? Response.json({}, { status: 503 })
+          : accepted(),
+      ),
+    )
+    const client = new DictionaryReportClient(endpoint, fetcher)
+    expect(await client.submit({ term: 'retry', category: 'missing' })).toEqual({
+      ok: false,
+      reason: 'failed',
+    })
+    for (let index = 0; index < 99; index++) {
+      expect(await client.submit({ term: `word${index}`, category: 'missing' })).toEqual({ ok: true })
+    }
+    expect(await client.submit({ term: 'another', category: 'missing' })).toEqual({
+      ok: false,
+      reason: 'rate-limited',
+    })
+    expect(fetcher).toHaveBeenCalledTimes(100)
+    expect(await client.submit({ term: 'word0', category: 'missing' })).toEqual({ ok: true })
+    expect(fetcher).toHaveBeenCalledTimes(100)
+    expect(await client.submit({ term: 'retry', category: 'missing' })).toEqual({
+      ok: false,
+      reason: 'failed',
+    })
+    expect(fetcher).toHaveBeenCalledTimes(101)
+    expect(JSON.parse(fetcher.mock.calls[0][1].body).requestId).toBe(
+      JSON.parse(fetcher.mock.calls[100][1].body).requestId,
+    )
+    client.dispose()
+  })
 })

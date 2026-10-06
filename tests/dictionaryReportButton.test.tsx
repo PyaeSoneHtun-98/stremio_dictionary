@@ -194,4 +194,31 @@ describe('icon-only dictionary reporting', () => {
     )
     expect(screen.getAllByRole('button')).toHaveLength(1)
   })
+
+  it('keeps reporting separate from dismissal and stops playback-surface pointer handling', async () => {
+    const onDismiss = vi.fn()
+    const onSurfacePointer = vi.fn()
+    render(
+      <div onPointerDown={onSurfacePointer}>
+        <TranslationPopup
+          {...popupProps}
+          onDismiss={onDismiss}
+          translation={{ status: 'missing', word: 'chosen', error: 'Missing' }}
+        />
+      </div>,
+    )
+    const report = await readyButton()
+    fireEvent.pointerDown(report)
+    fireEvent.click(report)
+    await screen.findByRole('button', { name: 'Reported' })
+    expect(onSurfacePointer).not.toHaveBeenCalled()
+    expect(onDismiss).not.toHaveBeenCalled()
+    expect(submit).toHaveBeenCalledTimes(1)
+    const close = screen.getByRole('button', { name: 'Close translation' })
+    fireEvent.pointerDown(close)
+    fireEvent.click(close)
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+    expect(onSurfacePointer).not.toHaveBeenCalled()
+    expect(submit).toHaveBeenCalledTimes(1)
+  })
 })

@@ -26,8 +26,9 @@ cookies, reject redirects, validate the fixed approved endpoint, and use bounded
 The renderer has no general network API. An isolated Windows probe reproduced intermittent Node
 fetch connection resets while Electron networking reached the same Vercel endpoint.
 
-For CI and official release builds, set the repository Actions variable
-`SUBTITLE_BRIDGE_REPORT_ENDPOINT` to the same URL. Both workflows embed this at build time.
+CI and official release workflows default to the public Vercel endpoint above and embed it at build
+time. The optional repository Actions variable `SUBTITLE_BRIDGE_REPORT_ENDPOINT` can override it
+with another approved reporting route. These workflows require no Supabase credential.
 Rebuild/restart after changing it. Packaged builds do not depend on runtime environment variables.
 Approved routes are the exact official Vercel hostname/path above or a direct
 `https://PROJECT_REF.supabase.co/functions/v1/report-dictionary` URL. Other Vercel deployments,
@@ -87,7 +88,8 @@ hosting processor, with no additional identity fields in reports.
 ## Acceptance still needed before release
 
 - Owner project `axcpqizzmjwdwwpdaggf` is linked, the migration is applied, and the function is
-  deployed. The development endpoint is configured; official build configuration remains pending.
+  deployed. The development endpoint is configured; official workflows now default to the public
+  Vercel endpoint, without requiring a repository variable.
 - The direct Supabase hostname remains unreachable on the tested network. On 2026-10-05 the exact
   Vercel production endpoint was verified without VPN: health/dashboard HTTP 200, reporting GET
   HTTP 405, two identical synthetic-report POSTs HTTP 202, and live database receipt/count of 1.

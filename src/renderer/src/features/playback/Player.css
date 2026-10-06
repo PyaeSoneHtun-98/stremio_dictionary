@@ -549,8 +549,14 @@ html.overlay-mode #root {
 }
 .translation-popup-header {
   display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.translation-popup-actions {
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  flex-shrink: 0;
 }
 .translation-popup-heading {
   flex: 1;
@@ -570,9 +576,9 @@ html.overlay-mode #root {
   letter-spacing: 0.04em;
 }
 .translation-popup-close {
-  flex-basis: 32px;
-  width: 32px;
-  height: 32px;
+  flex-basis: 34px;
+  width: 34px;
+  height: 34px;
 }
 .translation-popup-close svg {
   width: 17px;
@@ -580,14 +586,14 @@ html.overlay-mode #root {
 .translation-report-button {
   display: grid;
   place-items: center;
-  flex: 0 0 28px;
-  width: 28px;
-  height: 28px;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   color: #a1b6ac;
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
+  background: rgb(181 230 209 / 0.07);
+  border: 1px solid rgb(181 230 209 / 0.14);
+  border-radius: 10px;
   cursor: pointer;
 }
 .translation-report-button svg {

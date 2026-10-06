@@ -61,7 +61,7 @@
   max-height: min(330px, calc(100vh - 96px));
   transform: translate(-50%, -50%);
   overflow: auto;
-  padding: 20px 22px;
+  padding: 22px 24px;
   border: 1px solid rgb(255 255 255 / 0.24);
   border-radius: 22px;
   background:
@@ -89,6 +89,7 @@
 }
 
 .translation-popup-close {
+  border-radius: 10px;
   border: 1px solid rgb(255 255 255 / 0.1);
   background: rgb(255 255 255 / 0.06);
 }
@@ -148,7 +149,7 @@
   .translation-popup {
     width: min(420px, calc(100vw - 32px));
     max-height: calc(100vh - 64px);
-    padding: 17px 18px;
+    padding: 18px 20px;
     border-radius: 19px;
   }
 }

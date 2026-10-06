@@ -1332,21 +1332,23 @@ export function TranslationPopup({
                 : `English → ${languageLabel(resultLanguage)}`}
           </span>
         </div>
-        {report ? (
-          <DictionaryReportButton
-            key={`${lookupVersion}:${report.category}:${report.term}`}
-            report={report}
-          />
-        ) : null}
-        <button
-          type="button"
-          className="translation-popup-close"
-          aria-label="Close translation"
-          title="Close translation (Esc)"
-          onClick={onDismiss}
-        >
-          <PlayerIcon name="close" />
-        </button>
+        <div className="translation-popup-actions">
+          {report ? (
+            <DictionaryReportButton
+              key={`${lookupVersion}:${report.category}:${report.term}`}
+              report={report}
+            />
+          ) : null}
+          <button
+            type="button"
+            className="translation-popup-close"
+            aria-label="Close translation"
+            title="Close translation (Esc)"
+            onClick={onDismiss}
+          >
+            <PlayerIcon name="close" />
+          </button>
+        </div>
       </div>
 
       {translation.status === 'loading' ? (

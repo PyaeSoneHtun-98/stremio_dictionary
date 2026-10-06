@@ -196,6 +196,23 @@ Draft PR: [#72](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/72).
 Supabase code stays in the separate
 `D:\Projects\subtitle-report-service` project.
 
+Current snapshot (2026-10-06):
+
+- report submission succeeds in the restarted development app; the deployed owner dashboard's
+  login, report loading, and status saving were confirmed by the owner;
+- the owner requested final review/merge and more separation between the flag and close icons;
+  the card now has matching 34px action buttons with a 12px gap and additional padding;
+- actual-component synthetic browser previews at normal, 390px, and 320px widths check wrapping,
+  button separation, report feedback, and independent dismissal. They are not real-media acceptance;
+- official CI/release workflows now default to the public Vercel reporting endpoint; an optional
+  Actions variable remains an override, so an absent variable no longer disables official reporting;
+- local validation passes 235 tests. New behavioral tests cover report-versus-close/pointer behavior
+  and the 100-report session limit, including retries and completed receipts at capacity;
+- the full PR review found no unresolved P1/P2/P3 code defects after fixing official endpoint
+  configuration. The original CI #584 packaging failure is still tracked separately in Issue #73;
+- merge is authorized but remains gated by green final-head CI and the remaining real Windows
+  acceptance checks. The records below describe earlier investigation/validation stages.
+
 Scope:
 
 - one flag icon with tooltip and accessible label, with no report form or extra visible card text;
@@ -209,7 +226,7 @@ Scope:
 - owner-requested separate Vercel reporting endpoint and private report-review dashboard;
 - app rename/icon and dictionary changes remain out of scope.
 
-Validation status:
+Initial validation status (subsequent fixes and acceptance are recorded above/below):
 
 - local `npm run check` passed with 232 tests, dictionary verification, type checking, lint, and builds;
 - 18 new player tests exercise actual React button events/lifecycle, HTTPS behavior, IPC validation,
