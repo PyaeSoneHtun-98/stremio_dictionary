@@ -18,7 +18,7 @@
 
 .translation-settings-heading span,
 .translation-cache-row span {
-  color: rgb(206 219 213 / 0.58);
+  color: var(--theme-text-secondary);
   font-size: 0.64rem;
 }
 
@@ -38,18 +38,18 @@
   min-width: 0;
   padding: 9px 10px;
   border-radius: 11px;
-  background: rgb(4 10 14 / 0.3);
+  background: rgb(var(--theme-inset-rgb) / 0.3);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.045);
 }
 
 .translation-settings-summary span {
-  color: rgb(206 219 213 / 0.52);
+  color: var(--theme-text-secondary);
   font-size: 0.61rem;
 }
 
 .translation-settings-summary strong {
   overflow: hidden;
-  color: #edf5f1;
+  color: var(--theme-text);
   font-size: 0.7rem;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -61,13 +61,13 @@
   gap: 8px;
   align-items: center;
   margin-top: 10px;
-  color: #adb4c2;
+  color: var(--theme-text-secondary);
   font-size: 0.7rem;
 }
 
 .translation-settings-check input {
   width: auto;
-  accent-color: #8a72ff;
+  accent-color: var(--theme-accent);
 }
 
 .translation-settings-error {
@@ -86,14 +86,14 @@
   border: 0;
   padding: 0;
   background: transparent;
-  color: rgb(181 230 209 / 0.72);
+  color: var(--theme-accent);
   cursor: pointer;
   font: inherit;
   font-size: 0.64rem;
 }
 
 .translation-text-action:hover:not(:disabled) {
-  color: #d2f4e5;
+  color: var(--theme-accent);
 }
 
 .translation-text-action:disabled {
@@ -109,7 +109,7 @@
 }
 
 .translation-cache-row strong {
-  color: rgb(229 239 234 / 0.76);
+  color: var(--theme-text-secondary);
   font-weight: 650;
 }
 
@@ -133,12 +133,12 @@ html.overlay-mode #root {
   height: 100vh;
 }
 .overlay-probe {
-  --accent: #b5e6d1;
-  --muted: #b3bcc4;
+  --accent: var(--theme-accent);
+  --muted: var(--theme-text-secondary);
   position: relative;
   height: 100vh;
   width: 100%;
-  color: #fafcfb;
+  color: var(--theme-text-strong);
   pointer-events: none;
 }
 .overlay-probe::before {
@@ -161,12 +161,12 @@ html.overlay-mode #root {
   padding: 7px 10px;
   border: 1px solid rgb(255 255 255 / 0.09);
   border-radius: 999px;
-  background: rgb(8 14 20 / 0.56);
+  background: rgb(var(--theme-surface-rgb) / 0.88);
   box-shadow:
     0 8px 24px rgb(0 0 0 / 0.24),
     inset 0 1px 0 rgb(255 255 255 / 0.05);
-  backdrop-filter: blur(14px) saturate(125%);
-  -webkit-backdrop-filter: blur(14px) saturate(125%);
+  backdrop-filter: blur(14px) saturate(100%);
+  -webkit-backdrop-filter: blur(14px) saturate(100%);
   transition: opacity 180ms ease;
   pointer-events: auto;
 }
@@ -217,8 +217,8 @@ html.overlay-mode #root {
   place-content: center;
   justify-items: center;
   gap: 8px;
-  background: radial-gradient(circle at center, rgb(2 7 10 / 0.22), transparent 35%);
-  color: #f4f8f6;
+  background: radial-gradient(circle at center, rgb(var(--theme-surface-rgb) / 0.22), transparent 35%);
+  color: var(--theme-text-strong);
   text-align: center;
   pointer-events: none;
 }
@@ -232,9 +232,9 @@ html.overlay-mode #root {
   border: 1px solid rgb(255 255 255 / 0.16);
   border-radius: 10px;
   padding: 8px 12px;
-  background: rgb(7 12 18 / 0.78);
+  background: rgb(var(--theme-surface-rgb) / 0.78);
   box-shadow: 0 8px 28px rgb(0 0 0 / 0.32);
-  color: #f5f8f7;
+  color: var(--theme-text-strong);
   font-size: 12px;
   letter-spacing: 0.01em;
   text-shadow: 0 1px 8px rgb(0 0 0 / 0.6);
@@ -256,7 +256,7 @@ html.overlay-mode #root {
 }
 
 .player-buffering-layer > span:last-child {
-  color: rgb(222 234 228 / 0.7);
+  color: var(--theme-text-secondary);
   font-size: 10px;
   text-shadow: 0 2px 10px #000;
 }
@@ -265,9 +265,9 @@ html.overlay-mode #root {
   width: 44px;
   height: 44px;
   border: 3px solid rgb(255 255 255 / 0.2);
-  border-top-color: #b5e6d1;
+  border-top-color: var(--theme-accent);
   border-radius: 50%;
-  box-shadow: 0 0 28px rgb(181 230 209 / 0.12);
+  box-shadow: 0 0 28px rgb(var(--theme-accent-rgb) / 0.12);
   animation: player-buffering-spin 720ms linear infinite;
 }
 
@@ -300,12 +300,12 @@ html.overlay-mode #root {
   border-radius: 17px;
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.035), transparent 42%),
-    rgb(7 13 19 / 0.68);
+    rgb(var(--theme-surface-rgb) / 0.9);
   box-shadow:
     0 16px 42px rgb(0 0 0 / 0.34),
     inset 0 1px 0 rgb(255 255 255 / 0.05);
-  backdrop-filter: blur(18px) saturate(130%);
-  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(100%);
+  -webkit-backdrop-filter: blur(18px) saturate(100%);
   transition: opacity 180ms ease;
   pointer-events: auto;
 }
@@ -324,7 +324,7 @@ html.overlay-mode #root {
   gap: 8px;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  color: rgb(219 229 224 / 0.68);
+  color: var(--theme-text-secondary);
 }
 .timeline-row span:last-child {
   text-align: right;
@@ -357,7 +357,7 @@ html.overlay-mode #root {
   border-radius: 50%;
   background: var(--accent);
   margin-top: -4px;
-  box-shadow: 0 0 0 2px rgb(181 230 209 / 0.12);
+  box-shadow: 0 0 0 2px rgb(var(--theme-accent-rgb) / 0.12);
 }
 .timeline-slider:hover::-webkit-slider-runnable-track {
   height: 3px;
@@ -402,7 +402,7 @@ html.overlay-mode #root {
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
-  color: #e4eae7;
+  color: var(--theme-text);
   cursor: pointer;
   transition:
     background 140ms ease,
@@ -426,13 +426,13 @@ html.overlay-mode #root {
   width: 42px;
   height: 42px;
   background: var(--accent);
-  color: #13251d;
+  color: var(--theme-on-accent);
   border-radius: 50%;
-  box-shadow: 0 6px 18px rgb(181 230 209 / 0.16);
+  box-shadow: 0 6px 18px rgb(var(--theme-accent-rgb) / 0.16);
 }
 .play-button:hover {
-  background: #d5f6e7;
-  color: #13251d;
+  background: #b5cdff;
+  color: var(--theme-on-accent);
 }
 .skip-button {
   position: relative;
@@ -458,7 +458,7 @@ html.overlay-mode #root {
   width: 68px;
 }
 .player-controls option {
-  background: #152029;
+  background: var(--theme-surface);
   color: white;
 }
 .overlay-probe :is(button, input, select, [tabindex]):focus-visible {
@@ -493,7 +493,7 @@ html.overlay-mode #root {
   border-radius: 9px;
   padding: 6px 12px;
   color: #fff;
-  background: #03080c80;
+  background: rgb(var(--theme-inset-rgb) / 0.5);
   font-size: clamp(19px, 2.65vw, 34px);
   font-weight: 600;
   line-height: 1.5;
@@ -517,11 +517,11 @@ html.overlay-mode #root {
   cursor: pointer;
 }
 .subtitle-word:hover {
-  background: #b5e6d133;
+  background: rgb(var(--theme-accent-rgb) / 0.2);
 }
 .subtitle-word[aria-pressed="true"] {
-  background: #b5e6d1;
-  color: #112c21;
+  background: var(--theme-accent);
+  color: var(--theme-on-accent);
   text-shadow: none;
 }
 .translation-popup {
@@ -530,12 +530,12 @@ html.overlay-mode #root {
   max-height: min(230px, 30vh);
   overflow: auto;
   padding: 14px 18px;
-  background: #111c24fa;
-  border: 1px solid #b5e6d13d;
+  background: rgb(var(--theme-menu-rgb) / 0.98);
+  border: 1px solid rgb(var(--theme-accent-rgb) / 0.24);
   border-radius: 14px;
   box-shadow: 0 12px 40px #0006;
   text-align: left;
-  color: #e8eeeb;
+  color: var(--theme-text);
   pointer-events: auto;
   overflow-wrap: anywhere;
 }
@@ -567,11 +567,11 @@ html.overlay-mode #root {
 .translation-popup-heading strong {
   font-size: 18px;
   font-weight: 600;
-  color: #f6fcf8;
+  color: var(--theme-text-strong);
 }
 .translation-popup-heading span {
   font-size: 10px;
-  color: #a1b6ac;
+  color: var(--theme-text-secondary);
   letter-spacing: 0.04em;
 }
 .translation-popup-close {
@@ -589,9 +589,9 @@ html.overlay-mode #root {
   width: 34px;
   height: 34px;
   padding: 0;
-  color: #a1b6ac;
-  background: rgb(181 230 209 / 0.07);
-  border: 1px solid rgb(181 230 209 / 0.14);
+  color: var(--theme-text-secondary);
+  background: rgb(var(--theme-accent-rgb) / 0.07);
+  border: 1px solid rgb(var(--theme-accent-rgb) / 0.14);
   border-radius: 10px;
   cursor: pointer;
 }
@@ -600,11 +600,11 @@ html.overlay-mode #root {
   height: 16px;
 }
 .translation-report-button:hover:not(:disabled) {
-  color: #d2f4e4;
+  color: var(--theme-text);
   background: #ffffff12;
 }
 .translation-report-button:focus-visible {
-  outline: 2px solid #b5e6d1;
+  outline: 2px solid var(--theme-accent);
   outline-offset: 2px;
 }
 .translation-report-button:disabled {
@@ -619,17 +619,17 @@ html.overlay-mode #root {
   margin-top: 10px;
   padding-top: 10px;
   font-size: 11px;
-  color: #a1b6ac;
+  color: var(--theme-text-secondary);
 }
 
 .translation-phrase-detected strong {
   font-size: 13px;
-  color: #d2f4e4;
+  color: var(--theme-text);
 }
 
 .translation-phrase-detected small {
   font-size: 10px;
-  color: #82968d;
+  color: var(--theme-text-muted);
 }
 
 .translation-burmese {
@@ -638,13 +638,13 @@ html.overlay-mode #root {
   padding-top: 12px;
   font-size: 21px;
   line-height: 1.7;
-  color: #d2f4e4;
+  color: var(--theme-text);
 }
 .translation-pronunciation,
 .translation-loading {
   margin-top: 8px;
   font-size: 12px;
-  color: #b6c5bf;
+  color: var(--theme-text-secondary);
 }
 .translation-error {
   display: grid;
@@ -655,16 +655,16 @@ html.overlay-mode #root {
   color: #ffbfaf;
 }
 .translation-error small {
-  color: #b6c5bf;
+  color: var(--theme-text-secondary);
 }
 .subtitle-transient-status {
   max-width: 600px;
   padding: 9px 14px;
   border-radius: 8px;
-  background: #101a22eb;
+  background: rgb(var(--theme-menu-rgb) / 0.92);
   font-size: 12px;
   line-height: 1.5;
-  color: #cdd7d1;
+  color: var(--theme-text);
 }
 .subtitle-transient-warning {
   border-left: 2px solid #d1b185;
@@ -692,13 +692,13 @@ html.overlay-mode #root {
   border-radius: 20px;
   background:
     linear-gradient(145deg, rgb(255 255 255 / 0.055), transparent 42%),
-    rgb(11 19 25 / 0.82);
+    rgb(var(--theme-surface-rgb) / 0.94);
   box-shadow:
     0 24px 64px rgb(0 0 0 / 0.46),
     inset 0 1px 0 rgb(255 255 255 / 0.06);
-  color: #edf5f1;
-  backdrop-filter: blur(24px) saturate(135%);
-  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  color: var(--theme-text);
+  backdrop-filter: blur(24px) saturate(100%);
+  -webkit-backdrop-filter: blur(24px) saturate(100%);
 }
 .panel-heading {
   display: flex;
@@ -718,7 +718,7 @@ html.overlay-mode #root {
   border-radius: 9px;
 }
 .panel-note {
-  color: #adbdb5;
+  color: var(--theme-text-secondary);
   font-size: 12px;
   line-height: 1.6;
   margin: 12px 0;
@@ -727,7 +727,7 @@ html.overlay-mode #root {
   display: grid;
   gap: 10px;
   font-size: 12px;
-  color: #adbdb5;
+  color: var(--theme-text-secondary);
 }
 .track-control + .panel-note {
   margin-top: 16px;
@@ -735,7 +735,7 @@ html.overlay-mode #root {
 .track-control select {
   width: 100%;
   height: 42px;
-  background: #1c2933;
+  background: var(--theme-surface);
   border: 1px solid #ffffff26;
   border-radius: 8px;
   color: white;
@@ -770,7 +770,7 @@ html.overlay-mode #root {
 }
 
 .settings-section-heading {
-  color: #f1f7f4;
+  color: var(--theme-text);
   font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.02em;
@@ -782,7 +782,7 @@ html.overlay-mode #root {
   border: 1px solid #ffffff1f;
   border-radius: 8px;
   background: #ffffff08;
-  color: #edf5f1;
+  color: var(--theme-text);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -792,7 +792,7 @@ html.overlay-mode #root {
 
 .menu-action-button:hover:not(:disabled) {
   background: #ffffff12;
-  border-color: #b5e6d150;
+  border-color: rgb(var(--theme-accent-rgb) / 0.31);
 }
 
 .menu-action-button:disabled {
@@ -809,7 +809,7 @@ html.overlay-mode #root {
 .subtitle-setting-row {
   display: grid;
   gap: 6px;
-  color: #adbdb5;
+  color: var(--theme-text-secondary);
   font-size: 12px;
 }
 
@@ -820,7 +820,7 @@ html.overlay-mode #root {
 }
 
 .subtitle-setting-row output {
-  color: #d8e8e0;
+  color: var(--theme-text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -838,7 +838,7 @@ html.overlay-mode #root {
   padding: 3px 9px 4px;
   border: 0;
   border-radius: 12px;
-  background: rgb(4 10 14 / 0.3);
+  background: rgb(var(--theme-inset-rgb) / 0.3);
 }
 
 .compact-shortcut-list > div {
@@ -850,10 +850,10 @@ html.overlay-mode #root {
 
 .compact-shortcut-list kbd {
   padding: 2px 5px;
-  border-color: rgb(181 230 209 / 0.12);
+  border-color: rgb(var(--theme-accent-rgb) / 0.12);
   border-radius: 6px;
-  background: rgb(181 230 209 / 0.06);
-  color: #c7ecdc;
+  background: rgb(var(--theme-accent-rgb) / 0.06);
+  color: var(--theme-text);
 }
 
 .playback-speed-menu {
@@ -865,7 +865,7 @@ html.overlay-mode #root {
   overflow: visible;
   border: 0;
   border-radius: 12px;
-  background: rgb(4 10 14 / 0.3);
+  background: rgb(var(--theme-inset-rgb) / 0.3);
 }
 
 .playback-speed-menu button {
@@ -875,7 +875,7 @@ html.overlay-mode #root {
   border-radius: 9px;
   padding: 0 5px;
   background: transparent;
-  color: rgb(233 241 237 / 0.72);
+  color: var(--theme-text-secondary);
   cursor: pointer;
   font: inherit;
   font-size: 10px;
@@ -884,13 +884,13 @@ html.overlay-mode #root {
 
 .playback-speed-menu button:hover:not(:disabled) {
   background: rgb(255 255 255 / 0.065);
-  color: #f2f8f5;
+  color: var(--theme-text-strong);
 }
 
 .playback-speed-menu button.is-selected {
-  background: rgb(181 230 209 / 0.14);
-  color: #cef3e2;
-  box-shadow: inset 0 0 0 1px rgb(181 230 209 / 0.16);
+  background: rgb(var(--theme-accent-rgb) / 0.14);
+  color: var(--theme-accent);
+  box-shadow: inset 0 0 0 1px rgb(var(--theme-accent-rgb) / 0.16);
 }
 
 .playback-speed-menu button.is-selected::before {
@@ -922,7 +922,7 @@ html.overlay-mode #root {
 
 .compact-section-title {
   padding: 0 2px 2px;
-  color: rgb(224 235 230 / 0.58);
+  color: var(--theme-text-secondary);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -944,8 +944,8 @@ html.overlay-mode #root {
   border: 0;
   border-radius: 11px;
   padding: 0 10px;
-  background: rgb(4 10 14 / 0.42);
-  color: #eff6f2;
+  background: rgb(var(--theme-inset-rgb) / 0.42);
+  color: var(--theme-text);
   cursor: pointer;
   font: inherit;
   font-size: 10.5px;
@@ -967,14 +967,14 @@ html.overlay-mode #root {
 .app-select-trigger:hover:not(:disabled) {
   background: rgb(255 255 255 / 0.065);
   color: #ffffff;
-  box-shadow: inset 0 0 0 1px rgb(181 230 209 / 0.12);
+  box-shadow: inset 0 0 0 1px rgb(var(--theme-accent-rgb) / 0.12);
 }
 
 .app-select-trigger[aria-expanded="true"] {
-  background: rgb(181 230 209 / 0.075);
+  background: rgb(var(--theme-accent-rgb) / 0.075);
   box-shadow:
-    inset 0 0 0 1px rgb(181 230 209 / 0.18),
-    0 0 0 2px rgb(181 230 209 / 0.055);
+    inset 0 0 0 1px rgb(var(--theme-accent-rgb) / 0.18),
+    0 0 0 2px rgb(var(--theme-accent-rgb) / 0.055);
 }
 
 .app-select-trigger:disabled {
@@ -1011,12 +1011,12 @@ html.overlay-mode #root {
   padding: 5px;
   background:
     linear-gradient(145deg, rgb(255 255 255 / 0.05), transparent 46%),
-    rgb(10 18 24 / 0.94);
+    rgb(var(--theme-menu-rgb) / 0.94);
   box-shadow:
     0 18px 46px rgb(0 0 0 / 0.5),
     inset 0 1px 0 rgb(255 255 255 / 0.055);
-  backdrop-filter: blur(20px) saturate(135%);
-  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(100%);
+  -webkit-backdrop-filter: blur(20px) saturate(100%);
 }
 
 .app-select-menu button {
@@ -1030,7 +1030,7 @@ html.overlay-mode #root {
   border-radius: 9px;
   padding: 6px 9px;
   background: transparent;
-  color: #e9f1ed;
+  color: var(--theme-text);
   cursor: pointer;
   font: inherit;
   font-size: 10.5px;
@@ -1038,13 +1038,13 @@ html.overlay-mode #root {
 }
 
 .app-select-menu button:hover:not(:disabled) {
-  background: rgb(181 230 209 / 0.1);
+  background: rgb(var(--theme-accent-rgb) / 0.1);
 }
 
 .app-select-menu button.is-selected {
-  background: rgb(181 230 209 / 0.12);
-  color: #d5f7e9;
-  box-shadow: inset 0 0 0 1px rgb(181 230 209 / 0.08);
+  background: rgb(var(--theme-accent-rgb) / 0.12);
+  color: var(--theme-accent);
+  box-shadow: inset 0 0 0 1px rgb(var(--theme-accent-rgb) / 0.08);
 }
 
 .app-select-menu button:disabled {
@@ -1053,7 +1053,7 @@ html.overlay-mode #root {
 }
 
 .app-select-check {
-  color: #b5e6d1;
+  color: var(--theme-accent);
   font-weight: 700;
 }
 
@@ -1071,7 +1071,7 @@ html.overlay-mode #root {
   border-radius: 11px;
   padding: 0 10px;
   background: transparent;
-  color: rgb(239 246 242 / 0.88);
+  color: var(--theme-text-secondary);
   cursor: pointer;
   font: inherit;
   font-size: 10.5px;
@@ -1082,7 +1082,7 @@ html.overlay-mode #root {
 }
 
 .compact-menu-button > span:last-child {
-  color: rgb(201 228 216 / 0.6);
+  color: var(--theme-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1092,8 +1092,8 @@ html.overlay-mode #root {
 }
 
 .compact-menu-button[aria-expanded="true"] {
-  background: rgb(181 230 209 / 0.065);
-  color: #d2f4e5;
+  background: rgb(var(--theme-accent-rgb) / 0.065);
+  color: var(--theme-accent);
 }
 
 .compact-menu-button:disabled {
@@ -1108,7 +1108,7 @@ html.overlay-mode #root {
   padding: 9px;
   border: 0;
   border-radius: 12px;
-  background: rgb(4 10 14 / 0.3);
+  background: rgb(var(--theme-inset-rgb) / 0.3);
 }
 
 .compact-stepper-row {
@@ -1116,7 +1116,7 @@ html.overlay-mode #root {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: #adbdb5;
+  color: var(--theme-text-secondary);
   font-size: 11px;
 }
 
@@ -1134,7 +1134,7 @@ html.overlay-mode #root {
   border-radius: 9px;
   padding: 0;
   background: rgb(255 255 255 / 0.055);
-  color: #edf5f1;
+  color: var(--theme-text);
   cursor: pointer;
   font: inherit;
   font-size: 16px;
@@ -1152,7 +1152,7 @@ html.overlay-mode #root {
 }
 
 .compact-stepper output {
-  color: #d8e8e0;
+  color: var(--theme-text);
   font-variant-numeric: tabular-nums;
   text-align: center;
   white-space: nowrap;
@@ -1171,7 +1171,7 @@ html.overlay-mode #root {
 }
 .shortcut-list dd {
   margin: 0;
-  color: #b5e6d1;
+  color: var(--theme-accent);
 }
 kbd {
   font: inherit;
@@ -1185,7 +1185,7 @@ kbd {
   padding: 6px 12px;
   border: 1px solid #ffffff26;
   border-radius: 8px;
-  color: #edf5ef;
+  color: var(--theme-text);
   background: #ffffff0a;
   cursor: pointer;
   font-size: 12px;

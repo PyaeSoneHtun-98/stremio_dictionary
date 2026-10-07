@@ -197,7 +197,7 @@ describe('player presentation contracts', () => {
     expect(polishedOverlaySource).toContain('ariaLabel="Embedded subtitle track"')
     expect(polishedOverlaySource).toContain('ariaLabel="Audio track"')
     expect(playerCss).toMatch(
-      /\.app-select-menu\s*\{[\s\S]*?background:[\s\S]*?rgb\(10 18 24 \/ 0\.94\);[\s\S]*?box-shadow:/,
+      /\.app-select-menu\s*\{[\s\S]*?background:[\s\S]*?rgb\(var\(--theme-menu-rgb\) \/ 0\.94\);[\s\S]*?box-shadow:/,
     )
   })
 
@@ -257,7 +257,7 @@ describe('player presentation contracts', () => {
       /\.playback-speed-menu\s*\{[\s\S]*?grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\);/,
     )
     expect(playerCss).toMatch(
-      /\.app-select-trigger\s*\{[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*11px;[\s\S]*?background:\s*rgb\(4 10 14 \/ 0\.42\);/,
+      /\.app-select-trigger\s*\{[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*11px;[\s\S]*?background:\s*rgb\(var\(--theme-inset-rgb\) \/ 0\.42\);/,
     )
     expect(playerCss).toMatch(
       /\.app-select-menu\s*\{[\s\S]*?border-radius:\s*14px;[\s\S]*?backdrop-filter:\s*blur\(20px\)/,
@@ -267,10 +267,10 @@ describe('player presentation contracts', () => {
   it('uses one thin app-colored scrollbar style across launcher and player surfaces', () => {
     expect(globalCss).toMatch(/\*::-webkit-scrollbar\s*\{[\s\S]*?width:\s*8px;[\s\S]*?height:\s*8px;/)
     expect(globalCss).toMatch(
-      /\*::-webkit-scrollbar-thumb\s*\{[\s\S]*?border-radius:\s*999px;[\s\S]*?background:\s*rgb\(126 168 150 \/ 0\.52\);/,
+      /\*::-webkit-scrollbar-thumb\s*\{[\s\S]*?border-radius:\s*999px;[\s\S]*?background:\s*rgb\(var\(--theme-scrollbar-rgb\) \/ 0\.52\);/,
     )
     expect(globalCss).toMatch(
-      /\*::-webkit-scrollbar-thumb:hover\s*\{[\s\S]*?background:\s*rgb\(181 230 209 \/ 0\.72\);/,
+      /\*::-webkit-scrollbar-thumb:hover\s*\{[\s\S]*?background:\s*rgb\(var\(--theme-scrollbar-rgb\) \/ 0\.8\);/,
     )
     expect(globalCss).toContain('scrollbar-width: thin')
   })

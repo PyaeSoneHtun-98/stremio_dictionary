@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`7f42d8ca395907497324d563738260ea28828195`
+`bc6346003f073f33848b21653e38e6e50c06a68b`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -35,7 +35,8 @@ Current stable capabilities include:
 - centered stream buffering/loading feedback that distinguishes manual pause from cache/seek stalls;
 - single-click video-surface play/pause and Windows-system-aware double-click fullscreen;
 - compact launcher with Local video, Stremio, and current-session status;
-- frozen 30,000-headword Dictionary v1.0;
+- frozen 30,000-headword Dictionary v1.0 plus a pinned 5,000-entry extension and reviewed app
+  corrections: 35,014 unique runtime headwords;
 - frozen 3,000-entry Phrase Dictionary v1.0.0 with longest-match phrase lookup and single-word fallback;
 - offline English → Burmese lookup;
 - optional translation settings/cache;
@@ -241,7 +242,32 @@ Owner assigned implementation to Codex on 2026-10-06. Branch: `codex/issue-73-ff
 
 PR #74 squash-merged as `8842cd86945332cdd0713c1a5f22798c479a1847`; Issue #73 is closed. CI #588 passed both jobs, and the owner confirmed the requested real-media test on 2026-10-06. The report flag was absent from that test build because reporting remained on PR #72.
 
-## Active work — Issue #75 dictionary extension
+## Active work — Issue #77 neutral charcoal theme
+
+The owner requested a modern editor-style dark palette using a Codex screenshot as the reference
+and assigned the focused presentation implementation to Codex. Branch: `codex/issue-77-charcoal-theme`.
+
+- Replace green-tinted backgrounds/text/highlights with charcoal surfaces, neutral text and blue accents
+  across the launcher, player menus/controls, dictionary/report card, feedback, updates and scrollbars.
+- Shared CSS palette retains existing layout, keyboard focus, disabled/selected/error states,
+  white shadowed subtitles, popup anchoring and transparent Windows overlay hit testing.
+- More opaque neutral player surfaces keep text readable over bright scenes. Normal/hover primary
+  button contrast is 5.04/4.63:1; muted launcher text on its darkest panel is at least 5.58:1.
+- Local `npm run check` passed all 241 tests, corpus gates, typechecks and production builds after
+  the final opacity refinement; exact-head CI will be recorded in the PR.
+- Actual React components were previewed with an ignored local synthetic desktop-bridge fixture,
+  including launcher/player, audio options, subtitle steppers, speed/settings, dictionary/miss card
+  and simulated report success/failure. Normal desktop, 360px short-player and 320px bright-scene
+  checks show scroll-reachable options and an unclipped card. These are not real mpv/manual tests.
+- Real Windows appearance acceptance and final review are pending. No merge or release is authorized.
+  Public release remains v1.0.6; the owner deferred publication until later UI changes are complete.
+
+## Completed — Issue #75 dictionary extension
+
+PR #76 squash-merged as `bc6346003f073f33848b21653e38e6e50c06a68b`; Issue #75 is closed/completed.
+Final reviewed head `ff77cd62ead83c327900dcc0f1dd370768513bac` passed CI #595 validate and
+package-windows. The owner authorized merge after Windows acceptance and explicitly held release.
+The implementation and acceptance details below are the completed work's historical record.
 
 The owner selected the current 5,000-word extension after readiness validation and explicitly
 assigned implementation to Codex. Branch: `codex/issue-75-dictionary-extension`.
@@ -266,7 +292,7 @@ PR: [#76](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/76).
   No per-codec inventory, backend database-version inspection or exhaustive editorial pass is claimed.
 - The complete final code review found no unresolved P1/P2/P3/P4 findings. It was performed by
   the implementing Codex agent; no separate independent reviewer is claimed. This acceptance
-  record changes documentation only; final-head CI must be verified before merge.
+  record changed documentation only; final-head CI #595 passed before merge.
 - Full independent bilingual/IPA editorial review remains an acknowledged dataset limitation.
 
 See [dictionary extension](DICTIONARY_EXTENSION.md) for provenance, hashes and manual checklist.

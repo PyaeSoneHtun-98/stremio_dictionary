@@ -112,6 +112,12 @@ The frozen v1.0 corpus is AI-authored and has passed structural and targeted qua
 
 ## Desktop and IPC model
 
+The renderer uses a neutral charcoal dark palette with layered gray surfaces, off-white text,
+and restrained blue actions/focus/selection. Shared `--theme-*` variables in `styles.css` cover
+the launcher, player panels, translation/report card, feedback and scrollbars. Warning/error
+colors remain distinct. The native playback overlay remains transparent, including its required
+nonzero hit-testing layer; changing the palette does not alter layout or media behavior.
+
 The renderer does not own system/media processes directly.
 
 ```text
