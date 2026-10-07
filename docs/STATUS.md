@@ -246,6 +246,7 @@ PR #74 squash-merged as `8842cd86945332cdd0713c1a5f22798c479a1847`; Issue #73 is
 
 The owner requested a modern editor-style dark palette using a Codex screenshot as the reference
 and assigned the focused presentation implementation to Codex. Branch: `codex/issue-77-charcoal-theme`.
+Draft PR: [#78](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/78).
 
 - Replace green-tinted backgrounds/text/highlights with charcoal surfaces, neutral text and blue accents
   across the launcher, player menus/controls, dictionary/report card, feedback, updates and scrollbars.
@@ -261,6 +262,10 @@ and assigned the focused presentation implementation to Codex. Branch: `codex/is
   checks show scroll-reachable options and an unclipped card. These are not real mpv/manual tests.
 - Real Windows appearance acceptance and final review are pending. No merge or release is authorized.
   Public release remains v1.0.6; the owner deferred publication until later UI changes are complete.
+- Local Windows packaging passed. The portable test app is
+  `release/SubtitleBridge-win-x64/Subtitle Bridge.exe`; its 16 previously verified managed runtime
+  files were restored and hash-matched after ZIP/setup creation, so they are local test tools only.
+  The packaged theme is verified, main/preload match the build, and synthetic preview files are excluded.
 
 ## Completed — Issue #75 dictionary extension
 
