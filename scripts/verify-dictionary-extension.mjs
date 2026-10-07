@@ -7,16 +7,16 @@ import {
 } from './dictionary-lib.mjs'
 
 const directory = 'src/main/translation/data/'
-const expectedExtensionHash = '53b42c8c45a5bf0e956deed2d1764d0b40381edf88e141c5591461522b45f8cd'
-const expectedCorrectionHash = '8861989797ef5855acdffcc55245f508a260889548af69cb87efa445d486726f'
+const expectedExtensionHash = '2c0818ba6d5d835af2a28a5d2a98c0a96b6414d0af2c252bf9caf32a1bc16086'
+const expectedCorrectionHash = 'a12cd2cffe7da1ee3d43f7f8757b410df73dbfbf908bf4c199585adea8c9d145'
 const bytes = await readFile(`${directory}dictionary-extension.json`)
 if (createHash('sha256').update(bytes).digest('hex') !== expectedExtensionHash) {
   throw new Error('Pinned dictionary extension SHA-256 mismatch.')
 }
 const extension = validateDictionaryDocument(JSON.parse(bytes.toString('utf8')))
 const stats = dictionaryStats(extension)
-if (stats.entries !== 5000 || stats.forms !== 3783 || stats.meanings !== 5329) {
-  throw new Error('Pinned dictionary extension counts do not match batches 061–070.')
+if (stats.entries !== 10000 || stats.forms !== 6361 || stats.meanings !== 10980) {
+  throw new Error('Pinned dictionary extension counts do not match batches 061–080.')
 }
 const base = JSON.parse(await readFile(`${directory}dictionary.json`, 'utf8'))
 const baseKeys = new Set(
@@ -52,5 +52,5 @@ validateDictionaryDocument({
   ],
 })
 console.log(
-  'Dictionary extension verified: 5,000 headwords; frozen-base namespace disjoint; corrections validated.',
+  'Dictionary extension verified: 10,000 headwords; frozen-base namespace disjoint; corrections validated.',
 )

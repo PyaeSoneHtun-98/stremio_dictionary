@@ -49,14 +49,15 @@ then sends this JSON to the configured endpoint with `POST`:
   "category": "incorrect",
   "targetLanguage": "my",
   "appVersion": "1.0.6",
-  "dictionaryVersion": "1.0-ext.061-070.1",
-  "phraseDictionaryVersion": "1.0.0"
+  "dictionaryVersion": "1.0-ext.061-080.2",
+  "phraseDictionaryVersion": "1.0-ext.013-016.1"
 }
 ```
 
 Versions are derived by the main process, not accepted from the renderer. The dictionary identifier
-includes base v1.0, extension batches 061–070, and app correction revision 1;
-see [dictionary extension](DICTIONARY_EXTENSION.md). Terms are bounded to 120
+includes base v1.0, extension batches 061–080, and app correction revision 2;
+the phrase identifier covers the frozen base plus extension batches 013–016, revision 1.
+See [dictionary expansion](DICTIONARY_EXPANSION.md). Terms are bounded to 120
 characters and five tokens. Extra fields and path/URL/control-character inputs are rejected.
 Successful receipt is HTTP 202 with `{ "ok": true }`; 429 means retry later, and other failures
 allow retry. Network and response parsing have a ten-second deadline. Redirects and cookies are

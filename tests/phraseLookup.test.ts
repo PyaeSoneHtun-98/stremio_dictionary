@@ -2,16 +2,21 @@ import { describe, expect, it } from 'vitest'
 import {
   LOCAL_PHRASE_DATASET,
   LOCAL_PHRASES,
+  PRODUCTION_LOCAL_PHRASES,
+  LOCAL_PHRASE_EXTENSION,
   createPhraseMatcher,
   findLocalPhraseMatch
 } from '../src/main/translation/PhraseMatcher'
 import type { PhraseEntry } from '../src/shared/translation'
+import { tokenizeSubtitleText } from '../src/main/subtitles/normalize'
 
 describe('PhraseMatcher', () => {
   it('loads the frozen Phrase Dictionary v1 dataset', () => {
     expect(LOCAL_PHRASE_DATASET.version).toBe(1)
-    expect(LOCAL_PHRASES).toHaveLength(3000)
-    expect(LOCAL_PHRASES.reduce((total, entry) => total + entry.forms.length, 0)).toBe(4827)
+    expect(PRODUCTION_LOCAL_PHRASES).toHaveLength(3000)
+    expect(PRODUCTION_LOCAL_PHRASES.reduce((total, entry) => total + entry.forms.length, 0)).toBe(4827)
+    expect(LOCAL_PHRASE_EXTENSION).toHaveLength(1000)
+    expect(LOCAL_PHRASES).toHaveLength(4000)
 
     const phrases = new Set(LOCAL_PHRASES.map((entry) => entry.phrase))
     expect(phrases).toContain('give up')
@@ -139,5 +144,35 @@ describe('PhraseMatcher', () => {
         clickedTokenIndex: 2
       })
     ).toBeNull()
+  })
+
+  it('matches hyphenated surfaces while retaining the canonical phrase and token span', () => {
+    const contextTokens = tokenizeSubtitleText('Things went pear-shaped yesterday.').map(token => token.lookupTerm)
+    for (const clickedTokenIndex of [1, 2, 3]) {
+      expect(findLocalPhraseMatch({word: contextTokens[clickedTokenIndex], contextTokens, clickedTokenIndex})).toMatchObject({
+        entry: { phrase: 'go pear-shaped' },
+        match: { source: 'went pear shaped', startTokenIndex: 1, endTokenIndex: 4 },
+      })
+    }
+  })
+
+  it('rejects collisions introduced by subtitle tokenization', () => {
+    expect(() => createPhraseMatcher([
+      { phrase: 'go pear-shaped', type: 'idiom', forms: [], burmese: ['အခြေအနေ ပျက်ယွင်းသွားသည်'] },
+      { phrase: 'go pear shaped', type: 'expression', forms: [], burmese: ['အခြေအနေ ပျက်ယွင်းသွားသည်'] },
+    ])).toThrow('Phrase variant collision')
+  })
+
+  it('allows distinct hyphenated/open spellings to share a key under the same owner', () => {
+    const matcher = createPhraseMatcher([
+      { phrase: "bird's-eye view", type: 'expression', forms: ["bird's eye view"], burmese: ['အပေါ်မှ စီးမြင်ရသော မြင်ကွင်း'] },
+    ])
+    expect(matcher.match(["bird's", 'eye', 'view'], 1)?.entry.phrase).toBe("bird's-eye view")
+  })
+
+  it('rejects surfaces longer than the supported context after splitting hyphens', () => {
+    expect(() => createPhraseMatcher([
+      { phrase: 'one-two three-four five-six', type: 'expression', forms: [], burmese: ['စမ်းသပ်ချက်'] },
+    ])).toThrow('2–5 subtitle tokens')
   })
 })

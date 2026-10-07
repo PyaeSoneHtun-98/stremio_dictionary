@@ -1,5 +1,8 @@
 # Dictionary extension — Issue #75
 
+This is the historical 061–070 integration and acceptance record. The current Issue #79
+expansion is documented in [dictionary and phrase expansion](DICTIONARY_EXPANSION.md).
+
 ## Pinned data and release scope
 
 The app loads the frozen Dictionary v1.0 plus **5,000** extension headwords from batches
