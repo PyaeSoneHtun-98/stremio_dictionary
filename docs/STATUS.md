@@ -261,12 +261,17 @@ Draft PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
 - Dataset structural/artifact/index checks and all 38 upstream tests passed. Local `npm run check`
   passed 250 tests in 36 files, lint/typechecks, all corpus gates and production builds.
   CI #600 passed both jobs at implementation head `4b55b5fdedd4cc08fe49674f47a2bb66f7908965`.
-  Local Windows build and both packaging scripts passed in isolated staging. Owner acceptance
-  and final review remain pending; subsequent documentation-only heads need their own CI record.
+  Local Windows build and both packaging scripts passed in isolated staging. CI #601 passed
+  both jobs at documentation head `e5e2badb0b4b14bac44a3b27fccdb8d1421c0874`; complete-diff
+  final code review found no unresolved P1/P2/P3 findings. Subsequent heads need their own CI.
 - Prepared a separate local portable preview with this PR's app bundles, PR #78 neutral CSS
   and hash-matched existing runtimes; the prior running test app was preserved. The fixture
   `release/dictionary-expansion-acceptance.srt` supports representative external-subtitle checks.
   This combined preview is not the pure Issue #79 ZIP/setup and is not a release.
+- The initial owner screenshots came from the older theme app, as confirmed by its running
+  executable path and absence of the new phrase extension. After switching to the dictionary
+  preview, the owner reported the requested phrase retest passed. Broader word/reporting/
+  Stremio acceptance confirmation remains pending; no exhaustive manual checklist pass is claimed.
 - A first app check exposed legitimate same-owner hyphen/open spellings; the matcher now retains
   these while continuing to reject actual duplicate stored variants and cross-owner collisions.
 - No merge or release is authorized. See [dictionary expansion](DICTIONARY_EXPANSION.md).

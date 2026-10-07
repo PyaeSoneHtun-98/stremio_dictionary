@@ -83,8 +83,9 @@ Theme PR #78 remains separate. Local `npm run check` passed all 250 tests in 36 
 corpus gates, lint/typechecks and production builds. CI #600 passed both `validate` and
 `package-windows` at implementation head `4b55b5fdedd4cc08fe49674f47a2bb66f7908965`.
 Local Windows build and both packaging scripts also passed in an isolated staging folder
-to avoid replacing the running theme test app. Owner Windows acceptance and final review
-remain pending; automated Windows installer tests are not actual owner playback acceptance.
+to avoid replacing the running theme test app. CI #601 also passed both jobs at documentation
+head `e5e2badb0b4b14bac44a3b27fccdb8d1421c0874`. Final code review of that complete diff found
+no unresolved P1/P2/P3 findings. Automated Windows installer tests are not owner playback tests.
 No merge or release publication is authorized. Earlier Issue #75 Windows acceptance does not
 establish acceptance of this expansion or the phrase normalization change.
 
@@ -101,6 +102,14 @@ Pure ZIP/setup artifacts remain unchanged and do not contain that theme overlay 
 runtime copies. The running prior test app was preserved. Close it before opening the new
 preview. `release/dictionary-expansion-acceptance.srt` provides 18 synthetic cues for external
 subtitle acceptance; it is not packaged. Neither the preview nor fixture is committed.
+
+Owner acceptance follow-up (2026-10-07): the initial screenshots showed single-word fallback
+for `Things went pear-shaped`. Read-only process inspection confirmed the older theme app
+was running; its bundle did not contain the phrase extension. After instructions to close it
+and open the separate dictionary preview, the owner reported the requested phrase retest
+**passed**. No code change was required. This establishes the reported phrase retest, not an
+independently observed run of every checklist item. Confirmation of broader word/reporting/
+Stremio acceptance is still pending; no codec-specific or inbox-version check is claimed.
 
 Manual checklist for the new Windows test build:
 
