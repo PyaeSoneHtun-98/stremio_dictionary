@@ -8,12 +8,13 @@
   --theme-text-strong: #f5f5f5;
   --theme-text-secondary: #bdbdbd;
   --theme-text-muted: #999999;
-  --theme-accent: #9bbcfb;
-  --theme-accent-rgb: 155 188 251;
-  --theme-primary: #346bd1;
-  --theme-primary-hover: #3972d4;
+  --theme-accent: #ededed;
+  --theme-accent-rgb: 237 237 237;
+  --theme-primary: #333333;
+  --theme-primary-hover: #404040;
   --theme-on-primary: #ffffff;
-  --theme-on-accent: #111b2e;
+  --theme-selection: #454545;
+  --theme-on-selection: #ffffff;
   --theme-scrollbar-rgb: 156 156 156;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--theme-text);
@@ -232,7 +233,7 @@ p {
   color: var(--theme-on-primary);
   font-weight: 760;
   cursor: pointer;
-  box-shadow: 0 10px 28px rgb(var(--theme-accent-rgb) / 0.13);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.24);
 }
 
 .primary-action:hover:not(:disabled) {

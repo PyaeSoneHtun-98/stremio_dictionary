@@ -248,18 +248,21 @@ The owner requested a modern editor-style dark palette using a Codex screenshot 
 and assigned the focused presentation implementation to Codex. Branch: `codex/issue-77-charcoal-theme`.
 Draft PR: [#78](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/78).
 
-- Replace green-tinted backgrounds/text/highlights with charcoal surfaces, neutral text and blue accents
+- The owner rejected the initial blue accent preview and requested white controls on gray backgrounds
+  throughout the app. Replace green/blue accents with charcoal surfaces and neutral highlights
   across the launcher, player menus/controls, dictionary/report card, feedback, updates and scrollbars.
 - Shared CSS palette retains existing layout, keyboard focus, disabled/selected/error states,
   white shadowed subtitles, popup anchoring and transparent Windows overlay hit testing.
 - More opaque neutral player surfaces keep text readable over bright scenes. Normal/hover primary
-  button contrast is 5.04/4.63:1; muted launcher text on its darkest panel is at least 5.58:1.
+  button contrast is 12.63/10.37:1; muted launcher text on its darkest panel is at least 5.58:1.
 - Local `npm run check` passed all 241 tests, corpus gates, typechecks and production builds after
-  the final opacity refinement; exact-head CI will be recorded in the PR.
+  replacing the blue accents with gray/white; exact-head CI will be recorded in the PR.
 - Actual React components were previewed with an ignored local synthetic desktop-bridge fixture,
   including launcher/player, audio options, subtitle steppers, speed/settings, dictionary/miss card
   and simulated report success/failure. Normal desktop, 360px short-player and 320px bright-scene
   checks show scroll-reachable options and an unclipped card. These are not real mpv/manual tests.
+  The gray/white revision was rechecked for launcher/player/card colors, subtitle selection,
+  sliders, keyboard focus, short-player track options and bright-scene miss/report-error feedback.
 - Real Windows appearance acceptance and final review are pending. No merge or release is authorized.
   Public release remains v1.0.6; the owner deferred publication until later UI changes are complete.
 - Local Windows packaging passed. The portable test app is

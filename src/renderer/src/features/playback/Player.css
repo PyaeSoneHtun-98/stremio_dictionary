@@ -425,14 +425,14 @@ html.overlay-mode #root {
   flex-basis: 42px;
   width: 42px;
   height: 42px;
-  background: var(--accent);
-  color: var(--theme-on-accent);
+  background: var(--theme-primary);
+  color: var(--theme-on-primary);
   border-radius: 50%;
-  box-shadow: 0 6px 18px rgb(var(--theme-accent-rgb) / 0.16);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.24);
 }
 .play-button:hover {
-  background: #b5cdff;
-  color: var(--theme-on-accent);
+  background: var(--theme-primary-hover);
+  color: var(--theme-on-primary);
 }
 .skip-button {
   position: relative;
@@ -520,8 +520,8 @@ html.overlay-mode #root {
   background: rgb(var(--theme-accent-rgb) / 0.2);
 }
 .subtitle-word[aria-pressed="true"] {
-  background: var(--theme-accent);
-  color: var(--theme-on-accent);
+  background: var(--theme-selection);
+  color: var(--theme-on-selection);
   text-shadow: none;
 }
 .translation-popup {
