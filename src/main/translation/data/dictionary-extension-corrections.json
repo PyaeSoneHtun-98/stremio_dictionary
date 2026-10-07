@@ -2,6 +2,83 @@
   "version": 1,
   "entries": [
     {
+      "word": "can",
+      "pronunciation": "/kæn/",
+      "forms": [
+        "cans",
+        "canning"
+      ],
+      "meanings": [
+        {
+          "partOfSpeech": "modal",
+          "burmese": [
+            "နိုင်သည်"
+          ]
+        },
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "သတ္တုဘူး"
+          ]
+        },
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "အလုပ်မှဖြုတ်သည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "die",
+      "pronunciation": "/daɪ/",
+      "forms": [
+        "dies",
+        "died",
+        "dying"
+      ],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "သေဆုံးသည်"
+          ]
+        },
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "အန်စာတုံး",
+            "သတ္တုပုံသွင်းရာတွင် သုံးသောပုံစံခွက်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "go",
+      "pronunciation": "/ɡoʊ/",
+      "forms": [
+        "goes",
+        "went",
+        "gone",
+        "going"
+      ],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "သွားသည်"
+          ]
+        },
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "မိမိအလှည့်",
+            "ကြိုးစားလုပ်ကြည့်မှု"
+          ]
+        }
+      ]
+    },
+    {
       "word": "going",
       "pronunciation": "/ˈɡoʊɪŋ/",
       "forms": [],
@@ -16,6 +93,66 @@
           "partOfSpeech": "verb",
           "burmese": [
             "သွားသည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "in",
+      "pronunciation": "/ɪn/",
+      "forms": [],
+      "meanings": [
+        {
+          "partOfSpeech": "preposition",
+          "burmese": [
+            "အထဲ၌"
+          ]
+        },
+        {
+          "partOfSpeech": "adjective",
+          "burmese": [
+            "ခေတ်စားနေသော",
+            "ဝင်ခွင့်ရပြီးသော"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "let",
+      "pronunciation": "/lɛt/",
+      "forms": [
+        "lets",
+        "letting"
+      ],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "ခွင့်ပြုသည်",
+            "ငှားပေးသည်"
+          ]
+        },
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "ဘောလုံးပိုက်ကိုထိသဖြင့် ပြန်ကစားရသည့်အချက်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "lot",
+      "pronunciation": "/lɑt/",
+      "forms": [
+        "lots"
+      ],
+      "meanings": [
+        {
+          "partOfSpeech": "noun",
+          "burmese": [
+            "များပြားသောပမာဏ",
+            "မြေကွက်",
+            "ကံကြမ္မာ"
           ]
         }
       ]
@@ -80,6 +217,25 @@
       ]
     },
     {
+      "word": "run",
+      "pronunciation": "/rʌn/",
+      "forms": [
+        "runs",
+        "ran",
+        "running"
+      ],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "ပြေးသည်",
+            "လည်ပတ်သည်",
+            "စီမံခန့်ခွဲသည်"
+          ]
+        }
+      ]
+    },
+    {
       "word": "running",
       "pronunciation": "/ˈrʌnɪŋ/",
       "forms": [],
@@ -111,6 +267,26 @@
           "partOfSpeech": "verb",
           "burmese": [
             "ပြောသည်"
+          ]
+        }
+      ]
+    },
+    {
+      "word": "see",
+      "pronunciation": "/si/",
+      "forms": [
+        "sees",
+        "saw",
+        "seen",
+        "seeing"
+      ],
+      "meanings": [
+        {
+          "partOfSpeech": "verb",
+          "burmese": [
+            "မြင်သည်",
+            "နားလည်သဘောပေါက်သည်",
+            "တွေ့ဆုံသည်"
           ]
         }
       ]

@@ -74,8 +74,8 @@ describe('dictionary report HTTPS client', () => {
       requestId: expect.any(String),
       targetLanguage: 'my',
       appVersion: appMeta.version,
-      dictionaryVersion: '1.0-ext.061-070.1',
-      phraseDictionaryVersion: '1.0.0',
+      dictionaryVersion: '1.0-ext.061-080.2',
+      phraseDictionaryVersion: '1.0-ext.013-016.1',
     })
     client.dispose()
   })

@@ -20,7 +20,8 @@
     "dictionary:verify-extension": "node scripts/verify-dictionary-extension.mjs",
     "dictionary:validate": "node scripts/dictionary-tool.mjs validate src/main/translation/data/dictionary.json",
     "dictionary:build": "node scripts/dictionary-tool.mjs build dictionary/batches dictionary/generated/dictionary.json",
-    "check": "npm run lint && npm run typecheck && npm run dictionary:verify-production && npm run dictionary:verify-extension && npm run dictionary:validate && npm run phrase-dictionary:verify-production && npm run test && npm run build:app",
+    "check": "npm run lint && npm run typecheck && npm run dictionary:verify-production && npm run dictionary:verify-extension && npm run dictionary:validate && npm run phrase-dictionary:verify-production && npm run phrase-dictionary:verify-extension && npm run test && npm run build:app",
+    "phrase-dictionary:verify-extension": "node scripts/verify-phrase-extension.mjs",
     "phrase-dictionary:verify-production": "node scripts/verify-production-phrases.mjs"
   },
   "dependencies": {

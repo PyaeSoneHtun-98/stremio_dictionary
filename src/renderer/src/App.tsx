@@ -26,8 +26,8 @@ export function App(): React.JSX.Element {
           </p>
         </div>
         <ul className="launcher-capabilities" aria-label="Subtitle Bridge capabilities">
-          <li>30K word dictionary</li>
-          <li>3K phrase dictionary</li>
+          <li>40K word dictionary</li>
+          <li>4K phrase dictionary</li>
           <li>Offline lookup</li>
         </ul>
       </section>
