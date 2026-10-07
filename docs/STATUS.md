@@ -171,9 +171,10 @@ The real official in-app update acceptance passed on v1.0.6.
 
 ## Dictionary v1.0
 
-Stable master uses the frozen 30,000-headword Dictionary v1.0 plus the structured core supplement
-and collision-checked compatibility aliases. Issue #75 / PR #76 adds a separate 5,000-word
-extension on its active branch; it is not yet merged or manually accepted.
+Stable master uses the frozen 30,000-headword Dictionary v1.0 plus the pinned 5,000-word
+extension, reviewed app corrections, structured core supplement and collision-checked
+compatibility aliases: 35,014 unique runtime heads. Issue #75 / PR #76 is merged and owner
+Windows acceptance passed. The next word/phrase expansion is active in Issue #79 / PR #80.
 
 ## Phrase Dictionary v1.0.0
 
@@ -247,6 +248,7 @@ PR #74 squash-merged as `8842cd86945332cdd0713c1a5f22798c479a1847`; Issue #73 is
 The owner authorized integration after the readiness assessment of dataset commit
 `3bce8474b301c89e0dd21b09588c063b7342397d`. Branch: `codex/issue-79-dictionary-expansion`,
 based on stable master; theme PR #78 remains separate and unmerged.
+Draft PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
 
 - Vendor word batches 061–080 (10,000 total extension heads) and phrase batches 013–016
   (1,000 new phrases), retaining both frozen bases byte-for-byte.
@@ -258,7 +260,13 @@ based on stable master; theme PR #78 remains separate and unmerged.
   `1.0-ext.061-080.2` and `1.0-ext.013-016.1`.
 - Dataset structural/artifact/index checks and all 38 upstream tests passed. Local `npm run check`
   passed 250 tests in 36 files, lint/typechecks, all corpus gates and production builds.
-  Exact-head CI, local Windows packaging, owner acceptance and final review remain pending.
+  CI #600 passed both jobs at implementation head `4b55b5fdedd4cc08fe49674f47a2bb66f7908965`.
+  Local Windows build and both packaging scripts passed in isolated staging. Owner acceptance
+  and final review remain pending; subsequent documentation-only heads need their own CI record.
+- Prepared a separate local portable preview with this PR's app bundles, PR #78 neutral CSS
+  and hash-matched existing runtimes; the prior running test app was preserved. The fixture
+  `release/dictionary-expansion-acceptance.srt` supports representative external-subtitle checks.
+  This combined preview is not the pure Issue #79 ZIP/setup and is not a release.
 - A first app check exposed legitimate same-owner hyphen/open spellings; the matcher now retains
   these while continuing to reject actual duplicate stored variants and cross-owner collisions.
 - No merge or release is authorized. See [dictionary expansion](DICTIONARY_EXPANSION.md).

@@ -77,12 +77,30 @@ update pins, provenance and corpus versions together.
 
 ## Acceptance status
 
-Implementation is on `codex/issue-79-dictionary-expansion`, based on stable master.
+Implementation is on `codex/issue-79-dictionary-expansion`, based on stable master,
+in [Draft PR #80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
 Theme PR #78 remains separate. Local `npm run check` passed all 250 tests in 36 files,
-corpus gates, lint/typechecks and production builds. Exact-head CI, local Windows packaging,
-owner Windows acceptance and final review remain pending until recorded in the PR/STATUS.
+corpus gates, lint/typechecks and production builds. CI #600 passed both `validate` and
+`package-windows` at implementation head `4b55b5fdedd4cc08fe49674f47a2bb66f7908965`.
+Local Windows build and both packaging scripts also passed in an isolated staging folder
+to avoid replacing the running theme test app. Owner Windows acceptance and final review
+remain pending; automated Windows installer tests are not actual owner playback acceptance.
 No merge or release publication is authorized. Earlier Issue #75 Windows acceptance does not
 establish acceptance of this expansion or the phrase normalization change.
+
+Local pure Issue #79 artifacts (under `.vite/issue79-package-stage/release`):
+
+- ZIP SHA-256: `fc807ad8efccdcf6185ebda126d10e32549903ee3eeceac9c21e2b05d8b1ba2a`.
+- Setup SHA-256: `0dd0995486dcc064628b9baab595e1eb3a0be4be1c8e2266072d72858e4c2947`.
+
+The separate `release/SubtitleBridge-dictionary-test-win-x64/Subtitle Bridge.exe` is a
+local combined acceptance preview: this PR's app bundles plus only the neutral CSS from
+PR #78 head `a0862ef67b41eae0a90a6d578b347a5f7164c876`. App bundles and all 16 copied existing
+runtime files passed SHA-256 equality checks; the official reporting endpoint is present.
+Pure ZIP/setup artifacts remain unchanged and do not contain that theme overlay or local
+runtime copies. The running prior test app was preserved. Close it before opening the new
+preview. `release/dictionary-expansion-acceptance.srt` provides 18 synthetic cues for external
+subtitle acceptance; it is not packaged. Neither the preview nor fixture is committed.
 
 Manual checklist for the new Windows test build:
 
