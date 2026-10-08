@@ -1296,6 +1296,7 @@ try {
     $Shortcut.TargetPath = $ExePath
     $Shortcut.WorkingDirectory = $InstallDir
     $Shortcut.Description = 'Subtitle Bridge Player'
+    $Shortcut.IconLocation = "$ExePath,0"
     $Shortcut.Save()
     Write-Host "Created Start Menu shortcut: $ShortcutPath"
   }

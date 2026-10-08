@@ -10,6 +10,7 @@ import {
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertEmbeddedWindowsIcon } from './windows-icon.mjs'
 
 if (process.platform !== 'win32') {
   throw new Error('Windows setup packaging must run on Windows.')
@@ -22,8 +23,9 @@ const payloadZip = join(releaseRoot, 'SubtitleBridge-win-x64.zip')
 const bootstrapSource = join(packagingRoot, 'SetupBootstrap.cs')
 const setupExe = join(releaseRoot, 'SubtitleBridge-Setup-x64.exe')
 const setupChecksum = `${setupExe}.sha256`
+const setupIcon = join(root, 'assets', 'branding', 'subtitle-bridge-icon.ico')
 
-for (const requiredPath of [payloadZip, bootstrapSource]) {
+for (const requiredPath of [payloadZip, bootstrapSource, setupIcon]) {
   if (!existsSync(requiredPath)) {
     throw new Error(`Required setup input is missing: ${requiredPath}`)
   }
@@ -47,6 +49,7 @@ execFileSync(
     '/nologo',
     '/target:winexe',
     '/platform:x64',
+    `/win32icon:${setupIcon}`,
     `/out:${setupExe}`,
     '/reference:System.Windows.Forms.dll',
     '/reference:System.Drawing.dll',
@@ -71,6 +74,8 @@ const footer = Buffer.alloc(16)
 footer.write('SBSETUP1', 0, 8, 'ascii')
 footer.writeBigInt64LE(BigInt(payloadLength), 8)
 appendFileSync(setupExe, footer)
+// Inspect the final EXE, including the appended payload, before writing its release checksum.
+assertEmbeddedWindowsIcon(setupExe, setupIcon)
 
 const digest = createHash('sha256').update(readFileSync(setupExe)).digest('hex')
 writeFileSync(setupChecksum, `${digest}  SubtitleBridge-Setup-x64.exe\r\n`, 'utf8')

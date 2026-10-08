@@ -1,5 +1,6 @@
 import { BaseWindow, BrowserWindow } from 'electron'
 import { join } from 'node:path'
+import { getAppIconPath } from '../appIcon'
 
 export class PlaybackSurface {
   private hostWindow: BaseWindow | null = null
@@ -32,7 +33,8 @@ export class PlaybackSurface {
       show: false,
       autoHideMenuBar: true,
       backgroundColor: '#000000',
-      title: 'Subtitle Bridge Player'
+      title: 'Subtitle Bridge Player',
+      icon: getAppIconPath()
     })
 
     const overlayWindow = new BrowserWindow({

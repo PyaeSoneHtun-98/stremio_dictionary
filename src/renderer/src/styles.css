@@ -101,18 +101,10 @@ summary:focus-visible {
 }
 
 .brand-mark {
-  display: grid;
+  display: block;
   width: 32px;
   height: 32px;
-  place-items: center;
-  border: 1px solid rgb(255 255 255 / 0.16);
-  border-radius: 10px;
-  background: linear-gradient(145deg, #484848, #303030);
-  color: var(--theme-text-strong);
-  box-shadow: 0 9px 30px rgb(0 0 0 / 0.12);
-  font-size: 0.69rem;
-  font-weight: 850;
-  letter-spacing: 0.06em;
+  flex-shrink: 0;
 }
 
 .brand strong,

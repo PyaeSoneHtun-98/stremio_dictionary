@@ -22,9 +22,12 @@ filters or external resources. They can be edited in a vector editor and render 
 Inter installed. The editable text source is intentionally the exception: use the outlined
 version for distribution. The SVG title/description or accessible label identifies the logo.
 
-The owner approved this recreated vector appearance on 2026-10-08. This change does not
-connect the assets to Electron, the executable, shortcuts or setup. Integration remains
-separate follow-up work with its own packaging/installed-icon checks.
+The owner approved this recreated vector appearance on 2026-10-08. Issue
+[#85](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/85) applies the approved
+icon to the launcher header, native launcher/player windows and Windows app/setup executables.
+Start Menu and Installed Apps use the app executable's icon at index 0. That integration has
+its own packaging/installed-icon acceptance; original artwork approval alone is not a native
+Windows acceptance result.
 
 ## Wordmark provenance
 
@@ -76,4 +79,21 @@ and verifies each decoded ICO frame exactly matches its corresponding PNG.
 - PNG/ICO dimensions and transparent icon corners checked; all seven ICO frames match the PNGs.
 - Full logo and icon rendered and visually inspected, including native 16/24/32/48/64/128/256px icons.
 - The owner approved the recreated vector appearance on 2026-10-08; no installed-shell or
-  playback test is claimed for these unused assets.
+  playback test is claimed by the original artwork approval.
+
+## Windows integration verification
+
+`npm run package:win` embeds the ICO in the copied Electron executable and compiles setup
+with `/win32icon`. App-local ICO/PNG copies are included for native window icons in both
+development and packaged runs. The original npm Electron executable remains unchanged.
+`resedit` 3.1.0 and its PE parser are pinned build tooling only; they are not copied into the app.
+
+```powershell
+node scripts/verify-windows-branding.mjs
+```
+
+This checks all seven icon resource frames in both final EXEs against the approved PNG-based
+ICO, plus the packaged window image/license copies. CI repeats the resource check after
+installation and checks real shortcut/Installed Apps icon references. Release packaging also
+runs the resource gate before publication. Owner checks of actual Explorer/taskbar/shortcut/
+setup appearance remain recorded separately in the integration PR.
