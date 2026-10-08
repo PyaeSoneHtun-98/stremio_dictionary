@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`bc6346003f073f33848b21653e38e6e50c06a68b`
+`91cb213a7f0e77018ff7fc14ec6e93c40d872fba`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -35,9 +35,10 @@ Current stable capabilities include:
 - centered stream buffering/loading feedback that distinguishes manual pause from cache/seek stalls;
 - single-click video-surface play/pause and Windows-system-aware double-click fullscreen;
 - compact launcher with Local video, Stremio, and current-session status;
-- frozen 30,000-headword Dictionary v1.0 plus a pinned 5,000-entry extension and reviewed app
-  corrections: 35,014 unique runtime headwords;
-- frozen 3,000-entry Phrase Dictionary v1.0.0 with longest-match phrase lookup and single-word fallback;
+- frozen 30,000-headword Dictionary v1.0 plus a pinned 10,000-entry extension and targeted app
+  corrections: 40,011 unique runtime headwords;
+- frozen 3,000-entry Phrase Dictionary v1.0.0 plus a pinned 1,000-entry extension, with
+  longest-match phrase lookup and single-word fallback;
 - offline English → Burmese lookup;
 - optional translation settings/cache;
 - opt-in reversible Stremio **Play in Subtitle Bridge** compatibility integration with verified enabled/disabled/repair status and fail-closed recovery;
@@ -171,9 +172,10 @@ The real official in-app update acceptance passed on v1.0.6.
 
 ## Dictionary v1.0
 
-Stable master uses the frozen 30,000-headword Dictionary v1.0 plus the structured core supplement
-and collision-checked compatibility aliases. Issue #75 / PR #76 adds a separate 5,000-word
-extension on its active branch; it is not yet merged or manually accepted.
+Stable master uses the frozen 30,000-headword Dictionary v1.0 plus the pinned 10,000-word
+extension, targeted app corrections, structured core supplement and collision-checked
+compatibility aliases: 40,011 unique runtime heads. Issues #75 / #79 and PRs #76 / #80 are
+merged, with owner Windows acceptance recorded in their PRs.
 
 ## Phrase Dictionary v1.0.0
 
@@ -187,6 +189,8 @@ Production artifact: `src/main/translation/data/phrases.json`
 - artifact SHA-256: `951a8bbe54824cf76728393791607798f878a062b19eca63e572278ba8f62926`
 
 Phrase matching remains longest-match-first for contiguous 2–5-token expressions inside the current cue, with normal single-word fallback.
+PR #80 adds a separate 1,000-phrase extension: runtime totals are 4,000 canonical phrases,
+7,509 forms and 11,509 stored variants. The counts above describe the unchanged frozen base.
 
 ## Completed — Issue #69 audio track selector
 
@@ -242,6 +246,46 @@ Owner assigned implementation to Codex on 2026-10-06. Branch: `codex/issue-73-ff
 
 PR #74 squash-merged as `8842cd86945332cdd0713c1a5f22798c479a1847`; Issue #73 is closed. CI #588 passed both jobs, and the owner confirmed the requested real-media test on 2026-10-06. The report flag was absent from that test build because reporting remained on PR #72.
 
+## Completed — Issue #79 dictionary and phrase expansion
+
+PR #80 squash-merged as `91cb213a7f0e77018ff7fc14ec6e93c40d872fba`; Issue #79 is closed/completed.
+Final head `b4817c8774df9cf4f0e9176abd48d0cfd5e92eea` passed CI #602 validate and
+package-windows. The owner confirmed all requested new-word, reporting, Stremio and phrase
+checks passed in the combined Windows preview, then authorized merge. No exhaustive bilingual,
+codec inventory or private report-version inspection is claimed. Release stays on hold.
+The implementation and earlier pending snapshots below are historical.
+
+The owner authorized integration after the readiness assessment of dataset commit
+`3bce8474b301c89e0dd21b09588c063b7342397d`. Branch: `codex/issue-79-dictionary-expansion`,
+based on stable master; theme PR #78 remains separate and unmerged.
+Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
+
+- Vendor word batches 061–080 (10,000 total extension heads) and phrase batches 013–016
+  (1,000 new phrases), retaining both frozen bases byte-for-byte.
+- Reconcile `go`, `run` and `see` with core entries; preserve `went`/`gone` and prior corrections.
+- Correct common senses for `can`, `die`, `let`, `in` and `lot` in the separate app correction layer.
+- Align phrase keys with subtitle tokenization so hyphenated phrases resolve; canonical strings
+  remain unchanged. Same-owner spelling variants share keys; cross-owner collisions fail.
+- Resulting runtime has 40,011 word heads and 4,000 canonical phrases. Report identifiers are
+  `1.0-ext.061-080.2` and `1.0-ext.013-016.1`.
+- Dataset structural/artifact/index checks and all 38 upstream tests passed. Local `npm run check`
+  passed 250 tests in 36 files, lint/typechecks, all corpus gates and production builds.
+  CI #600 passed both jobs at implementation head `4b55b5fdedd4cc08fe49674f47a2bb66f7908965`.
+  Local Windows build and both packaging scripts passed in isolated staging. CI #601 passed
+  both jobs at documentation head `e5e2badb0b4b14bac44a3b27fccdb8d1421c0874`; complete-diff
+  final code review found no unresolved P1/P2/P3 findings. Subsequent heads need their own CI.
+- Prepared a separate local portable preview with this PR's app bundles, PR #78 neutral CSS
+  and hash-matched existing runtimes; the prior running test app was preserved. The fixture
+  `release/dictionary-expansion-acceptance.srt` supports representative external-subtitle checks.
+  This combined preview is not the pure Issue #79 ZIP/setup and is not a release.
+- The initial owner screenshots came from the older theme app, as confirmed by its running
+  executable path and absence of the new phrase extension. After switching to the dictionary
+  preview, the owner reported the requested phrase retest passed. Broader word/reporting/
+  Stremio acceptance confirmation remains pending; no exhaustive manual checklist pass is claimed.
+- A first app check exposed legitimate same-owner hyphen/open spellings; the matcher now retains
+  these while continuing to reject actual duplicate stored variants and cross-owner collisions.
+- Merge and acceptance completed as recorded above. See [dictionary expansion](DICTIONARY_EXPANSION.md).
+
 ## Active work — Issue #77 neutral charcoal theme
 
 The owner requested a modern editor-style dark palette using a Codex screenshot as the reference
@@ -263,8 +307,23 @@ Draft PR: [#78](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/78).
   checks show scroll-reachable options and an unclipped card. These are not real mpv/manual tests.
   The gray/white revision was rechecked for launcher/player/card colors, subtitle selection,
   sliders, keyboard focus, short-player track options and bright-scene miss/report-error feedback.
-- Real Windows appearance acceptance and final review are pending. No merge or release is authorized.
-  Public release remains v1.0.6; the owner deferred publication until later UI changes are complete.
+- On 2026-10-08, the owner confirmed the gray/white launcher, controls/menus, card readability
+  over bright/dark scenes and narrow-window appearance were checked in the combined dictionary
+  preview and accepted. That preview uses this PR's unchanged theme CSS at `a0862ef`.
+- Updating this branch to master `91cb213` conflicted only in STATUS.md; all six theme CSS files
+  remain byte-for-byte identical to the accepted revision. Local `npm run check` passed all 250
+  tests in 36 files, corpus gates, lint/typechecks and production build. Complete theme review
+  found no unresolved P1/P2/P3 findings; no independent second reviewer is claimed. Non-palette
+  CSS declarations, transparent hit testing, offsets, responsive layout and behavior are preserved.
+- Fresh Windows ZIP/setup packaging passed in isolated staging. The separate portable preview is
+  `release/SubtitleBridge-theme-test-win-x64/Subtitle Bridge.exe`; app bundles match the build,
+  compiled CSS matches the accepted preview and all 16 existing runtime copies hash-match.
+  ZIP SHA-256: `ec0d2724102f030c4d507a04aebd195d0dcabaf2017959d610036aebf488f08a`.
+  Setup SHA-256: `15dcd002d64b931465ccd9a49ccea8793785e5a88c63a5fc0fb4c2b3f1a9fd25`.
+  These are local test artifacts, not a release. Latest CI is recorded in PR #78 before merge.
+  Public release remains v1.0.6 and publication stays on hold.
+- Next: [Issue #81](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/81), a main-window
+  HTTP/HTTPS stream entry using the existing validated network playback path, in a separate PR.
 - Local Windows packaging passed. The portable test app is
   `release/SubtitleBridge-win-x64/Subtitle Bridge.exe`; its 16 previously verified managed runtime
   files were restored and hash-matched after ZIP/setup creation, so they are local test tools only.

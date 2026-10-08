@@ -12,13 +12,13 @@ import {
 } from '../src/main/translation/localDictionary'
 
 describe('LocalDictionaryProvider', () => {
-  it('loads the frozen base, separate 5,000-word extension and reconciled core supplement', () => {
+  it('loads the frozen base, separate 10,000-word extension and reconciled core supplement', () => {
     expect(LOCAL_DICTIONARY_DATASET.version).toBe(1)
     expect(PRODUCTION_LOCAL_DICTIONARY).toHaveLength(30_000)
     expect(CORE_LOCAL_DICTIONARY).toHaveLength(16)
-    expect(LOCAL_DICTIONARY_EXTENSION).toHaveLength(5_000)
-    expect(RETAINED_CORE_DICTIONARY).toHaveLength(14)
-    expect(LOCAL_DICTIONARY).toHaveLength(35_014)
+    expect(LOCAL_DICTIONARY_EXTENSION).toHaveLength(10_000)
+    expect(RETAINED_CORE_DICTIONARY).toHaveLength(11)
+    expect(LOCAL_DICTIONARY).toHaveLength(40_011)
 
     const productionHeadwords = new Set(PRODUCTION_LOCAL_DICTIONARY.map((entry) => entry.word))
     const coreHeadwords = CORE_LOCAL_DICTIONARY.map((entry) => entry.word)
@@ -77,12 +77,15 @@ describe('LocalDictionaryProvider', () => {
 
     await expect(provider.translate({ word: 'went' })).resolves.toMatchObject({
       originalWord: 'went',
-      translation: 'သွားသည်',
+      translation: 'သွားသည်၊ မိမိအလှည့်၊ ကြိုးစားလုပ်ကြည့်မှု',
       pronunciation: '/ɡoʊ/',
       dictionaryEntry: {
         word: 'go',
         forms: ['goes', 'went', 'gone', 'going'],
-        meanings: [{ partOfSpeech: 'verb', burmese: ['သွားသည်'] }]
+        meanings: [
+          { partOfSpeech: 'verb', burmese: ['သွားသည်'] },
+          { partOfSpeech: 'noun', burmese: ['မိမိအလှည့်', 'ကြိုးစားလုပ်ကြည့်မှု'] }
+        ]
       },
       provider: 'local-dictionary',
       targetLanguage: 'my'

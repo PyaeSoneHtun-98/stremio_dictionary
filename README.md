@@ -74,8 +74,8 @@ The updater only trusts stable releases and the exact Windows assets from the of
 - synchronized clickable embedded SRT/ASS/SSA text subtitles;
 - native external SRT/ASS/SSA file picker plus drag-and-drop loading;
 - subtitle delay, size, and position controls, including G/H 0.1-second timing shortcuts with on-screen feedback;
-- frozen 30,000-headword English → Burmese Dictionary v1.0;
-- frozen 3,000-entry Phrase Dictionary v1.0.0 with longest-match phrase detection and normal single-word fallback;
+- frozen 30,000-headword dictionary plus a separate 10,000-entry extension and core corrections;
+- 4,000 phrases from the frozen 3,000-entry base plus 1,000 new phrases, with longest-match detection;
 - compact launcher with Local video, Stremio, and current-session status;
 - installer-managed, pinned, SHA-256-verified mpv and FFmpeg;
 - Start Menu and Windows uninstall integration;
@@ -88,13 +88,13 @@ The updater only trusts stable releases and the exact Windows assets from the of
 
 ## Dictionary and phrase lookup
 
-The production word dictionary is the frozen **30,000-headword Dictionary v1.0**, plus a small structured core supplement and a collision-checked compatibility alias layer.
+The word dictionary combines frozen **Dictionary v1.0**, a pinned **10,000-entry extension**, targeted corrections and the remaining core supplement: **40,011 runtime headwords**. Compatibility aliases remain collision-checked. See [dictionary expansion](docs/DICTIONARY_EXPANSION.md) for provenance and acceptance status.
 
-The production **Phrase Dictionary v1.0.0** contains:
+The frozen **Phrase Dictionary v1.0.0** plus its separate extension contain:
 
-- 3,000 canonical phrases;
-- 4,827 stored forms;
-- 7,827 unique lookup keys.
+- 4,000 canonical phrases;
+- 7,509 stored forms;
+- 11,509 stored lookup variants (token-equivalent spellings can share a runtime key under one owner).
 
 When a user clicks a subtitle word, Subtitle Bridge checks the current cue for the longest known phrase containing that word before falling back to the normal single-word dictionary.
 
@@ -104,8 +104,10 @@ Dictionary validation is part of the normal project checks:
 
 ```bash
 npm run dictionary:verify-production
+npm run dictionary:verify-extension
 npm run dictionary:validate
 npm run phrase-dictionary:verify-production
+npm run phrase-dictionary:verify-extension
 ```
 
 ## Stremio integration

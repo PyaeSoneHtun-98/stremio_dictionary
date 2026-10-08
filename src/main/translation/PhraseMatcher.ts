@@ -1,5 +1,7 @@
 import type { PhraseDataset, PhraseEntry, PhraseMatch, TranslationRequest } from '../../shared/translation'
+import { tokenizeSubtitleText } from '../subtitles/normalize'
 import phraseData from './data/phrases.json'
+import extensionData from './data/phrases-extension.json'
 
 interface IndexedPhraseVariant {
   entry: PhraseEntry
@@ -18,7 +20,13 @@ export interface PhraseMatcher {
 }
 
 export const LOCAL_PHRASE_DATASET = phraseData as PhraseDataset
-export const LOCAL_PHRASES: readonly PhraseEntry[] = validatePhraseDataset(LOCAL_PHRASE_DATASET)
+export const LOCAL_PHRASE_EXTENSION_DATASET = extensionData as PhraseDataset
+export const PRODUCTION_LOCAL_PHRASES = validatePhraseDataset(LOCAL_PHRASE_DATASET)
+export const LOCAL_PHRASE_EXTENSION = validatePhraseDataset(LOCAL_PHRASE_EXTENSION_DATASET)
+export const LOCAL_PHRASES: readonly PhraseEntry[] = validatePhraseDataset({
+  version: 1,
+  entries: [...PRODUCTION_LOCAL_PHRASES, ...LOCAL_PHRASE_EXTENSION]
+})
 const LOCAL_PHRASE_MATCHER = createPhraseMatcher(LOCAL_PHRASES)
 
 export function findLocalPhraseMatch(request: TranslationRequest): ResolvedPhraseMatch | null {
@@ -38,16 +46,17 @@ export function createPhraseMatcher(entries: readonly PhraseEntry[]): PhraseMatc
     const entryVariants = new Set<string>()
 
     for (const rawVariant of [entry.phrase, ...entry.forms]) {
+      const storedVariant = normalizeStoredPhrase(rawVariant)
       const normalizedVariant = normalizePhrase(rawVariant)
-      if (entryVariants.has(normalizedVariant)) {
+      if (entryVariants.has(storedVariant)) {
         throw new Error(
           `Duplicate phrase variant within ${entry.phrase}: ${normalizedVariant}`
         )
       }
-      entryVariants.add(normalizedVariant)
+      entryVariants.add(storedVariant)
       const tokenCount = normalizedVariant.split(' ').length
-      if (tokenCount < 2) {
-        throw new Error(`Phrase variants must contain at least two tokens: ${rawVariant}`)
+      if (tokenCount < 2 || tokenCount > 5) {
+        throw new Error(`Phrase variants must contain 2–5 subtitle tokens: ${rawVariant}`)
       }
 
       const existing = variants.get(normalizedVariant)
@@ -174,14 +183,16 @@ function validatePhraseEntry(entry: PhraseEntry): void {
 }
 
 function normalizePhrase(value: string): string {
-  return value
-    .normalize('NFKC')
-    .trim()
-    .toLocaleLowerCase('en-US')
-    .split(/\s+/)
-    .map(normalizePhraseToken)
-    .filter(Boolean)
-    .join(' ')
+  // Index the same token keys that real subtitle clicks send, including hyphenated surfaces.
+  // Canonical entry text stays intact for display and reporting; normalized collisions still fail.
+  return tokenizeSubtitleText(value).map((token) => token.lookupTerm).join(' ')
+}
+
+function normalizeStoredPhrase(value: string): string {
+  // Distinct stored spellings (bird's-eye / bird's eye) can share one token key
+  // under the same owner. Exact normalized duplicates remain invalid.
+  return value.normalize('NFKC').trim().toLocaleLowerCase('en-US')
+    .split(/\s+/).map(normalizePhraseToken).filter(Boolean).join(' ')
 }
 
 function normalizePhraseToken(value: string): string {

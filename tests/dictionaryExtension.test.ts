@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { validateDictionaryDocument } from '../scripts/dictionary-lib.mjs'
 import { tokenizeSubtitleText } from '../src/main/subtitles/normalize'
+import { buildPhraseLookupContext } from '../src/renderer/src/features/playback/subtitleSegments'
 import { CORE_LOCAL_DICTIONARY } from '../src/main/translation/coreDictionary'
 import { LEGACY_COMPATIBILITY_ALIASES } from '../src/main/translation/legacyCompatibilityAliases'
 import { LocalDictionaryProvider } from '../src/main/translation/LocalDictionaryProvider'
@@ -14,6 +15,7 @@ import { LOCAL_PHRASES } from '../src/main/translation/PhraseMatcher'
 import {
   normalizeDictionaryReport,
   REPORT_DICTIONARY_VERSION,
+  REPORT_PHRASE_DICTIONARY_VERSION,
 } from '../src/shared/dictionaryReport'
 
 describe('integrated dictionary extension', () => {
@@ -23,7 +25,7 @@ describe('integrated dictionary extension', () => {
     expect(() =>
       validateDictionaryDocument({ version: 1, entries: LOCAL_DICTIONARY }),
     ).not.toThrow()
-    expect(new Set(LOCAL_DICTIONARY.map((entry) => entry.word)).size).toBe(35_014)
+    expect(new Set(LOCAL_DICTIONARY.map((entry) => entry.word)).size).toBe(40_011)
     const frozenKeys = new Set(
       PRODUCTION_LOCAL_DICTIONARY.flatMap((entry) => [entry.word, ...entry.forms]),
     )
@@ -32,7 +34,7 @@ describe('integrated dictionary extension', () => {
     }
   })
 
-  it('resolves all 8,783 upstream keys after real subtitle tokenization and accepts canonical reports', async () => {
+  it('resolves all 16,361 upstream keys after real subtitle tokenization and accepts canonical reports', async () => {
     let checked = 0
     const effectiveByWord = new Map(LOCAL_DICTIONARY_EXTENSION.map((entry) => [entry.word, entry]))
     for (const entry of LOCAL_DICTIONARY_EXTENSION_DATASET.entries) {
@@ -52,7 +54,7 @@ describe('integrated dictionary extension', () => {
       }
       expect(normalizeDictionaryReport({ term: entry.word, category: 'incorrect' })).not.toBeNull()
     }
-    expect(checked).toBe(8_783)
+    expect(checked).toBe(16_361)
   }, 15_000)
 
   it('retains every frozen canonical/form lookup and all app-only core/compatibility keys', async () => {
@@ -84,6 +86,17 @@ describe('integrated dictionary extension', () => {
   it('keeps ordinary subtitle meanings for every overlapping core/alias key', async () => {
     const cases = [
       ['going', 'သွားသည်'],
+      ['go', 'သွားသည်'],
+      ['goes', 'သွားသည်'],
+      ['went', 'သွားသည်'],
+      ['gone', 'သွားသည်'],
+      ['run', 'ပြေးသည်'],
+      ['runs', 'လည်ပတ်သည်'],
+      ['ran', 'စီမံခန့်ခွဲသည်'],
+      ['see', 'မြင်သည်'],
+      ['sees', 'မြင်သည်'],
+      ['saw', 'မြင်သည်'],
+      ['seen', 'မြင်သည်'],
       ['love', 'ချစ်သည်'],
       ['loves', 'ချစ်သည်'],
       ['loved', 'ချစ်ခဲ့သည်'],
@@ -108,26 +121,52 @@ describe('integrated dictionary extension', () => {
     expect((await provider.translate({ word: 'running' })).dictionaryEntry?.word).toBe('running')
   })
 
-  it('preserves phrase-first matching for all 7,827 canonical/form variants', async () => {
+  it.each([
+    ['I can swim.', 'can', 'modal', 'နိုင်သည်'],
+    ['I do not want to die.', 'die', 'verb', 'သေဆုံးသည်'],
+    ['Let me explain.', 'let', 'verb', 'ခွင့်ပြုသည်'],
+    ['It is in the room.', 'in', 'preposition', 'အထဲ၌'],
+    ['That costs a lot.', 'lot', 'noun', 'များပြားသောပမာဏ'],
+  ])('retains the common subtitle sense in %s', async (text, word, partOfSpeech, meaning) => {
+    const tokens = tokenizeSubtitleText(text)
+    const token = tokens.find((token) => token.lookupTerm === word)
+    expect(token).toBeDefined()
+    if (!token) return
+    const result = await provider.translate({
+      word: token.lookupTerm,
+      ...buildPhraseLookupContext(tokens, token),
+    })
+    expect(result.dictionaryEntry?.meanings).toContainEqual({
+      partOfSpeech,
+      burmese: expect.arrayContaining([meaning]),
+    })
+  })
+
+  it('preserves phrase-first matching for all 11,509 variants from every real subtitle token', async () => {
     let checked = 0
     for (const entry of LOCAL_PHRASES) {
       for (const variant of [entry.phrase, ...entry.forms]) {
-        const contextTokens = variant.split(' ')
-        const result = await provider.translate({
-          word: contextTokens[0],
-          contextTokens,
-          clickedTokenIndex: 0,
-        })
-        expect(result.phraseEntry?.phrase).toBe(entry.phrase)
+        const tokens = tokenizeSubtitleText(`"${variant.toUpperCase()}!"`)
+        for (const token of tokens) {
+          const result = await provider.translate({
+            word: token.lookupTerm,
+            ...buildPhraseLookupContext(tokens, token),
+          })
+          expect(result.phraseEntry).toEqual(entry)
+          expect(normalizeDictionaryReport({ term: result.phraseEntry?.phrase, category: 'incorrect' })).not.toBeNull()
+        }
         checked++
       }
     }
-    expect(checked).toBe(7_827)
+    expect(checked).toBe(11_509)
   }, 15_000)
 
   it('identifies the extension/correction snapshot using the existing backend version contract', () => {
-    expect(REPORT_DICTIONARY_VERSION).toBe('1.0-ext.061-070.1')
+    expect(REPORT_DICTIONARY_VERSION).toBe('1.0-ext.061-080.2')
     expect(REPORT_DICTIONARY_VERSION.length).toBeLessThanOrEqual(32)
     expect(REPORT_DICTIONARY_VERSION).toMatch(/^\d+\.\d+(?:\.\d+)?(?:-[a-z0-9.-]+)?$/i)
+    expect(REPORT_PHRASE_DICTIONARY_VERSION).toBe('1.0-ext.013-016.1')
+    expect(REPORT_PHRASE_DICTIONARY_VERSION.length).toBeLessThanOrEqual(32)
+    expect(REPORT_PHRASE_DICTIONARY_VERSION).toMatch(/^\d+\.\d+(?:\.\d+)?(?:-[a-z0-9.-]+)?$/i)
   })
 })

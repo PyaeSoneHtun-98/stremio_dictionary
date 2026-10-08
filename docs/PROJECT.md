@@ -90,16 +90,20 @@ The default translation provider is `LocalDictionaryProvider`.
 - The production corpus is the frozen Dictionary v1.0 artifact from `PyaeSoneHtun-98/dictionary-dataset/dist/dictionary_v1.json`.
 - The frozen corpus contains 30,000 unique headwords and 15,864 stored inflected forms.
 - Subtitle Bridge vendors the exact frozen artifact and verifies its SHA-256 during automated checks.
-- A separately pinned 5,000-headword extension from dataset commit `7be581c` adds batches 061–070.
-  Eleven reviewed app corrections preserve useful overlapping meanings/forms, including `waited`.
-  The combined dictionary has 35,014 unique headwords; the frozen artifacts remain unchanged.
-  See [dictionary extension](DICTIONARY_EXTENSION.md) for hashes, reconciliation, and acceptance gates.
+- A separately pinned 10,000-headword extension from dataset commit `3bce847` adds batches 061–080.
+  Nineteen targeted app corrections preserve core vocabulary/forms and restore common subtitle senses.
+  The combined dictionary has 40,011 unique headwords; the frozen artifacts remain unchanged.
+  See [dictionary expansion](DICTIONARY_EXPANSION.md) for hashes, reconciliation, and acceptance gates.
 - Automatic multi-word lookup uses the separately frozen Phrase Dictionary v1.0.0 from `PyaeSoneHtun-98/dictionary-dataset/dist/phrases_v1.json`.
 - Phrase Dictionary v1 contains 3,000 canonical phrases, 4,827 stored forms, 7,827 collision-free lookup keys, and 4,092 Burmese semantic meanings.
+- A separate extension from the same dataset commit adds 1,000 phrases and 2,682 forms;
+  runtime lookup contains 4,000 canonical phrases and 11,509 stored variants. Phrase index keys
+  use subtitle tokenization, including hyphens; distinct spellings can share a key under one owner,
+  and collisions between different owners fail. Canonical display/report text stays unchanged.
 - The vendored phrase artifact SHA-256 is `951a8bbe54824cf76728393791607798f878a062b19eca63e572278ba8f62926` and is verified during `npm run check`.
 - Phrase matching is longest-match-first within the bounded current subtitle cue; clicking any token inside a known contiguous 2–5-token phrase can resolve the phrase before single-word fallback.
 - The 16-entry structured core supplement preserves useful basic words absent from frozen v1;
-  14 remain separate after `love` and `wait` are explicitly reconciled into the extension.
+  11 remain separate after `go`, `love`, `run`, `see` and `wait` are explicitly reconciled into the extension.
 - A collision-checked compatibility alias table restores 11 historical starter-dictionary inflections that are intentionally absent from the frozen corpus forms, without modifying the frozen JSON.
 - All local results use the same structured dictionary model: canonical headword, pronunciation, grouped parts of speech, and Burmese meanings.
 - Canonical headwords are indexed before forms, so an exact headword wins over another entry's inflection.
@@ -247,7 +251,7 @@ Diagnostics are intentionally small and privacy-conscious. They may record lifec
 - Windows x64 only.
 - The first normal Windows install requires Internet access to download the pinned mpv and FFmpeg runtime archives; verified archives are cached for later upgrades.
 - The Dictionary v1.0 corpus is broad but not exhaustive; unknown words still fail cleanly offline.
-- Phrase Dictionary v1 covers 3,000 contiguous 2–5-token expressions with longest-match detection and single-word fallback. Separated-object phrasal verbs, cross-cue matching, and phrases longer than five tokens are not supported yet.
+- The frozen phrase base plus extension cover 4,000 contiguous 2–5-token expressions with longest-match detection and single-word fallback. Separated-object phrasal verbs, cross-cue matching, and phrases longer than five tokens are not supported yet.
 - Rich ASS/SSA styling is not recreated in the interactive overlay.
 - Image subtitles are not clickable text.
 - Stremio external subtitle-addon URLs are not yet ingested.

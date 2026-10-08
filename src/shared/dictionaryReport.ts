@@ -9,10 +9,10 @@ export type DictionaryReportOutcome =
   | { ok: true }
   | { ok: false; reason: 'unavailable' | 'invalid' | 'rate-limited' | 'failed' }
 
-// Base v1.0 + batches 061–070 + reviewed app corrections revision 1.
+// Base v1.0 + batches 061–080 + reviewed app corrections revision 2.
 // Uses the existing backend's bounded version syntax; no contract expansion is needed.
-export const REPORT_DICTIONARY_VERSION = '1.0-ext.061-070.1'
-export const REPORT_PHRASE_DICTIONARY_VERSION = '1.0.0'
+export const REPORT_DICTIONARY_VERSION = '1.0-ext.061-080.2'
+export const REPORT_PHRASE_DICTIONARY_VERSION = '1.0-ext.013-016.1'
 
 export function normalizeDictionaryReport(value: unknown): DictionaryReportRequest | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null

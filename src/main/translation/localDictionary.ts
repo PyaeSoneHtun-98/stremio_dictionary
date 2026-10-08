@@ -28,11 +28,14 @@ export const LOCAL_DICTIONARY_EXTENSION: readonly LocalDictionaryEntry[] =
     (entry) => correctionByWord.get(entry.word) ?? entry,
   )
 
-// love and wait are explicitly reconciled in the reviewed corrections, including waited.
+// Core overlaps are explicitly reconciled in the reviewed corrections, including went/gone.
 // Any future overlap must receive an explicit review instead of silently dropping a core entry.
-const reconciledCoreWords = new Set(['love', 'wait'])
+const reconciledCoreWords = new Set(['go', 'love', 'run', 'see', 'wait'])
 for (const entry of CORE_LOCAL_DICTIONARY) {
-  if (extensionWords.has(entry.word) && !reconciledCoreWords.has(entry.word)) {
+  if (
+    extensionWords.has(entry.word) &&
+    (!reconciledCoreWords.has(entry.word) || !correctionByWord.has(entry.word))
+  ) {
     throw new Error('Dictionary extension has an unreviewed core overlap.')
   }
 }
