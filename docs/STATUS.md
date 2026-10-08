@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`67c8edf29b1b902296c3c0a318151f8e4c9bac3a`
+`2700484b4e85c8f42f0f749f2f7cc18a6b06731c`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -326,6 +326,11 @@ PR: [#82](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/82).
   reviewer is claimed. All 18 focused stream tests were re-run and passed; CI #607 passed
   validate and package-windows at that head. This acceptance update changes documentation only;
   subsequent final-head CI is tracked in PR #82 before merge.
+- CI #608 passed both jobs at `02f2d7ec85b0014f148e4cbd118b11d083684246`.
+  The owner authorized merging PRs #86 and #82, then preparing a combined release candidate.
+  Updating this branch to icon master `2700484` conflicted only in this status document;
+  stream implementation and tests remain unchanged. Combined validation and final-head CI
+  are recorded in PR #82 before merge.
 - Code and owner manual acceptance gates passed. Release publication remains on hold;
   public release is still v1.0.6. No merge is claimed by this acceptance record.
 
@@ -376,6 +381,74 @@ Merged PR: [#78](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/78).
   `release/SubtitleBridge-win-x64/Subtitle Bridge.exe`; its 16 previously verified managed runtime
   files were restored and hash-matched after ZIP/setup creation, so they are local test tools only.
   The packaged theme is verified, main/preload match the build, and synthetic preview files are excluded.
+
+## Completed — Issue #83 clean vector logo
+
+Approved artwork PR #84 squash-merged as `5d4532f2a8338805e611f41919cda5af20b86648`
+after exact-head CI #610 passed both jobs. Issue #83 is closed/completed. The owner then
+authorized app/Windows icon integration separately as Issue #85. No release was published.
+The asset-creation snapshots below describe the completed artwork work.
+
+The owner kept the Subtitle Bridge name and assigned SVG recreation of the selected generated
+bridge/subtitle-bubble concept to Codex. Branch: `codex/issue-83-vector-logo`, based on master.
+PR: [#84](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/84).
+
+- Hand-authored white/charcoal SVG symbol, square icon and full logo; no embedded PNG or
+  external resources in the finished vector assets. Wordmark outlines use licensed Inter Bold.
+- Editable wordmark source, font provenance/license, optional export tools, PNG previews and
+  a seven-size Windows ICO are under [assets/branding](../assets/branding/README.md).
+- Full logo and native 16/24/32/48/64/128/256px icons were rendered and visually inspected.
+  The owner approved the recreated vector appearance on 2026-10-08 at asset head
+  `e9498e76dde0d5ea749c2990470a183808d5efed`; this follow-up changes acceptance documentation only.
+- Local `npm run check` passed: 250 tests in 36 files, lint/typechecks, corpus gates and
+  production builds. SVG structure/resource checks, PNG dimensions/alpha checks and all
+  seven decoded ICO frames passed; `git diff --check` passed. Existing lint warnings remain.
+- Complete asset/tooling review found no unresolved P1/P2/P3 findings. Review was performed
+  by the implementing Codex agent; no independent second review is claimed. Exact-head CI
+  and merge status are recorded in PR #84. Artwork approval does not publish a release.
+- App/installer icon wiring, executable/shortcut icon acceptance and release are separate
+  follow-up work; playback code and packaging configuration are unchanged.
+
+## Completed — Issue #85 apply approved app icon
+
+PR [#86](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/86) squash-merged as
+`2700484b4e85c8f42f0f749f2f7cc18a6b06731c`; Issue #85 is closed/completed.
+Exact-head CI #612 passed validate and package-windows at `76432a2a882454fabca8610db8afba7f8b0b0ce9`.
+The owner confirmed the icon preview was checked and works. No real setup installation or
+manual installed-shortcut appearance check is claimed; CI verified installed icon resources,
+shortcut metadata and registry references. Final review found no unresolved P1/P2/P3 findings.
+Implementation snapshots below are historical; no independent second reviewer is claimed.
+
+The owner authorized applying the approved logo to the app and Windows packaging.
+Branch: `codex/issue-85-app-icons`, using the approved PR #84 artwork.
+
+- Replace the launcher header's SB tile with the approved SVG. Native launcher/player host
+  windows load the app-local ICO; transparent subtitle-overlay flags and behavior are unchanged.
+- Embed all seven approved ICO frames into the copied app EXE and setup EXE. Setup uses its
+  own associated icon; the icon object is disposed with the setup form. Start Menu shortcuts
+  explicitly use the app EXE's index-0 icon; existing Installed Apps metadata uses the same source.
+- Pin build-only `resedit` 3.1.0 (two packages); no new runtime app dependency or bundled tools.
+  Before saving, embedding verifies non-icon resource payloads and non-resource section hashes/
+  addresses plus the architecture and entry point remain unchanged.
+- CI/release checks inspect the actual EXE resource frames. Windows install CI also verifies
+  copied window assets, real shortcut metadata and the Installed Apps icon reference.
+- Local `npm run check` passed all 250 tests in 36 files, corpus gates, lint/typechecks and
+  production build. Existing lint warnings remain. Windows packaging passed in isolated staging;
+  all seven frames in both final EXEs and packaged ICO/PNG/license copies match the approved assets.
+  The unmodified Electron icon was rejected as a negative control. A temporary shortcut persisted
+  the branded executable/index-0 icon correctly. `git diff --check` and installer syntax passed.
+- The exact packaged preview was launched and its process path verified. Native inspection
+  confirmed the launcher SVG and title-bar icon render correctly in the real Electron window.
+  This verifies app startup/header rendering, not real-media playback or owner acceptance.
+- An initial stronger pre-edit snapshot check caught the PE editor shrinking the resource
+  virtual size and moving `.reloc`. Embedding now retains the original resource allocation;
+  immutable before/after section addresses/hashes and entry-point checks pass in the rebuilt EXE.
+- Local ZIP SHA-256: `1a0b892251fe4445f96d5010ccc6d7f3d342bf6c26df308e75175bc69ad9d53d`.
+  Setup SHA-256: `09bf195585418bf3506773c635ff67d6abcad76f84b3aba88ec01b6749958760`.
+- Portable preview: `release/SubtitleBridge-icon-test-win-x64/Subtitle Bridge.exe`.
+  Its 16 existing verified runtime files were copied/hash-matched after ZIP/setup creation;
+  distribution artifacts contain no media runtime binaries. This preview excludes stream PR #82.
+- Acceptance/CI/merge completed as recorded above. No release has been published.
 
 ## Completed — Issue #75 dictionary extension
 

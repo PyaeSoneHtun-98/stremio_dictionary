@@ -243,6 +243,13 @@ npm run package:win
 
 The release build produces an Electron portable directory/ZIP plus a single `SubtitleBridge-Setup-x64.exe` for normal users. The setup executable extracts the packaged app, provisions pinned/hash-verified app-local mpv and FFmpeg runtimes, registers a per-user Start Menu entry and Windows Installed Apps uninstall metadata, and uses a staged directory swap with rollback and interrupted-upgrade recovery. The packaged PowerShell installer remains the internal transaction engine and developer/test path. Normal users do not need to run PowerShell commands. Uninstall removes the managed runtime archive cache by default while preserving normal Electron user settings/data.
 
+The approved white/charcoal logo sources live in [assets/branding](../assets/branding/README.md).
+The launcher header uses the SVG icon; native launcher/player windows use the packaged ICO.
+Windows packaging embeds that same seven-size ICO into the app and setup executables, and
+Start Menu/Installed Apps references resolve to the app executable's icon at index 0.
+Build-only `resedit` tooling checks the actual resource frames and preserves non-icon resources
+and executable sections. It is not shipped as an app runtime dependency.
+
 Diagnostics are intentionally small and privacy-conscious. They may record lifecycle, controlled media/subtitle failure metadata, and memory samples. They must not record:
 
 - API keys or authorization material
