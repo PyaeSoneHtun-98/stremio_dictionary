@@ -1,9 +1,9 @@
 .update-strip,
 .update-panel {
   margin-bottom: 14px;
-  border: 1px solid rgb(181 230 209 / 0.18);
+  border: 1px solid rgb(var(--theme-accent-rgb) / 0.18);
   border-radius: 17px;
-  background: rgb(181 230 209 / 0.055);
+  background: rgb(var(--theme-accent-rgb) / 0.055);
 }
 
 .update-strip {
@@ -11,7 +11,7 @@
   align-items: center;
   gap: 10px;
   padding: 11px 14px;
-  color: #9fb8ad;
+  color: var(--theme-text-secondary);
   font-size: 0.76rem;
 }
 
@@ -19,8 +19,8 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #b5e6d1;
-  box-shadow: 0 0 12px rgb(181 230 209 / 0.35);
+  background: var(--theme-accent);
+  box-shadow: 0 0 12px rgb(var(--theme-accent-rgb) / 0.35);
 }
 
 .update-strip-error {
@@ -40,7 +40,7 @@
 }
 
 .update-strip-error span {
-  color: #8f817f;
+  color: var(--theme-text-muted);
   font-size: 0.7rem;
 }
 
@@ -49,14 +49,12 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;
   padding: 18px 20px;
-  background:
-    radial-gradient(circle at 92% 0%, rgb(181 230 209 / 0.11), transparent 34%),
-    rgb(11 22 27 / 0.86);
+  background: var(--theme-surface);
 }
 
 .update-panel h2 {
   margin: 6px 0;
-  color: #f0f6f3;
+  color: var(--theme-text);
   font-size: 1.12rem;
   font-weight: 650;
   letter-spacing: -0.025em;
@@ -65,7 +63,7 @@
 .update-panel p {
   max-width: 650px;
   margin-bottom: 0;
-  color: #8da198;
+  color: var(--theme-text-secondary);
   font-size: 0.78rem;
   line-height: 1.55;
 }
@@ -80,7 +78,7 @@
 }
 
 .update-panel-action small {
-  color: #657a70;
+  color: var(--theme-text-muted);
   font-size: 0.64rem;
   text-align: right;
 }
@@ -91,7 +89,7 @@
 
 .update-release-notes summary {
   width: fit-content;
-  color: #9fc4b4;
+  color: var(--theme-accent);
   cursor: pointer;
   font-size: 0.72rem;
   font-weight: 700;
@@ -105,7 +103,7 @@
   border-radius: 12px;
   padding: 12px;
   background: rgb(0 0 0 / 0.18);
-  color: #83968d;
+  color: var(--theme-text-muted);
   font-family: inherit;
   font-size: 0.7rem;
   line-height: 1.5;
@@ -121,18 +119,18 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 7px;
-  color: #8fa59a;
+  color: var(--theme-text-secondary);
   font-size: 0.68rem;
 }
 
 .update-progress-label strong {
-  color: #b5e6d1;
+  color: var(--theme-accent);
 }
 
 .update-progress progress {
   width: 100%;
   height: 8px;
-  accent-color: #b5e6d1;
+  accent-color: var(--theme-accent);
 }
 
 .update-panel .update-action-error {

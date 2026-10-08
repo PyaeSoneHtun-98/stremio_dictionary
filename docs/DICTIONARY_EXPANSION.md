@@ -78,7 +78,7 @@ update pins, provenance and corpus versions together.
 ## Acceptance status
 
 Implementation is on `codex/issue-79-dictionary-expansion`, based on stable master,
-in [Draft PR #80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
+in [merged PR #80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
 Theme PR #78 remains separate. Local `npm run check` passed all 250 tests in 36 files,
 corpus gates, lint/typechecks and production builds. CI #600 passed both `validate` and
 `package-windows` at implementation head `4b55b5fdedd4cc08fe49674f47a2bb66f7908965`.
@@ -86,8 +86,11 @@ Local Windows build and both packaging scripts also passed in an isolated stagin
 to avoid replacing the running theme test app. CI #601 also passed both jobs at documentation
 head `e5e2badb0b4b14bac44a3b27fccdb8d1421c0874`. Final code review of that complete diff found
 no unresolved P1/P2/P3 findings. Automated Windows installer tests are not owner playback tests.
-No merge or release publication is authorized. Earlier Issue #75 Windows acceptance does not
-establish acceptance of this expansion or the phrase normalization change.
+CI #602 passed both jobs at final head `b4817c8774df9cf4f0e9176abd48d0cfd5e92eea`.
+The owner subsequently confirmed all requested word/reporting/Stremio/phrase checks passed
+in the prepared Windows preview and authorized merge. PR #80 squash-merged as
+`91cb213a7f0e77018ff7fc14ec6e93c40d872fba`; Issue #79 is closed/completed. Release stays on hold.
+Earlier Issue #75 Windows acceptance is a separate historical result.
 
 Local pure Issue #79 artifacts (under `.vite/issue79-package-stage/release`):
 
@@ -108,8 +111,9 @@ for `Things went pear-shaped`. Read-only process inspection confirmed the older 
 was running; its bundle did not contain the phrase extension. After instructions to close it
 and open the separate dictionary preview, the owner reported the requested phrase retest
 **passed**. No code change was required. This establishes the reported phrase retest, not an
-independently observed run of every checklist item. Confirmation of broader word/reporting/
-Stremio acceptance is still pending; no codec-specific or inbox-version check is claimed.
+independently observed run of every checklist item. The owner later confirmed the requested
+broader word/reporting/Stremio checks passed as recorded above; no codec-specific or
+private inbox-version inspection is claimed.
 
 Manual checklist for the new Windows test build:
 
