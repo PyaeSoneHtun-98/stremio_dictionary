@@ -290,7 +290,7 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
 
 Branch: `codex/issue-81-open-stream`. The owner assigned implementation to Codex before release.
 Issue: [#81](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/81).
-Draft PR: [#82](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/82).
+PR: [#82](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/82).
 
 - Add a compact Stream URL field and Open stream button below the local/Stremio launcher cards,
   using the accepted gray/white theme. Enter submits, errors stay inline, and pending requests
@@ -317,10 +317,17 @@ Draft PR: [#82](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/82).
   ZIP SHA-256: `5e4ece3a9768a73cd9d52d9dd07e70de71c2b2621b537d75d42bbddd6428e764`.
   Setup SHA-256: `0136851a12346552af62da8cc346fbbd44d1e75848cc80de4ae6ef3144ed38f1`.
   These are local test artifacts, not a published release.
-- Complete-diff code review found no unresolved P1/P2/P3 issues. It was performed by the
-  implementing Codex agent; no independent second reviewer is claimed. Current-head CI and
-  actual Windows stream acceptance remain pending and are tracked in the Draft PR.
-  Release publication remains on hold; public release is still v1.0.6.
+- On 2026-10-08 the owner confirmed a real Stremio localhost HTTP stream opens in that test
+  build, then explicitly confirmed clickable subtitles/Burmese lookup, button and Enter opening,
+  and local video/external subtitles all passed. No private stream URL or identifier is retained
+  in this record. A separate public HTTPS playback test or exhaustive codec inventory is not claimed.
+- Complete-diff follow-up review at `771930b489a5fb6c9fd6215257ef2a9f39806479` found no
+  P1/P2/P3/P4 findings. It was performed by the implementing Codex agent; no independent second
+  reviewer is claimed. All 18 focused stream tests were re-run and passed; CI #607 passed
+  validate and package-windows at that head. This acceptance update changes documentation only;
+  subsequent final-head CI is tracked in PR #82 before merge.
+- Code and owner manual acceptance gates passed. Release publication remains on hold;
+  public release is still v1.0.6. No merge is claimed by this acceptance record.
 
 ## Completed — Issue #77 neutral charcoal theme
 
