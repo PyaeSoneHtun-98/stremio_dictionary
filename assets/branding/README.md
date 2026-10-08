@@ -22,9 +22,9 @@ filters or external resources. They can be edited in a vector editor and render 
 Inter installed. The editable text source is intentionally the exception: use the outlined
 version for distribution. The SVG title/description or accessible label identifies the logo.
 
-These files are proposed assets awaiting owner appearance acceptance. This change does not
-connect them to Electron, the executable, shortcuts or setup. That integration will need its
-own packaging/installed-icon checks after the artwork is accepted.
+The owner approved this recreated vector appearance on 2026-10-08. This change does not
+connect the assets to Electron, the executable, shortcuts or setup. Integration remains
+separate follow-up work with its own packaging/installed-icon checks.
 
 ## Wordmark provenance
 
@@ -75,5 +75,5 @@ and verifies each decoded ICO frame exactly matches its corresponding PNG.
 - SVGs parsed successfully; finished assets have no embedded raster/external-resource/font dependency.
 - PNG/ICO dimensions and transparent icon corners checked; all seven ICO frames match the PNGs.
 - Full logo and icon rendered and visually inspected, including native 16/24/32/48/64/128/256px icons.
-- Owner approval of this recreated vector appearance remains pending; no installed-shell or
+- The owner approved the recreated vector appearance on 2026-10-08; no installed-shell or
   playback test is claimed for these unused assets.

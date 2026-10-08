@@ -348,16 +348,21 @@ merge remains separate from the logo work. No public release has been published.
 
 The owner kept the Subtitle Bridge name and assigned SVG recreation of the selected generated
 bridge/subtitle-bubble concept to Codex. Branch: `codex/issue-83-vector-logo`, based on master.
+PR: [#84](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/84).
 
 - Hand-authored white/charcoal SVG symbol, square icon and full logo; no embedded PNG or
   external resources in the finished vector assets. Wordmark outlines use licensed Inter Bold.
 - Editable wordmark source, font provenance/license, optional export tools, PNG previews and
   a seven-size Windows ICO are under [assets/branding](../assets/branding/README.md).
 - Full logo and native 16/24/32/48/64/128/256px icons were rendered and visually inspected.
-  Owner approval of the vector appearance remains pending.
+  The owner approved the recreated vector appearance on 2026-10-08 at asset head
+  `e9498e76dde0d5ea749c2990470a183808d5efed`; this follow-up changes acceptance documentation only.
 - Local `npm run check` passed: 250 tests in 36 files, lint/typechecks, corpus gates and
   production builds. SVG structure/resource checks, PNG dimensions/alpha checks and all
   seven decoded ICO frames passed; `git diff --check` passed. Existing lint warnings remain.
+- Complete asset/tooling review found no unresolved P1/P2/P3 findings. Review was performed
+  by the implementing Codex agent; no independent second review is claimed. Exact-head CI
+  and merge status are recorded in PR #84. Artwork approval does not publish a release.
 - App/installer icon wiring, executable/shortcut icon acceptance and release are separate
   follow-up work; playback code and packaging configuration are unchanged.
 
