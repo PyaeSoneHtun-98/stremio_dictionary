@@ -290,6 +290,7 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
 
 Branch: `codex/issue-81-open-stream`. The owner assigned implementation to Codex before release.
 Issue: [#81](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/81).
+Draft PR: [#82](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/82).
 
 - Add a compact Stream URL field and Open stream button below the local/Stremio launcher cards,
   using the accepted gray/white theme. Enter submits, errors stay inline, and pending requests
@@ -309,7 +310,16 @@ Issue: [#81](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/81).
   narrow (320px) checks: click/Enter, opening state, invalid input, failure/control recovery,
   successful input clearing and scroll reachability. No document-level horizontal overflow
   occurred at 320px. This does not claim native mpv playback or actual network acceptance.
-- Current-head CI, Windows packaging and actual Windows stream acceptance are pending.
+- Fresh Windows ZIP/setup packaging passed in isolated staging at implementation head
+  `a98317a7018f67d5e06c4405689ab72a8d17b95f`. The separate local test player is
+  `release/SubtitleBridge-stream-test-win-x64/Subtitle Bridge.exe`; its app bundles match the
+  production build and all 16 existing runtime copies hash-match. Existing apps were preserved.
+  ZIP SHA-256: `5e4ece3a9768a73cd9d52d9dd07e70de71c2b2621b537d75d42bbddd6428e764`.
+  Setup SHA-256: `0136851a12346552af62da8cc346fbbd44d1e75848cc80de4ae6ef3144ed38f1`.
+  These are local test artifacts, not a published release.
+- Complete-diff code review found no unresolved P1/P2/P3 issues. It was performed by the
+  implementing Codex agent; no independent second reviewer is claimed. Current-head CI and
+  actual Windows stream acceptance remain pending and are tracked in the Draft PR.
   Release publication remains on hold; public release is still v1.0.6.
 
 ## Completed — Issue #77 neutral charcoal theme
