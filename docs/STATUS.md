@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`2700484b4e85c8f42f0f749f2f7cc18a6b06731c`
+`f4ea6350c8b8f3199f4398392ba55feb3d1042ae`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -34,7 +34,8 @@ Current stable capabilities include:
 - temporary recovery notices for missing/unsupported/error subtitle states;
 - centered stream buffering/loading feedback that distinguishes manual pause from cache/seek stalls;
 - single-click video-surface play/pause and Windows-system-aware double-click fullscreen;
-- compact launcher with Local video, Stremio, and current-session status;
+- compact launcher with Local video, Stremio, HTTP/HTTPS Stream URL entry and current-session status;
+- approved white/charcoal logo in the launcher, native windows and Windows app/setup icons;
 - frozen 30,000-headword Dictionary v1.0 plus a pinned 10,000-entry extension and targeted app
   corrections: 40,011 unique runtime headwords;
 - frozen 3,000-entry Phrase Dictionary v1.0.0 plus a pinned 1,000-entry extension, with
@@ -286,7 +287,53 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
   these while continuing to reject actual duplicate stored variants and cross-owner collisions.
 - Merge and acceptance completed as recorded above. See [dictionary expansion](DICTIONARY_EXPANSION.md).
 
-## Active work — Issue #81 main-window stream entry
+## Active work — Issue #87 v1.0.7 release candidate
+
+The owner authorized merging the accepted icon/stream PRs and preparing one combined candidate
+for final Windows testing. Branch: `codex/issue-87-v1.0.7-candidate`, based on merged master
+`f4ea6350c8b8f3199f4398392ba55feb3d1042ae`.
+
+- Set package/lockfile and renderer metadata to 1.0.7; add user-facing release notes covering
+  the merged changes since v1.0.6. No playback, subtitle, reporting or installer behavior changes.
+- Both accepted features are present: approved icon/neutral theme and Stream URL/Open stream UI.
+- Windows packaging passed in isolated `.vite/issue87-rc-stage` with the official public reporting
+  endpoint. Source/config/package bytes match this candidate branch (staged source tests omitted).
+  Branding resources, v1.0.7 metadata and report-endpoint/stream-UI presence passed verification.
+- ZIP SHA-256: `b51051c5a6af41c5c14d4c006a8f5160452f2e6fcac7a3e56ec65a2b4ab63bb0`.
+  Setup SHA-256: `4729219ff24f52d7fa7246f73f2184cd7926f503b608ea11eb441e0c389749b4`.
+- Combined portable preview: `release/SubtitleBridge-v1.0.7-rc-test-win-x64/Subtitle Bridge.exe`.
+  Setup preview: `release/SubtitleBridge-v1.0.7-rc-Setup-x64.exe`. All app copies and 16 previously
+  verified runtime copies hash-match. Runtime copies were added only after ZIP/setup creation;
+  distribution artifacts contain no mpv/FFmpeg binaries. Dedicated previous test builds remain.
+- Candidate `npm run check` passed all 268 tests in 39 files, corpus gates, lint/typechecks
+  and production build. All five compiled app outputs exactly match the staged packaged app;
+  121 staged source/assets/tool files plus configuration/manifests hash-match the branch.
+  Release-preparation review found no unresolved P1/P2/P3 findings; no independent second
+  reviewer is claimed. `git diff --check` passed.
+- CI #616 passed validate and package-windows at candidate implementation head
+  `6088df44842a8285f266a4687e8b47d03aab3f5f`.
+- The owner reported **all passed** for the combined Windows candidate on 2026-10-08:
+  approved logo and stream entry, real Stremio stream via button and Enter, local video/external
+  subtitles, clickable Burmese word/phrase lookup, Reported flag feedback, audio selection,
+  fullscreen and player controls. This records the owner's explicit combined checklist result;
+  no exhaustive codec inventory, new real setup installation or independent observation is claimed.
+- Follow-up release-preparation review found no unresolved P1/P2/P3 findings. This acceptance
+  update changes documentation only; candidate application/package bytes remain unchanged.
+- Pending: final documentation-head CI and explicit publication authorization. PR:
+  [#88](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/88).
+- Keep the release PR Draft. The existing Release Windows workflow publishes a new stable
+  version automatically after successful master push CI; merging the version bump is therefore
+  held until final acceptance and explicit release authorization. Public release remains v1.0.6.
+
+## Completed — Issue #81 main-window stream entry
+
+PR [#82](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/82) squash-merged as
+`f4ea6350c8b8f3199f4398392ba55feb3d1042ae`; Issue #81 is closed/completed.
+Final head `9e9c81c1f853e43dea9cd01430ce3177b39eb3e5` passed CI #614 validate and
+package-windows after incorporating icon master. Only STATUS.md conflicted; stream source/tests
+remain byte-for-byte identical to accepted head `02f2d7e`. Combined local validation and final
+review found no unresolved P1/P2/P3 findings. No independent second reviewer is claimed.
+Implementation and earlier pending snapshots below are historical; release remains on hold.
 
 Branch: `codex/issue-81-open-stream`. The owner assigned implementation to Codex before release.
 Issue: [#81](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/81).
