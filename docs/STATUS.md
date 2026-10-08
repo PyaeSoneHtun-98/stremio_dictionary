@@ -310,9 +310,17 @@ for final Windows testing. Branch: `codex/issue-87-v1.0.7-candidate`, based on m
   121 staged source/assets/tool files plus configuration/manifests hash-match the branch.
   Release-preparation review found no unresolved P1/P2/P3 findings; no independent second
   reviewer is claimed. `git diff --check` passed.
-- Pending: exact-head CI and final combined owner Windows acceptance/review before publication.
-  Individual stream/icon manual acceptance is already recorded below; combined acceptance is
-  not inferred from those separate results. No new real setup installation is claimed.
+- CI #616 passed validate and package-windows at candidate implementation head
+  `6088df44842a8285f266a4687e8b47d03aab3f5f`.
+- The owner reported **all passed** for the combined Windows candidate on 2026-10-08:
+  approved logo and stream entry, real Stremio stream via button and Enter, local video/external
+  subtitles, clickable Burmese word/phrase lookup, Reported flag feedback, audio selection,
+  fullscreen and player controls. This records the owner's explicit combined checklist result;
+  no exhaustive codec inventory, new real setup installation or independent observation is claimed.
+- Follow-up release-preparation review found no unresolved P1/P2/P3 findings. This acceptance
+  update changes documentation only; candidate application/package bytes remain unchanged.
+- Pending: final documentation-head CI and explicit publication authorization. PR:
+  [#88](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/88).
 - Keep the release PR Draft. The existing Release Windows workflow publishes a new stable
   version automatically after successful master push CI; merging the version bump is therefore
   held until final acceptance and explicit release authorization. Public release remains v1.0.6.
