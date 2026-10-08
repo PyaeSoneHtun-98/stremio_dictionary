@@ -86,6 +86,13 @@ The updater only trusts stable releases and the exact Windows assets from the of
 - redacted rotating diagnostics;
 - Electron renderer isolation with Node integration disabled and context isolation enabled.
 
+## Stream URL entry (unreleased)
+
+Current development builds add **Stream URL** to the main window. Paste an HTTP/HTTPS media
+URL, then select **Open stream** or press Enter. This uses the same mpv playback and live text
+subtitle path as Stremio; an ordinary website page URL may not be playable media. Other URL
+schemes are rejected. The field clears on successful opening and no URL history is saved.
+
 ## Dictionary and phrase lookup
 
 The word dictionary combines frozen **Dictionary v1.0**, a pinned **10,000-entry extension**, targeted corrections and the remaining core supplement: **40,011 runtime headwords**. Compatibility aliases remain collision-checked. See [dictionary expansion](docs/DICTIONARY_EXPANSION.md) for provenance and acceptance status.

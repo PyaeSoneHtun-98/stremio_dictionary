@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   OpenVideoResult,
   PlaybackSnapshot,
   StremioHandoffStatus,
 } from '../../../../shared/media'
 import { createEmptySubtitleModel } from '../../../../shared/media'
+import {
+  INVALID_STREAM_URL_MESSAGE,
+  MAX_STREAM_URL_LENGTH,
+  normalizeStreamUrl,
+} from '../../../../shared/streamUrl'
 import './PlaybackProof.css'
 
 const EMPTY_STATE: PlaybackSnapshot = {
@@ -24,6 +29,10 @@ const EMPTY_STATE: PlaybackSnapshot = {
 export function PlaybackProof(): React.JSX.Element {
   const [state, setState] = useState<PlaybackSnapshot>(EMPTY_STATE)
   const [opening, setOpening] = useState(false)
+  const openingRequest = useRef(false)
+  const [streamOpening, setStreamOpening] = useState(false)
+  const [streamUrl, setStreamUrl] = useState('')
+  const [streamError, setStreamError] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
   const [stremioBusy, setStremioBusy] = useState(false)
@@ -80,6 +89,8 @@ export function PlaybackProof(): React.JSX.Element {
   }
 
   const openVideo = async (): Promise<void> => {
+    if (openingRequest.current) return
+    openingRequest.current = true
     setOpening(true)
     setLocalError(null)
     try {
@@ -87,11 +98,14 @@ export function PlaybackProof(): React.JSX.Element {
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : 'Could not open the video.')
     } finally {
+      openingRequest.current = false
       setOpening(false)
     }
   }
 
   const openDroppedFile = async (file: File): Promise<void> => {
+    if (openingRequest.current) return
+    openingRequest.current = true
     setOpening(true)
     setLocalError(null)
     try {
@@ -110,7 +124,37 @@ export function PlaybackProof(): React.JSX.Element {
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : 'Could not open the dropped video.')
     } finally {
+      openingRequest.current = false
       setOpening(false)
+    }
+  }
+
+  const openStream = async (): Promise<void> => {
+    if (openingRequest.current) return
+    const target = normalizeStreamUrl(streamUrl)
+    if (!target) {
+      setStreamError(INVALID_STREAM_URL_MESSAGE)
+      return
+    }
+    openingRequest.current = true
+    setOpening(true)
+    setStreamOpening(true)
+    setStreamError(null)
+    setLocalError(null)
+    try {
+      const result = await window.desktop.media.openStream(target)
+      if (result.error || result.cancelled) {
+        setStreamError('Could not open the stream. Check the URL and try again.')
+      } else {
+        setStreamUrl('')
+      }
+    } catch {
+      // IPC errors can contain implementation details or a private URL; never echo them.
+      setStreamError('Could not open the stream. Check the URL and try again.')
+    } finally {
+      openingRequest.current = false
+      setOpening(false)
+      setStreamOpening(false)
     }
   }
 
@@ -185,7 +229,7 @@ export function PlaybackProof(): React.JSX.Element {
             <p>Play an MKV or MP4 with clickable English subtitles and Burmese lookup.</p>
           </div>
           <button className="primary-action" type="button" onClick={openVideo} disabled={opening}>
-            {opening ? 'Opening…' : 'Choose video'}
+            {opening && !streamOpening ? 'Opening…' : 'Choose video'}
           </button>
           <span className="drop-hint">or drag and drop an MKV or MP4 anywhere on this panel</span>
         </section>
@@ -246,6 +290,42 @@ export function PlaybackProof(): React.JSX.Element {
           </div>
         </section>
       </div>
+
+      <form
+        className="stream-launcher"
+        aria-label="Open network stream"
+        aria-busy={streamOpening}
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault()
+          void openStream()
+        }}
+      >
+        <label htmlFor="stream-url">Stream URL</label>
+        <div className="stream-launcher-entry">
+          <input
+            id="stream-url"
+            type="url"
+            placeholder="https://example.com/video.mp4"
+            value={streamUrl}
+            maxLength={MAX_STREAM_URL_LENGTH}
+            autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="none"
+            disabled={opening}
+            aria-invalid={streamError ? true : undefined}
+            aria-describedby={streamError ? 'stream-url-error' : undefined}
+            onChange={(event) => {
+              setStreamUrl(event.target.value)
+              setStreamError(null)
+            }}
+          />
+          <button className="primary-action" type="submit" disabled={opening}>
+            {streamOpening ? 'Opening…' : 'Open stream'}
+          </button>
+        </div>
+        {streamError ? <p id="stream-url-error" role="alert">{streamError}</p> : null}
+      </form>
 
       {state.fileName ? (
         <section className="current-session">

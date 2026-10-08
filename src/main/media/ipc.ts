@@ -8,6 +8,7 @@ import type {
   SubtitlePreferencesUpdate
 } from '../../shared/media'
 import { parseMediaTarget } from './launchTarget'
+import { INVALID_STREAM_URL_MESSAGE, normalizeStreamUrl } from '../../shared/streamUrl'
 import { MpvController } from './MpvController'
 import { PlaybackSurface } from './PlaybackSurface'
 import { SerialTaskQueue } from './SerialTaskQueue'
@@ -25,6 +26,7 @@ import {
 const MEDIA_STATE_CHANNEL = 'media:state'
 const OPEN_VIDEO_CHANNEL = 'media:open-video'
 const OPEN_VIDEO_PATH_CHANNEL = 'media:open-video-path'
+const OPEN_STREAM_CHANNEL = 'media:open-stream'
 const OPEN_EXTERNAL_SUBTITLE_CHANNEL = 'media:open-external-subtitle'
 const LOAD_EXTERNAL_SUBTITLE_PATH_CHANNEL = 'media:load-external-subtitle-path'
 const GET_STATE_CHANNEL = 'media:get-state'
@@ -65,6 +67,7 @@ const playbackSurface = new PlaybackSurface(() => {
 })
 const openMediaQueue = new SerialTaskQueue()
 let registered = false
+let streamOpening = false
 
 export function registerMediaIpc(): void {
   if (registered) {
@@ -98,6 +101,27 @@ export function registerMediaIpc(): void {
 
     return openMediaTarget(filePath)
   })
+
+  ipcMain.handle(
+    OPEN_STREAM_CHANNEL,
+    async (_event, value: unknown): Promise<OpenVideoResult> => {
+      const target = normalizeStreamUrl(value)
+      if (!target) return { cancelled: false, error: INVALID_STREAM_URL_MESSAGE }
+      if (streamOpening) return { cancelled: false, error: 'A stream is already opening. Please wait.' }
+      streamOpening = true
+      try {
+        // openMediaTarget validates again and uses the same serial queue/surface/mpv path as handoff.
+        const result = await openMediaTarget(target)
+        return result.error
+          ? { cancelled: false, error: 'Could not open the stream. Check the URL and try again.' }
+          : result
+      } catch {
+        return { cancelled: false, error: 'Could not open the stream. Check the URL and try again.' }
+      } finally {
+        streamOpening = false
+      }
+    }
+  )
 
   ipcMain.handle(
     OPEN_EXTERNAL_SUBTITLE_CHANNEL,
@@ -261,6 +285,7 @@ export function disposeMediaIpc(): void {
 
   ipcMain.removeHandler(OPEN_VIDEO_CHANNEL)
   ipcMain.removeHandler(OPEN_VIDEO_PATH_CHANNEL)
+  ipcMain.removeHandler(OPEN_STREAM_CHANNEL)
   ipcMain.removeHandler(OPEN_EXTERNAL_SUBTITLE_CHANNEL)
   ipcMain.removeHandler(LOAD_EXTERNAL_SUBTITLE_PATH_CHANNEL)
   ipcMain.removeHandler(GET_STATE_CHANNEL)

@@ -21,7 +21,7 @@ export function App(): React.JSX.Element {
           <span className="eyebrow">Subtitle-first video player</span>
           <h1 id="launcher-title">Watch. Click. Understand.</h1>
           <p>
-            Open MKV or MP4, or play from Stremio. Click English subtitle words and phrases for
+            Open MKV or MP4, paste a stream URL, or play from Stremio. Click English subtitle words and phrases for
             instant Burmese meanings.
           </p>
         </div>

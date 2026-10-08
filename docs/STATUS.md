@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`91cb213a7f0e77018ff7fc14ec6e93c40d872fba`
+`67c8edf29b1b902296c3c0a318151f8e4c9bac3a`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -286,11 +286,42 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
   these while continuing to reject actual duplicate stored variants and cross-owner collisions.
 - Merge and acceptance completed as recorded above. See [dictionary expansion](DICTIONARY_EXPANSION.md).
 
-## Active work — Issue #77 neutral charcoal theme
+## Active work — Issue #81 main-window stream entry
+
+Branch: `codex/issue-81-open-stream`. The owner assigned implementation to Codex before release.
+Issue: [#81](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/81).
+
+- Add a compact Stream URL field and Open stream button below the local/Stremio launcher cards,
+  using the accepted gray/white theme. Enter submits, errors stay inline, and pending requests
+  disable competing local/drop/stream actions with a synchronous guard.
+- Validate HTTP/HTTPS in both renderer and main; preserve signed URL spelling, reject malformed
+  input/other schemes/control characters, and use the existing serialized mpv/network path.
+  Network subtitles continue using mpv live decoding; extraction, track selection and handoff
+  logic are unchanged.
+- Clear the URL field on successful opening. No URL history, persistence, logging, diagnostics
+  or raw URL error messages are added. Authenticated/signed URLs remain in memory as required
+  by existing playback, with the usual safe hostname-based session label.
+- Eighteen focused behavioral tests pass for validation, actual launcher form handling,
+  duplicates/loading/failure/retry, common IPC routing, preload exposure and disposal.
+- Local `npm run check` passes all 268 tests in 39 files, corpus gates, lint/typechecks and
+  production builds. The pre-existing Biome configuration/CSS/large-data warnings remain.
+- Actual React launcher preview with synthetic IPC responses passed desktop (1100px) and
+  narrow (320px) checks: click/Enter, opening state, invalid input, failure/control recovery,
+  successful input clearing and scroll reachability. No document-level horizontal overflow
+  occurred at 320px. This does not claim native mpv playback or actual network acceptance.
+- Current-head CI, Windows packaging and actual Windows stream acceptance are pending.
+  Release publication remains on hold; public release is still v1.0.6.
+
+## Completed — Issue #77 neutral charcoal theme
+
+PR #78 squash-merged as `67c8edf29b1b902296c3c0a318151f8e4c9bac3a`; Issue #77 is closed/completed.
+Final reviewed head `15907b0ee897033a5f6855071ad7af0677bcceee` passed CI #604 validate and
+package-windows. Owner appearance acceptance and review found no unresolved P1/P2/P3 issues.
+The implementation and earlier pending snapshots below are historical.
 
 The owner requested a modern editor-style dark palette using a Codex screenshot as the reference
 and assigned the focused presentation implementation to Codex. Branch: `codex/issue-77-charcoal-theme`.
-Draft PR: [#78](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/78).
+Merged PR: [#78](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/78).
 
 - The owner rejected the initial blue accent preview and requested white controls on gray backgrounds
   throughout the app. Replace green/blue accents with charcoal surfaces and neutral highlights
