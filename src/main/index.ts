@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog } from 'electron'
 import { join } from 'node:path'
+import { getAppIconPath } from './appIcon'
 import { diagnosticLog, disposeDiagnostics, initializeDiagnostics } from './diagnostics'
 import { disposeMediaIpc, isMediaPlaybackActive, openMediaTarget, registerMediaIpc } from './media/ipc'
 import { findLaunchTargetArgument } from './media/launchTarget'
@@ -87,6 +88,7 @@ function createWindow({ activateOnReady = true }: { activateOnReady?: boolean } 
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
+    icon: getAppIconPath(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

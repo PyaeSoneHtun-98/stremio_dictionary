@@ -1,4 +1,5 @@
 import type { PropsWithChildren } from 'react'
+import appIcon from '../../../../assets/branding/subtitle-bridge-icon.svg'
 import { appMeta } from '../../../shared/appMeta'
 
 export function AppShell({ children }: PropsWithChildren): React.JSX.Element {
@@ -6,9 +7,7 @@ export function AppShell({ children }: PropsWithChildren): React.JSX.Element {
     <div className="app-shell">
       <header className="app-header">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            SB
-          </span>
+          <img className="brand-mark" src={appIcon} width="32" height="32" alt="" />
           <span>
             <strong>Subtitle Bridge</strong>
             <small>Interactive subtitle player</small>

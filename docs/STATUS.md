@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`67c8edf29b1b902296c3c0a318151f8e4c9bac3a`
+`5d4532f2a8338805e611f41919cda5af20b86648`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -344,7 +344,12 @@ real Stremio opening, button/Enter submission, clickable subtitles/Burmese looku
 local video/external subtitles passed. Final review found no unresolved P1/P2/P3 findings;
 merge remains separate from the logo work. No public release has been published.
 
-## Active work — Issue #83 clean vector logo
+## Completed — Issue #83 clean vector logo
+
+Approved artwork PR #84 squash-merged as `5d4532f2a8338805e611f41919cda5af20b86648`
+after exact-head CI #610 passed both jobs. Issue #83 is closed/completed. The owner then
+authorized app/Windows icon integration separately as Issue #85. No release was published.
+The asset-creation snapshots below describe the completed artwork work.
 
 The owner kept the Subtitle Bridge name and assigned SVG recreation of the selected generated
 bridge/subtitle-bubble concept to Codex. Branch: `codex/issue-83-vector-logo`, based on master.
@@ -365,6 +370,40 @@ PR: [#84](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/84).
   and merge status are recorded in PR #84. Artwork approval does not publish a release.
 - App/installer icon wiring, executable/shortcut icon acceptance and release are separate
   follow-up work; playback code and packaging configuration are unchanged.
+
+## Active work — Issue #85 apply approved app icon
+
+The owner authorized applying the approved logo to the app and Windows packaging.
+Branch: `codex/issue-85-app-icons`, using the approved PR #84 artwork.
+
+- Replace the launcher header's SB tile with the approved SVG. Native launcher/player host
+  windows load the app-local ICO; transparent subtitle-overlay flags and behavior are unchanged.
+- Embed all seven approved ICO frames into the copied app EXE and setup EXE. Setup uses its
+  own associated icon; the icon object is disposed with the setup form. Start Menu shortcuts
+  explicitly use the app EXE's index-0 icon; existing Installed Apps metadata uses the same source.
+- Pin build-only `resedit` 3.1.0 (two packages); no new runtime app dependency or bundled tools.
+  Before saving, embedding verifies non-icon resource payloads and non-resource section hashes/
+  addresses plus the architecture and entry point remain unchanged.
+- CI/release checks inspect the actual EXE resource frames. Windows install CI also verifies
+  copied window assets, real shortcut metadata and the Installed Apps icon reference.
+- Local `npm run check` passed all 250 tests in 36 files, corpus gates, lint/typechecks and
+  production build. Existing lint warnings remain. Windows packaging passed in isolated staging;
+  all seven frames in both final EXEs and packaged ICO/PNG/license copies match the approved assets.
+  The unmodified Electron icon was rejected as a negative control. A temporary shortcut persisted
+  the branded executable/index-0 icon correctly. `git diff --check` and installer syntax passed.
+- The exact packaged preview was launched and its process path verified. Native inspection
+  confirmed the launcher SVG and title-bar icon render correctly in the real Electron window.
+  This verifies app startup/header rendering, not real-media playback or owner acceptance.
+- An initial stronger pre-edit snapshot check caught the PE editor shrinking the resource
+  virtual size and moving `.reloc`. Embedding now retains the original resource allocation;
+  immutable before/after section addresses/hashes and entry-point checks pass in the rebuilt EXE.
+- Local ZIP SHA-256: `1a0b892251fe4445f96d5010ccc6d7f3d342bf6c26df308e75175bc69ad9d53d`.
+  Setup SHA-256: `09bf195585418bf3506773c635ff67d6abcad76f84b3aba88ec01b6749958760`.
+- Portable preview: `release/SubtitleBridge-icon-test-win-x64/Subtitle Bridge.exe`.
+  Its 16 existing verified runtime files were copied/hash-matched after ZIP/setup creation;
+  distribution artifacts contain no media runtime binaries. This preview excludes stream PR #82.
+- Pending: owner native Windows icon/taskbar/shortcut/setup appearance acceptance and exact-head
+  PR CI/final review. No real-media acceptance, installed shortcut appearance or release is claimed.
 
 ## Completed — Issue #75 dictionary extension
 

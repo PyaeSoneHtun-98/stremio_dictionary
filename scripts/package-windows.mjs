@@ -12,6 +12,7 @@ import {
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { embedWindowsIcon } from './windows-icon.mjs'
 
 if (process.platform !== 'win32') {
   throw new Error('Windows packaging must run on Windows.')
@@ -29,8 +30,10 @@ const releaseRoot = join(root, 'release')
 const packageDir = join(releaseRoot, 'SubtitleBridge-win-x64')
 const zipPath = join(releaseRoot, 'SubtitleBridge-win-x64.zip')
 const checksumPath = `${zipPath}.sha256`
+const brandingRoot = join(root, 'assets', 'branding')
+const appIcon = join(brandingRoot, 'subtitle-bridge-icon.ico')
 
-for (const requiredPath of [electronDist, builtApp]) {
+for (const requiredPath of [electronDist, builtApp, appIcon]) {
   if (!existsSync(requiredPath)) {
     throw new Error(`Required build input is missing: ${requiredPath}`)
   }
@@ -48,10 +51,18 @@ if (!existsSync(electronExe)) {
   throw new Error('Electron runtime did not contain electron.exe.')
 }
 renameSync(electronExe, appExe)
+// Only modify our copied executable; leave the npm Electron runtime unchanged.
+embedWindowsIcon(appExe, appIcon)
 
 const appResources = join(packageDir, 'resources', 'app')
 mkdirSync(appResources, { recursive: true })
 cpSync(builtApp, join(appResources, 'out'), { recursive: true })
+const packagedBranding = join(appResources, 'assets', 'branding')
+mkdirSync(packagedBranding, { recursive: true })
+for (const file of ['subtitle-bridge-icon.ico', 'subtitle-bridge-icon.png']) {
+  copyFileSync(join(brandingRoot, file), join(packagedBranding, file))
+}
+copyFileSync(join(brandingRoot, 'licenses', 'Inter-OFL.txt'), join(packagedBranding, 'Inter-OFL.txt'))
 writeFileSync(
   join(appResources, 'package.json'),
   `${JSON.stringify(

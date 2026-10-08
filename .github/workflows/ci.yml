@@ -199,6 +199,9 @@ jobs:
       - name: Package Windows MVP
         run: npm run package:win
 
+      - name: Verify Windows branding resources
+        run: node scripts/verify-windows-branding.mjs
+
       - name: Verify packaged install, upgrade, and Stremio handoff
         shell: pwsh
         run: |
@@ -299,10 +302,26 @@ jobs:
             throw 'Uninstaller deleted data from an unowned directory.'
           }
 
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoShortcut -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer -InstallDir $installDir -NoLaunch -RuntimeManifestPath $runtimeManifest -RuntimeCacheDir $runtimeCacheDir
           if ($LASTEXITCODE -ne 0) {
             throw 'Initial installer run failed.'
           }
+
+          $iconShortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Subtitle Bridge.lnk'
+          $iconShortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($iconShortcutPath)
+          $iconExePath = Join-Path $installDir 'Subtitle Bridge.exe'
+          if ($iconShortcut.TargetPath -ne $iconExePath -or $iconShortcut.IconLocation -ne "$iconExePath,0") {
+            throw 'Installed Start Menu shortcut does not use the branded app executable.'
+          }
+          $iconRegistration = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SubtitleBridge'
+          if ($iconRegistration.DisplayIcon -ne "$iconExePath,0") {
+            throw 'Installed Apps icon does not reference the branded executable.'
+          }
+          node scripts/verify-windows-branding.mjs $installDir
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Installed branding resources differ from approved artwork.'
+          }
+          Remove-Item -LiteralPath $iconShortcutPath -Force
 
           $required = @(
             (Join-Path $installDir 'Subtitle Bridge.exe'),
@@ -313,6 +332,7 @@ jobs:
             (Join-Path $installDir 'resources\app\out\main\index.js'),
             (Join-Path $installDir 'resources\app\out\preload\index.js'),
             (Join-Path $installDir 'resources\app\out\renderer\index.html'),
+            (Join-Path $installDir 'resources\app\assets\branding\subtitle-bridge-icon.ico'),
             (Join-Path $installDir 'resources\tools\mpv\mpv.exe'),
             (Join-Path $installDir 'resources\tools\ffmpeg\ffmpeg.exe'),
             (Join-Path $installDir 'resources\tools\ffmpeg\avcodec-fixture.dll'),

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -23,7 +24,8 @@ internal static class SubtitleBridgeSetup
             return RunSetup();
         }
 
-        using (var form = CreateProgressForm())
+        using (var icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath))
+        using (var form = CreateProgressForm(icon))
         {
             form.Shown += async (sender, args) =>
             {
@@ -56,11 +58,12 @@ internal static class SubtitleBridgeSetup
         return exitCode;
     }
 
-    private static Form CreateProgressForm()
+    private static Form CreateProgressForm(Icon icon)
     {
         var form = new Form
         {
             Text = "Subtitle Bridge Setup",
+            Icon = icon,
             Width = 470,
             Height = 155,
             StartPosition = FormStartPosition.CenterScreen,
