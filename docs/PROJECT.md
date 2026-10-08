@@ -48,6 +48,12 @@ mpv also exposes local audio tracks through the shared track list. Subtitle Brid
 
 Network streams, including Stremio's local `http://127.0.0.1:11470/...` stream URLs, use a different subtitle path.
 
+The main-window **Stream URL** field opens HTTP/HTTPS media using **Open stream** or Enter.
+The narrow `media:open-stream` IPC validates input in the main process before forwarding it
+through the existing serialized media-open path. Other schemes, malformed URLs and control
+characters are rejected. The field clears after successful opening; URLs are not persisted
+or echoed in errors. This opens media streams, not arbitrary website/video page links.
+
 ```text
 HTTP/HTTPS stream
   ↓

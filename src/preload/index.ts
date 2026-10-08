@@ -7,6 +7,7 @@ const desktopBridge: DesktopBridge = {
   media: {
     openVideo: () => ipcRenderer.invoke('media:open-video'),
     openVideoPath: (filePath) => ipcRenderer.invoke('media:open-video-path', filePath),
+    openStream: (url) => ipcRenderer.invoke('media:open-stream', url),
     getPathForFile: (file) =>
       webUtils.getPathForFile(file as Parameters<typeof webUtils.getPathForFile>[0]),
     openExternalSubtitle: () => ipcRenderer.invoke('media:open-external-subtitle'),

@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`5d4532f2a8338805e611f41919cda5af20b86648`
+`2700484b4e85c8f42f0f749f2f7cc18a6b06731c`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -286,16 +286,64 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
   these while continuing to reject actual duplicate stored variants and cross-owner collisions.
 - Merge and acceptance completed as recorded above. See [dictionary expansion](DICTIONARY_EXPANSION.md).
 
+## Active work — Issue #81 main-window stream entry
+
+Branch: `codex/issue-81-open-stream`. The owner assigned implementation to Codex before release.
+Issue: [#81](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/81).
+PR: [#82](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/82).
+
+- Add a compact Stream URL field and Open stream button below the local/Stremio launcher cards,
+  using the accepted gray/white theme. Enter submits, errors stay inline, and pending requests
+  disable competing local/drop/stream actions with a synchronous guard.
+- Validate HTTP/HTTPS in both renderer and main; preserve signed URL spelling, reject malformed
+  input/other schemes/control characters, and use the existing serialized mpv/network path.
+  Network subtitles continue using mpv live decoding; extraction, track selection and handoff
+  logic are unchanged.
+- Clear the URL field on successful opening. No URL history, persistence, logging, diagnostics
+  or raw URL error messages are added. Authenticated/signed URLs remain in memory as required
+  by existing playback, with the usual safe hostname-based session label.
+- Eighteen focused behavioral tests pass for validation, actual launcher form handling,
+  duplicates/loading/failure/retry, common IPC routing, preload exposure and disposal.
+- Local `npm run check` passes all 268 tests in 39 files, corpus gates, lint/typechecks and
+  production builds. The pre-existing Biome configuration/CSS/large-data warnings remain.
+- Actual React launcher preview with synthetic IPC responses passed desktop (1100px) and
+  narrow (320px) checks: click/Enter, opening state, invalid input, failure/control recovery,
+  successful input clearing and scroll reachability. No document-level horizontal overflow
+  occurred at 320px. This does not claim native mpv playback or actual network acceptance.
+- Fresh Windows ZIP/setup packaging passed in isolated staging at implementation head
+  `a98317a7018f67d5e06c4405689ab72a8d17b95f`. The separate local test player is
+  `release/SubtitleBridge-stream-test-win-x64/Subtitle Bridge.exe`; its app bundles match the
+  production build and all 16 existing runtime copies hash-match. Existing apps were preserved.
+  ZIP SHA-256: `5e4ece3a9768a73cd9d52d9dd07e70de71c2b2621b537d75d42bbddd6428e764`.
+  Setup SHA-256: `0136851a12346552af62da8cc346fbbd44d1e75848cc80de4ae6ef3144ed38f1`.
+  These are local test artifacts, not a published release.
+- On 2026-10-08 the owner confirmed a real Stremio localhost HTTP stream opens in that test
+  build, then explicitly confirmed clickable subtitles/Burmese lookup, button and Enter opening,
+  and local video/external subtitles all passed. No private stream URL or identifier is retained
+  in this record. A separate public HTTPS playback test or exhaustive codec inventory is not claimed.
+- Complete-diff follow-up review at `771930b489a5fb6c9fd6215257ef2a9f39806479` found no
+  P1/P2/P3/P4 findings. It was performed by the implementing Codex agent; no independent second
+  reviewer is claimed. All 18 focused stream tests were re-run and passed; CI #607 passed
+  validate and package-windows at that head. This acceptance update changes documentation only;
+  subsequent final-head CI is tracked in PR #82 before merge.
+- CI #608 passed both jobs at `02f2d7ec85b0014f148e4cbd118b11d083684246`.
+  The owner authorized merging PRs #86 and #82, then preparing a combined release candidate.
+  Updating this branch to icon master `2700484` conflicted only in this status document;
+  stream implementation and tests remain unchanged. Combined validation and final-head CI
+  are recorded in PR #82 before merge.
+- Code and owner manual acceptance gates passed. Release publication remains on hold;
+  public release is still v1.0.6. No merge is claimed by this acceptance record.
+
 ## Completed — Issue #77 neutral charcoal theme
 
-PR #78 squash-merged as `67c8edf29b1b902296c3c0a318151f8e4c9bac3a`; Issue #77 is closed.
-Final head `15907b0ee897033a5f6855071ad7af0677bcceee` passed CI #604 validate and
-package-windows. The owner accepted the gray/white appearance; no unresolved P1/P2/P3
-findings remained. The implementation/testing snapshots below are historical. Release stays on hold.
+PR #78 squash-merged as `67c8edf29b1b902296c3c0a318151f8e4c9bac3a`; Issue #77 is closed/completed.
+Final reviewed head `15907b0ee897033a5f6855071ad7af0677bcceee` passed CI #604 validate and
+package-windows. Owner appearance acceptance and review found no unresolved P1/P2/P3 issues.
+The implementation and earlier pending snapshots below are historical.
 
 The owner requested a modern editor-style dark palette using a Codex screenshot as the reference
 and assigned the focused presentation implementation to Codex. Branch: `codex/issue-77-charcoal-theme`.
-Draft PR: [#78](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/78).
+Merged PR: [#78](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/78).
 
 - The owner rejected the initial blue accent preview and requested white controls on gray backgrounds
   throughout the app. Replace green/blue accents with charcoal surfaces and neutral highlights
@@ -334,16 +382,6 @@ Draft PR: [#78](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/78).
   files were restored and hash-matched after ZIP/setup creation, so they are local test tools only.
   The packaged theme is verified, main/preload match the build, and synthetic preview files are excluded.
 
-## Active work — Issue #81 launcher stream entry
-
-Separate [PR #82](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/82), branch
-`codex/issue-81-open-stream`, adds an HTTP/HTTPS media URL field to the main window using
-the existing validated network playback path. It is not included in this logo branch/master.
-Head `02f2d7ec85b0014f148e4cbd118b11d083684246` passed CI #608. The owner confirmed
-real Stremio opening, button/Enter submission, clickable subtitles/Burmese lookup and
-local video/external subtitles passed. Final review found no unresolved P1/P2/P3 findings;
-merge remains separate from the logo work. No public release has been published.
-
 ## Completed — Issue #83 clean vector logo
 
 Approved artwork PR #84 squash-merged as `5d4532f2a8338805e611f41919cda5af20b86648`
@@ -371,7 +409,15 @@ PR: [#84](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/84).
 - App/installer icon wiring, executable/shortcut icon acceptance and release are separate
   follow-up work; playback code and packaging configuration are unchanged.
 
-## Active work — Issue #85 apply approved app icon
+## Completed — Issue #85 apply approved app icon
+
+PR [#86](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/86) squash-merged as
+`2700484b4e85c8f42f0f749f2f7cc18a6b06731c`; Issue #85 is closed/completed.
+Exact-head CI #612 passed validate and package-windows at `76432a2a882454fabca8610db8afba7f8b0b0ce9`.
+The owner confirmed the icon preview was checked and works. No real setup installation or
+manual installed-shortcut appearance check is claimed; CI verified installed icon resources,
+shortcut metadata and registry references. Final review found no unresolved P1/P2/P3 findings.
+Implementation snapshots below are historical; no independent second reviewer is claimed.
 
 The owner authorized applying the approved logo to the app and Windows packaging.
 Branch: `codex/issue-85-app-icons`, using the approved PR #84 artwork.
@@ -402,8 +448,7 @@ Branch: `codex/issue-85-app-icons`, using the approved PR #84 artwork.
 - Portable preview: `release/SubtitleBridge-icon-test-win-x64/Subtitle Bridge.exe`.
   Its 16 existing verified runtime files were copied/hash-matched after ZIP/setup creation;
   distribution artifacts contain no media runtime binaries. This preview excludes stream PR #82.
-- Pending: owner native Windows icon/taskbar/shortcut/setup appearance acceptance and exact-head
-  PR CI/final review. No real-media acceptance, installed shortcut appearance or release is claimed.
+- Acceptance/CI/merge completed as recorded above. No release has been published.
 
 ## Completed — Issue #75 dictionary extension
 

@@ -13,6 +13,47 @@
   background: rgb(var(--theme-accent-rgb) / 0.06);
 }
 
+.stream-launcher {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  border: 1px solid rgb(255 255 255 / 0.085);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgb(var(--theme-inset-rgb) / 0.45);
+}
+
+.stream-launcher label {
+  color: var(--theme-text-secondary);
+  font-size: 0.73rem;
+  font-weight: 600;
+}
+
+.stream-launcher-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stream-launcher input {
+  flex: 1 1 230px;
+  min-width: 0;
+  width: 100%;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--theme-background);
+  color: var(--theme-text);
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.stream-launcher input::placeholder { color: var(--theme-text-muted); }
+.stream-launcher input:focus-visible { outline: 2px solid var(--theme-accent); outline-offset: 2px; }
+.stream-launcher input:disabled { opacity: 0.55; }
+.stream-launcher input[aria-invalid="true"] { border-color: #ffaaa8; }
+.stream-launcher [role="alert"] { margin: 0; color: #ffaaa8; font-size: 0.73rem; }
+
 .launcher-panel-heading,
 .subtitle-diagnostic-header,
 .current-session,

@@ -117,6 +117,7 @@ export interface DesktopBridge {
   media: {
     openVideo: () => Promise<OpenVideoResult>
     openVideoPath: (filePath: string) => Promise<OpenVideoResult>
+    openStream: (url: string) => Promise<OpenVideoResult>
     getPathForFile: (file: unknown) => string
     openExternalSubtitle: () => Promise<LoadExternalSubtitleResult>
     loadExternalSubtitlePath: (filePath: string) => Promise<LoadExternalSubtitleResult>
