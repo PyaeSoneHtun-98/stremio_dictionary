@@ -4,7 +4,7 @@
 
 Current stable `master`:
 
-`91cb213a7f0e77018ff7fc14ec6e93c40d872fba`
+`67c8edf29b1b902296c3c0a318151f8e4c9bac3a`
 
 Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
 
@@ -286,7 +286,12 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
   these while continuing to reject actual duplicate stored variants and cross-owner collisions.
 - Merge and acceptance completed as recorded above. See [dictionary expansion](DICTIONARY_EXPANSION.md).
 
-## Active work — Issue #77 neutral charcoal theme
+## Completed — Issue #77 neutral charcoal theme
+
+PR #78 squash-merged as `67c8edf29b1b902296c3c0a318151f8e4c9bac3a`; Issue #77 is closed.
+Final head `15907b0ee897033a5f6855071ad7af0677bcceee` passed CI #604 validate and
+package-windows. The owner accepted the gray/white appearance; no unresolved P1/P2/P3
+findings remained. The implementation/testing snapshots below are historical. Release stays on hold.
 
 The owner requested a modern editor-style dark palette using a Codex screenshot as the reference
 and assigned the focused presentation implementation to Codex. Branch: `codex/issue-77-charcoal-theme`.
@@ -328,6 +333,38 @@ Draft PR: [#78](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/78).
   `release/SubtitleBridge-win-x64/Subtitle Bridge.exe`; its 16 previously verified managed runtime
   files were restored and hash-matched after ZIP/setup creation, so they are local test tools only.
   The packaged theme is verified, main/preload match the build, and synthetic preview files are excluded.
+
+## Active work — Issue #81 launcher stream entry
+
+Separate [PR #82](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/82), branch
+`codex/issue-81-open-stream`, adds an HTTP/HTTPS media URL field to the main window using
+the existing validated network playback path. It is not included in this logo branch/master.
+Head `02f2d7ec85b0014f148e4cbd118b11d083684246` passed CI #608. The owner confirmed
+real Stremio opening, button/Enter submission, clickable subtitles/Burmese lookup and
+local video/external subtitles passed. Final review found no unresolved P1/P2/P3 findings;
+merge remains separate from the logo work. No public release has been published.
+
+## Active work — Issue #83 clean vector logo
+
+The owner kept the Subtitle Bridge name and assigned SVG recreation of the selected generated
+bridge/subtitle-bubble concept to Codex. Branch: `codex/issue-83-vector-logo`, based on master.
+PR: [#84](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/84).
+
+- Hand-authored white/charcoal SVG symbol, square icon and full logo; no embedded PNG or
+  external resources in the finished vector assets. Wordmark outlines use licensed Inter Bold.
+- Editable wordmark source, font provenance/license, optional export tools, PNG previews and
+  a seven-size Windows ICO are under [assets/branding](../assets/branding/README.md).
+- Full logo and native 16/24/32/48/64/128/256px icons were rendered and visually inspected.
+  The owner approved the recreated vector appearance on 2026-10-08 at asset head
+  `e9498e76dde0d5ea749c2990470a183808d5efed`; this follow-up changes acceptance documentation only.
+- Local `npm run check` passed: 250 tests in 36 files, lint/typechecks, corpus gates and
+  production builds. SVG structure/resource checks, PNG dimensions/alpha checks and all
+  seven decoded ICO frames passed; `git diff --check` passed. Existing lint warnings remain.
+- Complete asset/tooling review found no unresolved P1/P2/P3 findings. Review was performed
+  by the implementing Codex agent; no independent second review is claimed. Exact-head CI
+  and merge status are recorded in PR #84. Artwork approval does not publish a release.
+- App/installer icon wiring, executable/shortcut icon acceptance and release are separate
+  follow-up work; playback code and packaging configuration are unchanged.
 
 ## Completed — Issue #75 dictionary extension
 
