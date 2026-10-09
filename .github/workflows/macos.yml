@@ -21,33 +21,51 @@ jobs:
       - name: Install mpv and FFmpeg
         run: brew install mpv ffmpeg
 
-      - name: Standalone mpv without --wid
+      - name: Runner graphics
+        if: ${{ !cancelled() }}
         run: |
-          set -uo pipefail
+          echo "::notice title=runner graphics::$(system_profiler SPDisplaysDataType 2>/dev/null | grep -E 'Chipset|Metal|Vendor|Resolution|Type' | tr -s ' ' | tr '\n' ';' | cut -c1-600)"
+
+      - name: Standalone mpv video outputs without --wid
+        if: ${{ !cancelled() }}
+        run: |
+          set -u
           ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=25 -t 60 -pix_fmt yuv420p clip.mp4
-          for vo in null default; do
-            args=(--no-config --ao=null --keep-open=yes)
-            if [ "$vo" = null ]; then args+=(--vo=null); fi
-            mpv "${args[@]}" clip.mp4 > /dev/null 2>&1 &
+          reports="$HOME/Library/Logs/DiagnosticReports"
+          for variant in "null:--vo=null" "default:" "gpu-opengl:--vo=gpu --gpu-api=opengl" "gpu-next-opengl:--vo=gpu-next --gpu-api=opengl" "gpu-next-macvk:--vo=gpu-next --gpu-api=vulkan --gpu-context=macvk" "libmpv-vo:--vo=libmpv"; do
+            name="${variant%%:*}"
+            # shellcheck disable=SC2086 # option list is intentionally word-split
+            mpv --no-config --ao=null --keep-open=yes ${variant#*:} clip.mp4 > "mpv-$name.log" 2>&1 &
             pid=$!
-            sleep 10
+            sleep 8
             if kill -0 "$pid" 2> /dev/null; then
-              echo "::notice title=mpv control::vo=$vo stayed running for 10s"
-              kill "$pid"
+              echo "::notice title=mpv $name::stayed running for 8s"
+              kill "$pid"; wait "$pid" 2> /dev/null
             else
-              wait "$pid"
-              echo "::error title=mpv control::vo=$vo exited early with status $?"
+              wait "$pid"; status=$?
+              sleep 3
+              report="$(ls -t "$reports"/mpv*.ips 2> /dev/null | head -1)"
+              reason=""
+              if [ -n "$report" ]; then
+                reason="$(tail -n +2 "$report" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=d.get("threads",[{}])[d.get("faultingThread",0)]; print(json.dumps({"exception":d.get("exception"),"asi":d.get("asi"),"frames":[f.get("symbol") for f in t.get("frames",[])[:8]]})[:700])' 2> /dev/null)"
+                rm -f "$report"
+              fi
+              echo "::error title=mpv $name::exited with status $status; log: $(tail -c 300 "mpv-$name.log" | tr '\n' ' '); crash: $reason"
             fi
           done
 
       - name: mpv --wid documentation (primary source)
+        if: ${{ !cancelled() }}
         run: |
-          set -uo pipefail
+          set -u
           version="$(mpv --version | head -1 | awk '{print $2}')"
           echo "::notice title=mpv version::$version"
-          curl -fsSL "https://raw.githubusercontent.com/mpv-player/mpv/${version}/DOCS/man/options.rst" -o options.rst || exit 0
-          section="$(awk '/^``--wid=<ID>``/{found=1} found && /^``--no-window-dragging``/{exit} found' options.rst)"
-          echo "::notice title=mpv --wid docs::$(echo "$section" | grep -i -B1 -A3 'macos\|cocoa\|NSView' | tr '\n' ' ' | cut -c1-900)"
+          if curl -fsSL "https://raw.githubusercontent.com/mpv-player/mpv/${version}/DOCS/man/options.rst" -o options.rst; then
+            section="$(awk '/^``--wid=<ID>``/{found=1} found && /^``--no-window-dragging``/{exit} found' options.rst)"
+            echo "::notice title=mpv --wid docs::$(echo "$section" | grep -i -B1 -A3 'macos\|cocoa\|NSView' | tr '\n' ' ' | cut -c1-900)"
+          else
+            echo "::warning title=mpv --wid docs::could not download options.rst for $version"
+          fi
 
   libmpv-spike:
     runs-on: macos-14
