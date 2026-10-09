@@ -11,12 +11,15 @@ const { join, resolve } = require('node:path')
 
 const clip = resolve(process.argv.at(-1))
 const failures = []
+const passed = []
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 
+// Only failures become annotations (GitHub keeps 10 notices per step); passes are summarised.
 function check(name, ok, detail) {
   const text = `${ok ? 'PASS' : 'FAIL'} ${name}${detail === undefined ? '' : ` — ${JSON.stringify(detail)}`}`
-  console.log(`::${ok ? 'notice' : 'error'} title=view harness::${text.replace(/[\r\n%]/g, ' ')}`)
-  if (!ok) failures.push(name)
+  console.log(ok ? text : `::error title=view harness::${text.replace(/[\r\n%]/g, ' ')}`)
+  if (ok) passed.push(name)
+  else failures.push(name)
 }
 
 function loadNative() {
@@ -25,14 +28,14 @@ function loadNative() {
   return module.exports
 }
 
-function mpvCommand(socketPath, command) {
+function mpvCommand(socketPath, command, timeoutMs = 3000) {
   return new Promise((done) => {
     const socket = createConnection(socketPath)
     let buffer = ''
     const timer = setTimeout(() => {
       socket.destroy()
       done({ error: 'timeout' })
-    }, 3000)
+    }, timeoutMs)
     socket.on('connect', () => socket.write(`${JSON.stringify({ command })}\n`))
     socket.on('data', (chunk) => {
       buffer += chunk.toString()
@@ -69,9 +72,16 @@ async function checkRenderSize(socketPath, host, name) {
   const bounds = host.getContentBounds()
   const scale = screen.getDisplayMatching(bounds).scaleFactor
   const expected = { w: Math.round(bounds.width * scale), h: Math.round(bounds.height * scale) }
-  const osd = (await mpvCommand(socketPath, ['get_property', 'osd-dimensions'])).data
+  // Software rendering of large frames on the CI runner can delay replies; retry patiently.
+  let reply = null
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    reply = await mpvCommand(socketPath, ['get_property', 'osd-dimensions'], 10_000)
+    if (reply.data && near(reply.data.w, expected.w) && near(reply.data.h, expected.h)) break
+    await sleep(2000)
+  }
+  const osd = reply?.data
   check(name, Boolean(osd) && near(osd.w, expected.w) && near(osd.h, expected.h), {
-    osd: osd && { w: osd.w, h: osd.h },
+    osd: osd ? { w: osd.w, h: osd.h } : reply,
     expected
   })
 }
@@ -175,7 +185,10 @@ app.whenReady().then(async () => {
   } catch (error) {
     check('harness completed without exceptions', false, String(error?.stack ?? error))
   }
-  console.log(failures.length === 0 ? 'ALL VIEW CHECKS PASSED' : `FAILED: ${failures.join('; ')}`)
+  const summary = `${passed.length} passed, ${failures.length} failed`
+  console.log(
+    `::notice title=view harness summary::${summary}${failures.length ? `: ${failures.join('; ')}` : ''}`
+  )
   app.exit(failures.length === 0 ? 0 : 1)
 })
 
