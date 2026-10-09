@@ -1,0 +1,55 @@
+name: macOS
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - 'feat/issue-53-**'
+
+permissions:
+  contents: read
+
+jobs:
+  embed-spike:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install mpv and FFmpeg
+        run: |
+          brew install mpv ffmpeg
+          mpv --version
+          mpv --vo=help
+          mpv --gpu-context=help || true
+          ffmpeg -version | head -1
+
+      - name: Create test clip
+        run: |
+          mkdir -p spike-out
+          ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=25 -t 60 -pix_fmt yuv420p spike-out/clip.mp4
+
+      - name: Run embed spike
+        env:
+          SPIKE_OUT: ${{ github.workspace }}/spike-out
+          SPIKE_CLIP: ${{ github.workspace }}/spike-out/clip.mp4
+        run: npx electron spike/macos-embed/main.cjs
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-embed-spike
+          path: spike-out/*.png
+          if-no-files-found: warn
