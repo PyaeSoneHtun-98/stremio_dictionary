@@ -314,7 +314,13 @@ macOS artifact is an untested beta and must not be described as stable.
   FFmpeg subtitle extraction, frames rendered into the native view at the host content size
   (960x572) with **Apple Software Renderer** at roughly 5 fps, mpv's rendered-output screenshot
   non-black (mean luma 124.9 vs 125.1 decoded) and a clean quit within 15 seconds.
-  This does not cover GPU rendering, Retina scaling, fullscreen, the subtitle overlay's
+- macOS CI run 37894905400 at `c64728d` passed the same gates plus the native-view harness
+  (22 checks, 0 failures): render size matches the window and follows resize, native
+  fullscreen fills the display with the overlay window visible and matching, size restored
+  after fullscreen, frames keep advancing, three create/destroy cycles with prompt destroy and
+  closed IPC; the GL context is created once and reused. The packaged app's quit disposed the
+  in-process player (`mpv.inProcessDestroyed` ~145 ms, expected `mpv.exit`).
+  This does not cover GPU rendering, Retina scaling, the subtitle overlay's
   appearance, clicks, audio output or real media on a physical Mac.
 - **Correction:** macOS CI run 37888226307 at `228cbf9` was earlier recorded as a passing
   playback smoke test. That test only checked that mpv spawned; its log also contained an
