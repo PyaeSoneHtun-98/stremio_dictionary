@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { createConnection, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import type { MediaTrack, PlaybackSnapshot, SubtitleCue } from '../../shared/media'
 import { createEmptySubtitleModel, normalizeMpvTracks } from '../../shared/media'
 import { diagnosticLog } from '../diagnostics'
-import { missingRuntimeMessage, resolveMpvExecutable } from '../runtimeTools'
+import { missingRuntimeMessage, resolveLibmpv, resolveMpvExecutable } from '../runtimeTools'
 import { SubtitleExtractor } from '../subtitles/SubtitleExtractor'
 import { findActiveCue, tokenizeSubtitleText } from '../subtitles/normalize'
 import {
@@ -15,6 +15,7 @@ import {
   normalizeSubtitleDelay
 } from '../subtitles/timing'
 import { deriveBufferingState } from './bufferingState'
+import { buildLibmpvOptions, InProcessMpv } from './macosMpv'
 
 const CONNECT_RETRIES = 50
 const CONNECT_DELAY_MS = 100
@@ -30,13 +31,13 @@ interface MpvEvent {
 }
 
 export class MpvController {
-  private child: ChildProcess | null = null
+  private child: MpvProcess | null = null
   private socket: Socket | null = null
   private incomingBuffer = ''
   private paused = false
   private pausedForCache = false
   private seekPending = false
-  private readonly expectedExits = new WeakSet<ChildProcess>()
+  private readonly expectedExits = new WeakSet<MpvProcess>()
   private readonly subtitleExtractor = new SubtitleExtractor()
   private subtitleCues: SubtitleCue[] = []
   private subtitleExtractionKey: string | null = null
@@ -322,22 +323,8 @@ export class MpvController {
       return generation === this.playbackGeneration
     }
 
-    const runtime = resolveMpvExecutable()
     const pipePath = this.ipcPathFor(generation)
-    diagnosticLog('mpv.start', { source: runtime.source })
-    const child = spawn(
-      runtime.executable,
-      buildMpvArguments({
-        platform: process.platform,
-        windowId,
-        ipcPath: pipePath,
-        diagnosticArguments: mpvDiagnosticArguments()
-      }),
-      {
-        windowsHide: true,
-        stdio: 'ignore'
-      }
-    )
+    const { child, runtime } = startMpvProcess(windowId, pipePath)
 
     await new Promise<void>((resolve, reject) => {
       const handleSpawn = (): void => {
@@ -438,7 +425,7 @@ export class MpvController {
     return true
   }
 
-  private handleSocketFailure(socket: Socket, child: ChildProcess): void {
+  private handleSocketFailure(socket: Socket, child: MpvProcess): void {
     if (this.socket !== socket) {
       return
     }
@@ -964,13 +951,59 @@ export function isSupportedPlaybackPlatform(platform: NodeJS.Platform): boolean 
   return platform === 'win32' || platform === 'darwin'
 }
 
+/** The parts of a player process MpvController relies on (a Windows child or macOS in-process). */
+export interface MpvProcess {
+  readonly killed: boolean
+  kill(): boolean
+  once(event: 'spawn', listener: () => void): unknown
+  once(event: 'error', listener: (error: Error) => void): unknown
+  off(event: 'spawn', listener: () => void): unknown
+  off(event: 'error', listener: (error: Error) => void): unknown
+  on(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown
+}
+
+function startMpvProcess(
+  windowId: string,
+  ipcPath: string
+): { child: MpvProcess; runtime: { source: string } } {
+  if (process.platform === 'darwin') {
+    // mpv cannot embed into another process's window on macOS, so libmpv runs in-process.
+    const library = resolveLibmpv()
+    const runtime = { source: library?.source ?? 'missing' }
+    diagnosticLog('mpv.start', { source: runtime.source, mode: 'in-process' })
+    const child = new InProcessMpv({
+      libraryPath: library?.path ?? null,
+      viewId: windowId,
+      options: buildLibmpvOptions(ipcPath),
+      probe: process.env.SUBTITLE_BRIDGE_RENDER_PROBE === '1'
+    })
+    return { child, runtime }
+  }
+
+  const runtime = resolveMpvExecutable()
+  diagnosticLog('mpv.start', { source: runtime.source })
+  const child = spawn(
+    runtime.executable,
+    buildMpvArguments({
+      windowId,
+      ipcPath,
+      diagnosticArguments: mpvDiagnosticArguments()
+    }),
+    {
+      windowsHide: true,
+      stdio: 'ignore'
+    }
+  )
+  return { child, runtime }
+}
+
 export interface MpvArgumentOptions {
-  platform: NodeJS.Platform
   windowId: string
   ipcPath: string
   diagnosticArguments?: readonly string[]
 }
 
+/** Windows child-process mpv embedded into the player HWND. */
 export function buildMpvArguments(options: MpvArgumentOptions): string[] {
   return [
     '--no-config',
@@ -980,20 +1013,14 @@ export function buildMpvArguments(options: MpvArgumentOptions): string[] {
     '--sub-visibility=no',
     '--no-terminal',
     '--no-osc',
-    ...mpvVideoOutputArguments(options.platform),
+    '--vo=gpu',
+    '--gpu-api=d3d11',
+    '--gpu-context=d3d11',
+    '--hwdec=no',
     ...(options.diagnosticArguments ?? []),
     `--wid=${options.windowId}`,
     `--input-ipc-server=${options.ipcPath}`
   ]
-}
-
-function mpvVideoOutputArguments(platform: NodeJS.Platform): string[] {
-  if (platform === 'win32') {
-    return ['--vo=gpu', '--gpu-api=d3d11', '--gpu-context=d3d11', '--hwdec=no']
-  }
-
-  // macOS: TODO(#53) choose from the CI embedding spike before this is reviewed.
-  return []
 }
 
 export function mpvSocketPath(directory: string, generation: number): string {

@@ -43,6 +43,37 @@ export function resolveFfmpegExecutable(
   )
 }
 
+export const MACOS_HOMEBREW_LIB_DIRECTORIES = ['/opt/homebrew/lib', '/usr/local/lib'] as const
+const LIBMPV_FILE_NAME = 'libmpv.2.dylib'
+
+export interface LibmpvResolution {
+  path: string
+  source: Extract<RuntimeToolSource, 'environment' | 'homebrew'>
+}
+
+export interface LibmpvResolutionOptions {
+  environment?: NodeJS.ProcessEnv
+  homebrewDirectories?: readonly string[]
+}
+
+// macOS plays through libmpv inside the app, loaded at runtime rather than linked or bundled.
+export function resolveLibmpv(options: LibmpvResolutionOptions = {}): LibmpvResolution | null {
+  const environment = options.environment ?? process.env
+  const override = environment.MPV_LIBRARY_PATH?.trim()
+  if (override) {
+    return { path: override, source: 'environment' }
+  }
+
+  for (const directory of options.homebrewDirectories ?? MACOS_HOMEBREW_LIB_DIRECTORIES) {
+    const candidate = join(directory, LIBMPV_FILE_NAME)
+    if (existsSync(candidate)) {
+      return { path: candidate, source: 'homebrew' }
+    }
+  }
+
+  return null
+}
+
 export const MACOS_RUNTIME_INSTALL_COMMAND = 'brew install mpv ffmpeg'
 
 export function missingRuntimeMessage(

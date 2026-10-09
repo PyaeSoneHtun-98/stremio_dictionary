@@ -21,7 +21,6 @@ describe('mpv controller safety helpers', () => {
   it('keeps the Windows mpv embedding arguments unchanged', () => {
     expect(
       buildMpvArguments({
-        platform: 'win32',
         windowId: '123456',
         ipcPath: mpvPipePath(1),
       })
@@ -40,18 +39,6 @@ describe('mpv controller safety helpers', () => {
       '--wid=123456',
       `--input-ipc-server=${mpvPipePath(1)}`,
     ])
-  })
-
-  it('never passes Windows D3D11 options to mpv on macOS', () => {
-    const args = buildMpvArguments({
-      platform: 'darwin',
-      windowId: '105553116266496',
-      ipcPath: '/var/folders/x/T/sb-mpv-abc/mpv-1.sock',
-    })
-
-    expect(args.join(' ')).not.toContain('d3d11')
-    expect(args).toContain('--wid=105553116266496')
-    expect(args).toContain('--input-ipc-server=/var/folders/x/T/sb-mpv-abc/mpv-1.sock')
   })
 
   it('uses a unique short Unix socket per playback generation on macOS', () => {

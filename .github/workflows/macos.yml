@@ -14,124 +14,6 @@ permissions:
   contents: read
 
 jobs:
-  mpv-control:
-    runs-on: macos-14
-    timeout-minutes: 15
-    steps:
-      - name: Install mpv and FFmpeg
-        run: brew install mpv ffmpeg
-
-      - name: Runner graphics
-        if: ${{ !cancelled() }}
-        run: |
-          echo "::notice title=runner graphics::$(system_profiler SPDisplaysDataType 2>/dev/null | grep -E 'Chipset|Metal|Vendor|Resolution|Type' | tr -s ' ' | tr '\n' ';' | cut -c1-600)"
-
-      - name: Standalone mpv video outputs without --wid
-        if: ${{ !cancelled() }}
-        run: |
-          set -u
-          ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=25 -t 60 -pix_fmt yuv420p clip.mp4
-          reports="$HOME/Library/Logs/DiagnosticReports"
-          for variant in "null:--vo=null" "default:" "gpu-opengl:--vo=gpu --gpu-api=opengl" "gpu-next-opengl:--vo=gpu-next --gpu-api=opengl" "gpu-next-macvk:--vo=gpu-next --gpu-api=vulkan --gpu-context=macvk" "libmpv-vo:--vo=libmpv"; do
-            name="${variant%%:*}"
-            # shellcheck disable=SC2086 # option list is intentionally word-split
-            mpv --no-config --ao=null --keep-open=yes ${variant#*:} clip.mp4 > "mpv-$name.log" 2>&1 &
-            pid=$!
-            sleep 8
-            if kill -0 "$pid" 2> /dev/null; then
-              echo "::notice title=mpv $name::stayed running for 8s"
-              kill "$pid"; wait "$pid" 2> /dev/null
-            else
-              wait "$pid"; status=$?
-              sleep 3
-              report="$(ls -t "$reports"/mpv*.ips 2> /dev/null | head -1)"
-              reason=""
-              if [ -n "$report" ]; then
-                reason="$(tail -n +2 "$report" | python3 -c 'import json,sys; d=json.load(sys.stdin); t=d.get("threads",[{}])[d.get("faultingThread",0)]; print(json.dumps({"exception":d.get("exception"),"asi":d.get("asi"),"frames":[f.get("symbol") for f in t.get("frames",[])[:8]]})[:700])' 2> /dev/null)"
-                rm -f "$report"
-              fi
-              echo "::error title=mpv $name::exited with status $status; log: $(tail -c 300 "mpv-$name.log" | tr '\n' ' '); crash: $reason"
-            fi
-          done
-
-      - name: mpv --wid documentation (primary source)
-        if: ${{ !cancelled() }}
-        run: |
-          set -u
-          version="$(mpv --version | head -1 | awk '{print $2}')"
-          echo "::notice title=mpv version::$version"
-          if curl -fsSL "https://raw.githubusercontent.com/mpv-player/mpv/${version}/DOCS/man/options.rst" -o options.rst; then
-            section="$(awk '/^``--wid=<ID>``/{found=1} found && /^``--no-window-dragging``/{exit} found' options.rst)"
-            echo "::notice title=mpv --wid docs::$(echo "$section" | grep -i -B1 -A3 'macos\|cocoa\|NSView' | tr '\n' ' ' | cut -c1-900)"
-          else
-            echo "::warning title=mpv --wid docs::could not download options.rst for $version"
-          fi
-
-  libmpv-spike:
-    runs-on: macos-14
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        variant: [default, gpu-next-macvk, gpu-macvk]
-    env:
-      SPIKE_OUT: ${{ github.workspace }}/spike-out
-      SPIKE_CLIP: ${{ github.workspace }}/spike-out/clip.mp4
-      SPIKE_PROBE: ${{ github.workspace }}/spike-out/window-probe
-      SPIKE_VARIANT: ${{ matrix.variant }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: |
-          npm ci
-          npm install --no-save koffi@2.9.0
-
-      - name: Install mpv and FFmpeg
-        run: brew install mpv ffmpeg
-
-      - name: Prepare clip and window probe
-        run: |
-          mkdir -p spike-out
-          ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=25 -t 60 -pix_fmt yuv420p spike-out/clip.mp4
-          swiftc -O -o spike-out/window-probe scripts/macos-window-probe.swift
-
-      - name: In-process embed and resize
-        if: ${{ !cancelled() }}
-        timeout-minutes: 3
-        env:
-          SPIKE_PHASE: embed
-        run: npx electron spike/macos-libmpv/main.cjs
-
-      - name: In-process native fullscreen
-        if: ${{ !cancelled() }}
-        timeout-minutes: 3
-        env:
-          SPIKE_PHASE: fullscreen
-        run: npx electron spike/macos-libmpv/main.cjs
-
-      - name: In-process destroy and recreate
-        if: ${{ !cancelled() }}
-        timeout-minutes: 3
-        env:
-          SPIKE_PHASE: recreate
-        run: npx electron spike/macos-libmpv/main.cjs
-
-      - name: Upload screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-libmpv-spike-${{ matrix.variant }}
-          path: spike-out/*.png
-          if-no-files-found: warn
-
   package-macos:
     runs-on: macos-14
     timeout-minutes: 40
@@ -148,6 +30,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # libmpv headers are needed to build the native video view; the app loads libmpv at runtime.
+      - name: Install mpv and FFmpeg
+        run: brew install mpv ffmpeg
+
       - name: Validate project on macOS
         run: npm run check
 
@@ -157,8 +43,10 @@ jobs:
       - name: Verify app bundle
         run: |
           set -euo pipefail
+          trap 'echo "::error title=bundle::failed at line $LINENO: $BASH_COMMAND"' ERR
           app="release/SubtitleBridge-macos-arm64/Subtitle Bridge.app"
           plist="$app/Contents/Info.plist"
+          native="$app/Contents/Resources/app/out/native/mpv_view.node"
           test "$(plutil -extract CFBundleExecutable raw "$plist")" = "Subtitle Bridge"
           test "$(plutil -extract CFBundleIdentifier raw "$plist")" = "io.github.pyaesonehtun-98.subtitlebridge"
           test "$(plutil -extract CFBundleShortVersionString raw "$plist")" = "$(node -p "require('./package.json').version")"
@@ -166,24 +54,28 @@ jobs:
           test -f "$app/Contents/Resources/app/out/main/index.js"
           test ! -e "$app/Contents/Resources/default_app.asar"
           lipo -archs "$app/Contents/MacOS/Subtitle Bridge" | grep -qx arm64
+          lipo -archs "$native" | grep -qx arm64
+          if otool -L "$native" | tail -n +2 | grep -qi libmpv; then
+            echo 'The native video view must load libmpv at runtime, not link it.'
+            exit 1
+          fi
+          codesign --verify --strict "$native"
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -dv "$app" 2>&1 | grep -q 'Signature=adhoc'
-          if find "$app" -iname 'mpv*' -o -iname 'ffmpeg' | grep .; then
+          if find "$app" \( -iname '*mpv*' -o -iname 'ffmpeg' -o -iname 'libav*' \) ! -name 'mpv_view.node' | grep .; then
             echo 'The macOS beta must not bundle mpv or FFmpeg.'
             exit 1
           fi
           hdiutil verify release/SubtitleBridge-macos-arm64.dmg
           (cd release && shasum -a 256 -c SubtitleBridge-macos-arm64.dmg.sha256)
 
-      - name: Install mpv and FFmpeg
-        run: brew install mpv ffmpeg
-
       - name: Smoke-test packaged playback
+        env:
+          SUBTITLE_BRIDGE_RENDER_PROBE: '1'
         run: |
           set -euo pipefail
           trap 'echo "::error title=smoke::failed at line $LINENO: $BASH_COMMAND"' ERR
           mkdir -p smoke
-          swiftc -O -o smoke/window-probe scripts/macos-window-probe.swift
           cat > smoke/subs.srt <<'SRT'
           1
           00:00:00,500 --> 00:00:59,000
@@ -199,44 +91,39 @@ jobs:
           log="$HOME/Library/Application Support/Subtitle Bridge/diagnostics/subtitle-bridge.log"
           "$app/Contents/MacOS/Subtitle Bridge" "$PWD/smoke/clip.mkv" > smoke/app-stdout.txt 2>&1 &
           app_pid=$!
-          sleep 20
+          sleep 25
           screencapture -x smoke/player.png || true
           cat "$log"
           echo "::notice title=smoke events::$(grep -o '"event":"[^"]*"' "$log" | cut -d'"' -f4 | sort | uniq -c | tr -s ' \n' ' ')"
-          echo "::notice title=smoke processes::$(pgrep -lf 'mpv|Subtitle Bridge' | cut -c1-60 | tr '\n' ';' || true)"
-          echo "::notice title=smoke ffmpeg log::$(grep '"ffmpeg\.' "$log" | sed 's/.*"event"/"event"/' | tr '\n' ' ' | cut -c1-600)"
-          if ffmpeg -v error -nostdin -i smoke/clip.mkv -map 0:2 -c:s srt -f srt pipe:1 > smoke/direct.srt 2> smoke/direct.err; then
-            echo "::notice title=smoke direct ffmpeg::ok $(wc -c < smoke/direct.srt) bytes"
-          else
-            echo "::error title=smoke direct ffmpeg::exit $? $(head -c 300 smoke/direct.err | tr '\n' ' ')"
-          fi
+          echo "::notice title=smoke mpv::$(grep '"mpv\.\(start\|spawned\|spawnFailed\|exit\|renderStats\)"' "$log" | sed 's/.*"event"/"event"/' | tr '\n' ' ' | cut -c1-900)"
+          echo "::notice title=smoke playback::$(grep '"media.loadFailed"\|"playback.failed"\|"ffmpeg\.' "$log" | sed 's/.*"event"/"event"/' | tr '\n' ' ' | cut -c1-600)"
 
           kill -0 "$app_pid"
-          mpv_pids="$(pgrep -x mpv)" || { echo 'mpv is not running.'; exit 1; }
-          # shellcheck disable=SC2086 # one probe argument per PID
-          mpv_windows="$(smoke/window-probe $mpv_pids)"
-          echo "::notice title=smoke mpv windows::$mpv_windows"
-          test "$mpv_windows" = '[]' || { echo 'mpv opened its own window instead of embedding.'; exit 1; }
-          socket="$(find "${TMPDIR:-/tmp}" -path '*sb-mpv-*' -name 'mpv-*.sock' 2>/dev/null | head -1)"
-          test -S "$socket" || { echo 'mpv IPC socket not found.'; exit 1; }
-          osd="$(echo '{"command":["get_property","osd-dimensions"]}' | nc -U -w 2 "$socket" | grep '"osd-dimensions"\|"request_id"' || true)"
-          echo "::notice title=smoke osd::$osd"
-          echo "$osd" | grep -q '"w":[1-9]' || { echo 'mpv is not rendering into a sized surface.'; exit 1; }
-
-          grep -q '"mpv.spawned"' "$log"
-          grep -q '"source":"homebrew"' "$log"
-          grep -q '"ffmpeg.extractComplete"' "$log" || { echo 'Homebrew FFmpeg did not extract the English subtitle track.'; exit 1; }
-          if grep -q '"media.loadFailed"\|"mpv.spawnFailed"\|"media.externalLaunchRejected"\|"ffmpeg.extractFailed"' "$log" \
-            || grep '"mpv.exit"' "$log" | grep -q '"expected":false'; then
-            echo 'Packaged playback smoke test reported a failure.'
+          if pgrep -x mpv; then
+            echo '::error title=smoke::A separate mpv process is running; macOS must play in-process.'
             exit 1
           fi
+          grep '"mpv.spawned"' "$log" | grep -q '"source":"homebrew"'
+          grep -q '"ffmpeg.extractComplete"' "$log"
+          if grep -q '"media.loadFailed"\|"mpv.spawnFailed"\|"playback.failed"\|"ffmpeg.extractFailed"' "$log" \
+            || grep '"mpv.exit"' "$log" | grep -q '"expected":false'; then
+            echo '::error title=smoke::Packaged playback reported a failure.'
+            exit 1
+          fi
+          node -e '
+            const fs = require("node:fs")
+            const records = fs.readFileSync(process.argv[1], "utf8").trim().split("\n").map((line) => JSON.parse(line))
+            const stats = records.filter((record) => record.event === "mpv.renderStats").pop()?.details
+            if (!stats) throw new Error("No render stats were logged.")
+            console.log(`::notice title=smoke render::${JSON.stringify(stats)}`)
+            if (!(stats.frames > 0 && stats.width > 0 && stats.height > 0)) throw new Error("mpv rendered no frames.")
+            if (!(stats.meanLuma > 20)) throw new Error("Rendered frames are black.")
+          ' "$log"
 
           kill "$app_pid"
-          for _ in $(seq 1 20); do kill -0 "$app_pid" 2>/dev/null || break; sleep 0.5; done
-          sleep 2
-          if pgrep -x mpv; then
-            echo 'mpv kept running after Subtitle Bridge quit.'
+          for _ in $(seq 1 30); do kill -0 "$app_pid" 2> /dev/null || break; sleep 0.5; done
+          if kill -0 "$app_pid" 2> /dev/null; then
+            echo '::error title=smoke::Subtitle Bridge did not quit within 15 seconds.'
             exit 1
           fi
 

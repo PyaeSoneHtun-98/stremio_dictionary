@@ -35,13 +35,14 @@ const electronApp = join(electronDist, 'Electron.app')
 const builtApp = join(root, 'out')
 const brandingRoot = join(root, 'assets', 'branding')
 const iconSource = join(brandingRoot, 'subtitle-bridge-icon.png')
+const nativeVideoView = join(builtApp, 'native', 'mpv_view.node')
 const releaseRoot = join(root, 'release')
 const packageDir = join(releaseRoot, 'SubtitleBridge-macos-arm64')
 const appBundle = join(packageDir, `${PRODUCT_NAME}.app`)
 const dmgPath = join(releaseRoot, 'SubtitleBridge-macos-arm64.dmg')
 const checksumPath = `${dmgPath}.sha256`
 
-for (const requiredPath of [electronApp, builtApp, iconSource]) {
+for (const requiredPath of [electronApp, builtApp, iconSource, nativeVideoView]) {
   if (!existsSync(requiredPath)) {
     throw new Error(`Required build input is missing: ${requiredPath}`)
   }
@@ -119,8 +120,12 @@ writeFileSync(
     '',
     '  brew install mpv ffmpeg',
     '',
-    'Runtime lookup order:',
-    '1. MPV_PATH / FFMPEG_PATH developer override',
+    'mpv runs inside the app as libmpv, loaded at runtime from:',
+    '1. MPV_LIBRARY_PATH developer override',
+    '2. Homebrew: /opt/homebrew/lib/libmpv.2.dylib, then /usr/local/lib/libmpv.2.dylib',
+    '',
+    'FFmpeg lookup order:',
+    '1. FFMPEG_PATH developer override',
     '2. Homebrew: /opt/homebrew/bin, then /usr/local/bin',
     '3. system PATH fallback',
     ''
@@ -140,7 +145,7 @@ writeFileSync(
       createdAt: new Date().toISOString(),
       signing: 'ad-hoc',
       runtimeDependencies: {
-        mpv: { bundled: false, resolution: ['MPV_PATH', 'homebrew', 'PATH'] },
+        libmpv: { bundled: false, resolution: ['MPV_LIBRARY_PATH', 'homebrew'] },
         ffmpeg: { bundled: false, resolution: ['FFMPEG_PATH', 'homebrew', 'PATH'] }
       }
     },
@@ -151,7 +156,13 @@ writeFileSync(
 )
 
 // Renaming the executable and editing Info.plist invalidates Electron's signature. Apple Silicon
-// refuses to run unsigned code, so re-sign the whole bundle ad hoc (no Developer ID available).
+// refuses to run unsigned code, so re-sign ad hoc (no Developer ID available): first the native
+// video view, which --deep does not reach inside Resources, then the whole bundle.
+execFileSync(
+  'codesign',
+  ['--force', '--sign', '-', join(appResources, 'out', 'native', 'mpv_view.node')],
+  { stdio: 'inherit' }
+)
 execFileSync('codesign', ['--force', '--deep', '--sign', '-', appBundle], { stdio: 'inherit' })
 execFileSync('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appBundle], {
   stdio: 'inherit'

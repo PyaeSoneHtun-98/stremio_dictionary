@@ -74,6 +74,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # libmpv headers are needed to build the native video view; the app loads libmpv at runtime.
+      - name: Install mpv headers
+        run: brew install mpv
+
       - name: Validate project
         run: npm run check
 

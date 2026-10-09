@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   resolveFfmpegExecutable,
+  resolveLibmpv,
   resolveMpvExecutable,
   type RuntimeToolResolutionOptions
 } from '../src/main/runtimeTools'
@@ -124,6 +125,34 @@ describe('runtime tool resolution', () => {
         homebrewDirectories: [homebrew]
       })
     ).toEqual({ executable: 'ffmpeg', source: 'path' })
+  })
+
+  it('finds Homebrew libmpv for in-process macOS playback', () => {
+    const appleSilicon = createTemporaryDirectory()
+    const intel = createTemporaryDirectory()
+    writeFileSync(join(intel, 'libmpv.2.dylib'), '')
+
+    expect(resolveLibmpv({ environment: {}, homebrewDirectories: [appleSilicon, intel] })).toEqual({
+      path: join(intel, 'libmpv.2.dylib'),
+      source: 'homebrew'
+    })
+
+    writeFileSync(join(appleSilicon, 'libmpv.2.dylib'), '')
+    expect(
+      resolveLibmpv({ environment: {}, homebrewDirectories: [appleSilicon, intel] })?.path
+    ).toBe(join(appleSilicon, 'libmpv.2.dylib'))
+  })
+
+  it('prefers a developer libmpv override and reports a missing library', () => {
+    const empty = createTemporaryDirectory()
+
+    expect(
+      resolveLibmpv({
+        environment: { MPV_LIBRARY_PATH: '/Users/dev/libmpv.2.dylib' },
+        homebrewDirectories: [empty]
+      })
+    ).toEqual({ path: '/Users/dev/libmpv.2.dylib', source: 'environment' })
+    expect(resolveLibmpv({ environment: {}, homebrewDirectories: [empty] })).toBeNull()
   })
 })
 
