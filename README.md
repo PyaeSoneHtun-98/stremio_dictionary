@@ -2,9 +2,9 @@
 
 Subtitle Bridge is a Windows desktop video player for English learners. It plays local MKV files and supported HTTP/HTTPS media streams, shows supported English text subtitles as clickable words, and provides offline English → Burmese word and phrase lookup without leaving the player.
 
-## Windows v1.0.6
+## Windows v1.0.7
 
-Subtitle Bridge v1.0.6 is a focused updater hotfix. It keeps all v1.0.5 playback, subtitle, dictionary, launcher, and Stremio features while fixing an in-app upgrade failure caused by the setup process inheriting the installed application's working directory.
+Subtitle Bridge v1.0.7 adds a **Stream URL** entry to the main window, audio-track switching during playback, a consolidated CC/Tracks panel, the neutral charcoal theme and approved logo, a larger offline dictionary (40,011 headwords and 4,000 phrases), and an optional flag for reporting missing or questionable dictionary entries. See the [v1.0.7 release notes](docs/releases/v1.0.7.md).
 
 ### Normal installation
 
@@ -50,7 +50,7 @@ The one-click setup EXE is the recommended download for normal users.
 
 ## In-app update support
 
-Subtitle Bridge v1.0.6 keeps the user-approved Windows updater and adds working-directory isolation so setup does not keep the install directory locked during an in-app upgrade.
+Subtitle Bridge includes a user-approved Windows updater. Since v1.0.6 it isolates the setup working directory so setup does not keep the install directory locked during an in-app upgrade.
 
 - Subtitle Bridge checks the official stable GitHub Release shortly after startup and periodically.
 - Up-to-date checks stay unobtrusive.
@@ -62,12 +62,14 @@ Subtitle Bridge v1.0.6 keeps the user-approved Windows updater and adds working-
 - Installation is blocked while video playback is loading, playing, or paused.
 - Offline/update-server failures do not block normal playback or dictionary use.
 
-The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository. v1.0.6 retains the existing process-identity, checksum, rollback, custom-install-directory, and transient-lock protections while explicitly relocating updater/setup working directories outside the installed application tree.
+The updater only trusts stable releases and the exact Windows assets from the official `PyaeSoneHtun-98/stremio_dictionary` repository. It retains the existing process-identity, checksum, rollback, custom-install-directory, and transient-lock protections while explicitly relocating updater/setup working directories outside the installed application tree.
 
-## What v1.0.6 includes
+## What v1.0.7 includes
 
 - local MKV and MP4 playback;
-- HTTP/HTTPS and Stremio stream playback;
+- HTTP/HTTPS and Stremio stream playback, including a **Stream URL** field in the main window;
+- audio-track switching while playback continues;
+- a consolidated CC/Tracks panel for subtitle selection, external subtitles, delay, size and position;
 - centered stream buffering/loading feedback;
 - single-click video-surface play/pause;
 - double-click fullscreen using the Windows-configured double-click interval;
@@ -76,7 +78,9 @@ The updater only trusts stable releases and the exact Windows assets from the of
 - subtitle delay, size, and position controls, including G/H 0.1-second timing shortcuts with on-screen feedback;
 - frozen 30,000-headword dictionary plus a separate 10,000-entry extension and core corrections;
 - 4,000 phrases from the frozen 3,000-entry base plus 1,000 new phrases, with longest-match detection;
-- compact launcher with Local video, Stremio, and current-session status;
+- optional dictionary-entry reporting from the translation card;
+- compact launcher with Local video, Stremio, Stream URL, and current-session status;
+- neutral charcoal theme and the approved Subtitle Bridge logo;
 - installer-managed, pinned, SHA-256-verified mpv and FFmpeg;
 - Start Menu and Windows uninstall integration;
 - rollback-safe upgrades and recovery after interrupted setup;
@@ -86,9 +90,9 @@ The updater only trusts stable releases and the exact Windows assets from the of
 - redacted rotating diagnostics;
 - Electron renderer isolation with Node integration disabled and context isolation enabled.
 
-## Stream URL entry (unreleased)
+## Stream URL entry
 
-Current development builds add **Stream URL** to the main window. Paste an HTTP/HTTPS media
+Since v1.0.7 the main window has a **Stream URL** field. Paste an HTTP/HTTPS media
 URL, then select **Open stream** or press Enter. This uses the same mpv playback and live text
 subtitle path as Stremio; an ordinary website page URL may not be playable media. Other URL
 schemes are rejected. The field clears on successful opening and no URL history is saved.
@@ -106,6 +110,8 @@ The frozen **Phrase Dictionary v1.0.0** plus its separate extension contain:
 When a user clicks a subtitle word, Subtitle Bridge checks the current cue for the longest known phrase containing that word before falling back to the normal single-word dictionary.
 
 Normal Burmese word and phrase lookup is offline and requires no account, API key, payment method, or network request.
+
+The dictionary and phrase data were generated by the project owner with OpenAI GPT models and are maintained in [PyaeSoneHtun-98/dictionary-dataset](https://github.com/PyaeSoneHtun-98/dictionary-dataset). The copies shipped in this repository are covered by the same [MIT license](LICENSE). The data is AI-generated and has not had a full native-speaker editorial review, so some meanings may be imperfect; use the report flag on the translation card to point out problems.
 
 Dictionary validation is part of the normal project checks:
 
@@ -152,6 +158,8 @@ diagnostics\subtitle-bridge.log
 ```
 
 Diagnostics intentionally avoid subtitle text, clicked dictionary words, raw FFmpeg/mpv logs, credentials, and full media paths or stream URLs. Known secret-shaped fields and sensitive query/header patterns are redacted.
+
+Dictionary reports are sent only when you click the flag on a translation card. A report contains the looked-up word or phrase, the report category, the target language, the app and dictionary versions, and a random request ID used only to deduplicate retries. It goes to the project's HTTPS reporting endpoint for manual review and never includes subtitle context, translations, media paths, stream URLs, credentials, or user/device identifiers. See [dictionary reporting](docs/DICTIONARY_REPORTING.md).
 
 ## Development
 
@@ -240,3 +248,7 @@ issue
 ```
 
 Future work includes macOS/Linux packaging, separated-object phrasal-verb matching, pronunciation/TTS, richer ASS/libass fidelity, broader bilingual editorial review, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support.
+
+## License
+
+Subtitle Bridge, including the dictionary and phrase data in this repository, is released under the [MIT License](LICENSE). Third-party components keep their own licenses: mpv and FFmpeg (downloaded separately by the installer), Electron/Chromium, and the Inter font used in the logo artwork. See [packaging/THIRD_PARTY_NOTICES.txt](packaging/THIRD_PARTY_NOTICES.txt) and [assets/branding/licenses](assets/branding/licenses).

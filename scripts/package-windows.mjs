@@ -97,6 +97,7 @@ copyFileSync(
   join(root, 'packaging', 'THIRD_PARTY_NOTICES.txt'),
   join(packageDir, 'THIRD_PARTY_NOTICES.txt')
 )
+copyFileSync(join(root, 'LICENSE'), join(packageDir, 'LICENSE.txt'))
 
 writeFileSync(
   join(packageDir, 'RUNTIME_DEPENDENCIES.txt'),

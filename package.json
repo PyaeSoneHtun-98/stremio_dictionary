@@ -2,6 +2,7 @@
   "name": "subtitle-bridge",
   "version": "1.0.7",
   "private": true,
+  "license": "MIT",
   "description": "Windows desktop video player with interactive Burmese subtitle translation.",
   "main": "./out/main/index.js",
   "scripts": {
