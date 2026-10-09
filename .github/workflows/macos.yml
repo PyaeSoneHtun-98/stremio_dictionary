@@ -17,6 +17,15 @@ jobs:
   embed-spike:
     runs-on: macos-14
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [default, gpu-next-macvk, gpu-macvk, default-hwdec]
+    env:
+      SPIKE_OUT: ${{ github.workspace }}/spike-out
+      SPIKE_CLIP: ${{ github.workspace }}/spike-out/clip.mp4
+      SPIKE_PROBE: ${{ github.workspace }}/spike-out/window-probe
+      SPIKE_VARIANT: ${{ matrix.variant }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,26 +43,36 @@ jobs:
         run: |
           brew install mpv ffmpeg
           mpv --version
-          mpv --vo=help
-          mpv --gpu-context=help || true
-          ffmpeg -version | head -1
 
-      - name: Create test clip
+      - name: Prepare clip and window probe
         run: |
           mkdir -p spike-out
           ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=25 -t 60 -pix_fmt yuv420p spike-out/clip.mp4
+          swiftc -O -o spike-out/window-probe scripts/macos-window-probe.swift
 
-      - name: Run embed spike
+      - name: Embedded in window and resize
+        if: ${{ !cancelled() }}
         env:
-          SPIKE_OUT: ${{ github.workspace }}/spike-out
-          SPIKE_CLIP: ${{ github.workspace }}/spike-out/clip.mp4
+          SPIKE_PHASE: embed
+        run: npx electron spike/macos-embed/main.cjs
+
+      - name: Native fullscreen
+        if: ${{ !cancelled() }}
+        env:
+          SPIKE_PHASE: fullscreen
+        run: npx electron spike/macos-embed/main.cjs
+
+      - name: Simple fullscreen
+        if: ${{ !cancelled() }}
+        env:
+          SPIKE_PHASE: simplefullscreen
         run: npx electron spike/macos-embed/main.cjs
 
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: macos-embed-spike
+          name: macos-embed-spike-${{ matrix.variant }}
           path: spike-out/*.png
           if-no-files-found: warn
 
@@ -107,6 +126,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p smoke
+          swiftc -O -o smoke/window-probe scripts/macos-window-probe.swift
           cat > smoke/subs.srt <<'SRT'
           1
           00:00:00,500 --> 00:00:59,000
@@ -119,22 +139,41 @@ jobs:
             -map 0:v -map 1:a -map 2:s -c:v libx264 -pix_fmt yuv420p -c:a aac -c:s srt \
             -metadata:s:s:0 language=eng smoke/clip.mkv
           app="$PWD/release/SubtitleBridge-macos-arm64/Subtitle Bridge.app"
+          log="$HOME/Library/Application Support/Subtitle Bridge/diagnostics/subtitle-bridge.log"
           "$app/Contents/MacOS/Subtitle Bridge" "$PWD/smoke/clip.mkv" > smoke/app-stdout.txt 2>&1 &
           app_pid=$!
           sleep 20
           screencapture -x smoke/player.png || true
-          kill -0 "$app_pid"
-          pgrep -fl 'mpv' || true
-          log="$HOME/Library/Application Support/Subtitle Bridge/diagnostics/subtitle-bridge.log"
           cat "$log"
+
+          kill -0 "$app_pid"
+          mpv_pids="$(pgrep -x mpv)" || { echo 'mpv is not running.'; exit 1; }
+          # shellcheck disable=SC2086 # one probe argument per PID
+          mpv_windows="$(smoke/window-probe $mpv_pids)"
+          echo "mpv-owned windows: $mpv_windows"
+          test "$mpv_windows" = '[]' || { echo 'mpv opened its own window instead of embedding.'; exit 1; }
+          socket="$(find "${TMPDIR:-/tmp}" -path '*sb-mpv-*' -name 'mpv-*.sock' 2>/dev/null | head -1)"
+          test -S "$socket" || { echo 'mpv IPC socket not found.'; exit 1; }
+          osd="$(echo '{"command":["get_property","osd-dimensions"]}' | nc -U -w 2 "$socket" | grep '"osd-dimensions"\|"request_id"' || true)"
+          echo "osd-dimensions: $osd"
+          echo "$osd" | grep -q '"w":[1-9]' || { echo 'mpv is not rendering into a sized surface.'; exit 1; }
+
           grep -q '"mpv.spawned"' "$log"
           grep -q '"source":"homebrew"' "$log"
-          if grep -q '"media.loadFailed"\|"mpv.spawnFailed"\|"media.externalLaunchRejected"' "$log"; then
+          grep -q '"ffmpeg.extractComplete"' "$log" || { echo 'Homebrew FFmpeg did not extract the English subtitle track.'; exit 1; }
+          if grep -q '"media.loadFailed"\|"mpv.spawnFailed"\|"media.externalLaunchRejected"\|"ffmpeg.extractFailed"' "$log" \
+            || grep '"mpv.exit"' "$log" | grep -q '"expected":false'; then
             echo 'Packaged playback smoke test reported a failure.'
             exit 1
           fi
+
           kill "$app_pid"
-          wait "$app_pid" || true
+          for _ in $(seq 1 20); do kill -0 "$app_pid" 2>/dev/null || break; sleep 0.5; done
+          sleep 2
+          if pgrep -x mpv; then
+            echo 'mpv kept running after Subtitle Bridge quit.'
+            exit 1
+          fi
 
       - name: Upload macOS beta package
         if: always()
