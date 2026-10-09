@@ -6,15 +6,31 @@ extracts its subtitle track and quits. Everything below needs a **physical Apple
 Record each result truthfully in the PR (pass / fail / not tested), with the macOS version and
 Mac model. Never paste private stream URLs, file paths or subtitle text.
 
-About 15–20 minutes.
+About 30–40 minutes including setup (15–20 minutes of checks).
 
-## Setup
+## Bring with you (prepare on Windows)
 
-1. Install [Homebrew](https://brew.sh) if needed, then run `brew install mpv ffmpeg`.
-2. Download the test DMG from the PR's macOS CI run (artifact `subtitle-bridge-macos-arm64`)
-   or the beta prerelease, open it and drag **Subtitle Bridge** to Applications.
-3. Open it. Expected: macOS blocks the first launch (unnotarized). Use
+On a USB stick or cloud drive:
+
+- the test DMG and its `.sha256` from the PR's macOS CI run (artifact `subtitle-bridge-macos-arm64`,
+  or `gh run download <run-id> --name subtitle-bridge-macos-arm64`);
+- an MKV with English SRT or ASS subtitles (1080p), plus a 4K file and an MP4 if you have them;
+- a separate `.srt` subtitle file for the external-subtitle check;
+- a direct HTTP/HTTPS video link (any public `.mp4` URL) for the stream check;
+- this checklist.
+
+## Setup on the Mac
+
+Ask the Mac's owner first: Homebrew and mpv/FFmpeg get installed (removable afterwards, see
+Clean up).
+
+1. Note the Mac model and macOS version (Apple menu → About This Mac).
+2. Install [Homebrew](https://brew.sh) if needed (its one-line Terminal command; asks for the
+   Mac's password), then run `brew install mpv ffmpeg`.
+3. Open the DMG and drag **Subtitle Bridge** to Applications.
+4. Open it. Expected: macOS blocks the first launch (unnotarized). Use
    **System Settings → Privacy & Security → Open Anyway**. Note whether that worked.
+5. Use **Cmd+Shift+5** to screen-record anything that looks wrong.
 
 ## Checks
 
@@ -37,4 +53,13 @@ About 15–20 minutes.
 If something fails, note the step and send
 `~/Library/Application Support/Subtitle Bridge/diagnostics/subtitle-bridge.log`
 (it is redacted: no full media paths, stream URLs or subtitle text). If the app crashed, also send
-the newest `Subtitle Bridge*.ips` from `~/Library/Logs/DiagnosticReports`.
+the newest `Subtitle Bridge*.ips` from `~/Library/Logs/DiagnosticReports`. In Finder use
+**Go → Go to Folder…** and paste the path.
+
+## Clean up
+
+1. Quit Subtitle Bridge and drag it from Applications to the Trash.
+2. Remove its data: Finder → Go → Go to Folder… →
+   `~/Library/Application Support/Subtitle Bridge` → move to Trash.
+3. If mpv/FFmpeg were installed only for this test: `brew uninstall mpv ffmpeg` then
+   `brew autoremove`. Homebrew itself can stay or be removed with its official uninstall script.
