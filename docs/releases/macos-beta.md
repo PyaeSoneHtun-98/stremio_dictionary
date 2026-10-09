@@ -12,7 +12,7 @@
   brew install mpv ffmpeg
   ```
 
-  Subtitle Bridge looks for them in `/opt/homebrew/bin` automatically.
+  Subtitle Bridge finds them in Homebrew's standard location automatically.
 
 ### Install
 

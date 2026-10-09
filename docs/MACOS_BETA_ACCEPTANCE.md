@@ -24,6 +24,7 @@ About 15–20 minutes.
 | 2 | Open a local MKV with English SRT/ASS subtitles | Video and audio play inside the player window (no separate mpv window or Dock icon). |
 | 3 | Subtitles | English subtitle line appears above the video; clicking a word shows the Burmese card; a phrase (e.g. "look it up") resolves as a phrase. |
 | 4 | Controls | Play/pause (click and Space), seek, volume, speed, audio track, subtitle delay/size/position all work. |
+| 4b | Smoothness | Play a 1080p (and, if available, 4K) file for a minute while clicking words: no stutter, dropped audio, or lag opening the Burmese card. Note the Mac model. |
 | 5 | Resize the player window | Video scales with the window; subtitles stay aligned; no black or stretched video. |
 | 6 | Fullscreen (double-click or button) and back | Video fills the screen with subtitles visible; leaving fullscreen restores the window. |
 | 7 | External subtitle | Load an SRT through the picker and by dragging it onto the player. |

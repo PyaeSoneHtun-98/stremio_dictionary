@@ -66,6 +66,7 @@ struct Player {
   std::atomic<double> meanLuma{-1};
   std::atomic<int> glError{0};
   std::atomic<int> framebuffer{-1};
+  std::atomic<int> contextRequests{0};
   bool probe = false;
   CFAbsoluteTime lastProbe = 0;
   bool destroyed = false;
@@ -119,9 +120,25 @@ void OnRenderUpdate(void *context);
 
 @interface SBVideoLayer : CAOpenGLLayer
 @property(nonatomic, assign) sbmpv::Player *player;
+- (void)createRenderContext;
 @end
 
-@implementation SBVideoLayer
+// Core Animation may ask for a pixel format and context again (display or GPU change, sleep and
+// wake). The mpv render context is bound to one GL context, so both are created once and the
+// same retained objects are returned on every later request.
+@implementation SBVideoLayer {
+  CGLPixelFormatObj _pixelFormat;
+  CGLContextObj _context;
+}
+
+- (void)dealloc {
+  if (_context) {
+    CGLReleaseContext(_context);
+  }
+  if (_pixelFormat) {
+    CGLReleasePixelFormat(_pixelFormat);
+  }
+}
 
 - (instancetype)init {
   self = [super init];
@@ -145,29 +162,48 @@ void OnRenderUpdate(void *context);
       kCGLPFARendererID, (CGLPixelFormatAttribute)kCGLRendererGenericFloatID,
       kCGLPFADoubleBuffer, (CGLPixelFormatAttribute)0};
 
-  CGLPixelFormatObj pixelFormat = nullptr;
-  GLint count = 0;
-  if (CGLChoosePixelFormat(accelerated, &pixelFormat, &count) != kCGLNoError || !pixelFormat) {
-    pixelFormat = nullptr;
-    CGLChoosePixelFormat(software, &pixelFormat, &count);
+  if (!_pixelFormat) {
+    GLint count = 0;
+    if (CGLChoosePixelFormat(accelerated, &_pixelFormat, &count) != kCGLNoError || !_pixelFormat) {
+      _pixelFormat = nullptr;
+      CGLChoosePixelFormat(software, &_pixelFormat, &count);
+    }
   }
-  return pixelFormat;
+  return _pixelFormat ? CGLRetainPixelFormat(_pixelFormat) : nullptr;
 }
 
 - (CGLContextObj)copyCGLContextForPixelFormat:(CGLPixelFormatObj)pixelFormat {
-  CGLContextObj context = [super copyCGLContextForPixelFormat:pixelFormat];
   sbmpv::Player *player = self.player;
-  if (!context || !player) {
-    return context;
+  if (player) {
+    ++player->contextRequests;
+  }
+
+  if (!_context) {
+    if (CGLCreateContext(_pixelFormat ?: pixelFormat, nullptr, &_context) != kCGLNoError) {
+      _context = nullptr;
+    }
+    if (!_context) {
+      return [super copyCGLContextForPixelFormat:pixelFormat];
+    }
+    GLint swapInterval = 1;
+    CGLSetParameter(_context, kCGLCPSwapInterval, &swapInterval);
+    [self createRenderContext];
+  }
+  return CGLRetainContext(_context);
+}
+
+- (void)createRenderContext {
+  sbmpv::Player *player = self.player;
+  if (!player || !_context) {
+    return;
   }
 
   std::lock_guard<std::mutex> lock(player->renderLock);
   if (player->render || !player->mpv) {
-    return context;
+    return;
   }
 
-  GLint swapInterval = 1;
-  CGLSetParameter(context, kCGLCPSwapInterval, &swapInterval);
+  CGLContextObj context = _context;
   CGLSetCurrentContext(context);
 
   mpv_opengl_init_params glInit{};
@@ -181,7 +217,7 @@ void OnRenderUpdate(void *context);
   if (sbmpv::g_api.renderCreate(&player->render, player->mpv, params) < 0) {
     player->render = nullptr;
     player->renderer = "render-context-failed";
-    return context;
+    return;
   }
 
   player->glContext = CGLRetainContext(context);
@@ -189,7 +225,6 @@ void OnRenderUpdate(void *context);
   player->renderer = name ? reinterpret_cast<const char *>(name) : "unknown";
   sbmpv::g_api.renderSetUpdateCallback(player->render, sbmpv::OnRenderUpdate,
                                        (__bridge void *)self);
-  return context;
 }
 
 - (void)drawInCGLContext:(CGLContextObj)context
@@ -557,6 +592,8 @@ napi_value GetRenderStats(napi_env env, napi_callback_info info) {
   napi_set_named_property(env, result, "glError", value);
   napi_create_int32(env, player->framebuffer.load(), &value);
   napi_set_named_property(env, result, "framebuffer", value);
+  napi_create_int32(env, player->contextRequests.load(), &value);
+  napi_set_named_property(env, result, "contextRequests", value);
   return result;
 }
 

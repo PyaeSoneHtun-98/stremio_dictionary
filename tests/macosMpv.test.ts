@@ -12,7 +12,8 @@ const stats = {
   height: 1080,
   meanLuma: 120,
   glError: 0,
-  framebuffer: 1
+  framebuffer: 1,
+  contextRequests: 1
 }
 
 function fakeNative(overrides: Partial<NativeMpvView> = {}): NativeMpvView {
@@ -113,6 +114,9 @@ describe('macOS in-process mpv', () => {
     expect(player.killed).toBe(true)
     expect(native.destroyPlayer).toHaveBeenCalledTimes(1)
     expect(diagnosticLog).toHaveBeenCalledWith('mpv.renderStats', stats)
+    expect(diagnosticLog).toHaveBeenCalledWith('mpv.inProcessDestroyed', {
+      ms: expect.any(Number)
+    })
     expect(player.renderStats()).toBeNull()
   })
 
@@ -130,6 +134,7 @@ describe('macOS in-process mpv', () => {
     expect(diagnosticLog).toHaveBeenCalledTimes(1)
     player.kill()
     vi.advanceTimersByTime(120_000)
-    expect(diagnosticLog).toHaveBeenCalledTimes(2)
+    // Final stats plus the destroy record; no further periodic stats after kill.
+    expect(diagnosticLog).toHaveBeenCalledTimes(3)
   })
 })

@@ -69,12 +69,9 @@ jobs:
           hdiutil verify release/SubtitleBridge-macos-arm64.dmg
           (cd release && shasum -a 256 -c SubtitleBridge-macos-arm64.dmg.sha256)
 
-      - name: Smoke-test packaged playback
-        env:
-          SUBTITLE_BRIDGE_RENDER_PROBE: '1'
+      - name: Create synthetic test media
         run: |
           set -euo pipefail
-          trap 'echo "::error title=smoke::failed at line $LINENO: $BASH_COMMAND"' ERR
           mkdir -p smoke
           cat > smoke/subs.srt <<'SRT'
           1
@@ -87,6 +84,18 @@ jobs:
             -i smoke/subs.srt -t 60 \
             -map 0:v -map 1:a -map 2:s -c:v libx264 -pix_fmt yuv420p -c:a aac -c:s srt \
             -metadata:s:s:0 language=eng smoke/clip.mkv
+
+      - name: Exercise native video view (resize, fullscreen, recreate)
+        timeout-minutes: 5
+        run: npx electron scripts/ci/macos-view-harness.cjs smoke/clip.mkv
+
+      - name: Smoke-test packaged playback
+        if: ${{ !cancelled() }}
+        env:
+          SUBTITLE_BRIDGE_RENDER_PROBE: '1'
+        run: |
+          set -euo pipefail
+          trap 'echo "::error title=smoke::failed at line $LINENO: $BASH_COMMAND"' ERR
           app="$PWD/release/SubtitleBridge-macos-arm64/Subtitle Bridge.app"
           log="$HOME/Library/Application Support/Subtitle Bridge/diagnostics/subtitle-bridge.log"
           "$app/Contents/MacOS/Subtitle Bridge" "$PWD/smoke/clip.mkv" > smoke/app-stdout.txt 2>&1 &
@@ -152,6 +161,9 @@ jobs:
             echo '::error title=smoke::Subtitle Bridge did not quit within 15 seconds.'
             exit 1
           fi
+          # An orderly quit disposes the in-process player before the app exits.
+          echo "::notice title=smoke quit::$(grep '"mpv.inProcessDestroyed"\|"mpv.exit"' "$log" | sed 's/.*"event"/"event"/' | tr '\n' ' ')"
+          grep -q '"mpv.inProcessDestroyed"' "$log"
 
       - name: Upload macOS beta package
         if: always()

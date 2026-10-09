@@ -11,6 +11,7 @@ export interface MpvRenderStats {
   meanLuma: number
   glError: number
   framebuffer: number
+  contextRequests: number
 }
 
 export interface NativeMpvView {
@@ -122,7 +123,9 @@ export class InProcessMpv extends EventEmitter {
     if (this.native && player) {
       this.logRenderStats()
       this.player = null
+      const started = Date.now()
       this.native.destroyPlayer(player)
+      diagnosticLog('mpv.inProcessDestroyed', { ms: Date.now() - started })
     }
     setImmediate(() => this.emit('exit', 0, null))
     return true
