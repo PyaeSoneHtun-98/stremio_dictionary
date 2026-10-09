@@ -24,6 +24,7 @@ export interface NativeMpvView {
 
 const FIRST_STATS_DELAY_MS = 5_000
 const STATS_INTERVAL_MS = 60_000
+const PROBE_STATS_INTERVAL_MS = 5_000
 
 let nativeModule: NativeMpvView | null = null
 
@@ -72,9 +73,11 @@ export class InProcessMpv extends EventEmitter {
   private native: NativeMpvView | null = null
   private player: unknown = null
   private statsTimer: NodeJS.Timeout | null = null
+  private readonly statsIntervalMs: number
 
   constructor(options: InProcessMpvOptions) {
     super()
+    this.statsIntervalMs = options.probe ? PROBE_STATS_INTERVAL_MS : STATS_INTERVAL_MS
     try {
       if (!options.libraryPath) {
         throw Object.assign(new Error('libmpv was not found.'), { code: 'ENOENT' })
@@ -129,7 +132,7 @@ export class InProcessMpv extends EventEmitter {
       diagnosticLog('mpv.renderStats', { ...stats })
     }
     if (!this.killed && this.player) {
-      this.statsTimer = setTimeout(() => this.logRenderStats(), STATS_INTERVAL_MS)
+      this.statsTimer = setTimeout(() => this.logRenderStats(), this.statsIntervalMs)
     }
   }
 }

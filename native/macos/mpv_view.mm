@@ -65,6 +65,7 @@ struct Player {
   std::atomic<int> height{0};
   std::atomic<double> meanLuma{-1};
   bool probe = false;
+  CFAbsoluteTime lastProbe = 0;
   bool destroyed = false;
 };
 
@@ -212,10 +213,12 @@ void OnRenderUpdate(void *context);
       sbmpv::g_api.renderRender(player->render, params);
       rendered = true;
 
-      const uint64_t frame = ++player->frames;
+      ++player->frames;
       player->width = viewport[2];
       player->height = viewport[3];
-      if (player->probe && frame % 30 == 1) {
+      const CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+      if (player->probe && now - player->lastProbe >= 0.5) {
+        player->lastProbe = now;
         // Diagnostics only: mean brightness of a small centre sample, never frame content.
         const int sampleWidth = std::min(64, static_cast<int>(viewport[2]));
         const int sampleHeight = std::min(64, static_cast<int>(viewport[3]));

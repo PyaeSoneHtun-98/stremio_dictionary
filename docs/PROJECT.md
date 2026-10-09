@@ -239,22 +239,33 @@ This is a compatibility integration, not native/upstream Stremio support.
 
 Issue #53 adds an Apple Silicon build without changing Windows behavior:
 
-- mpv embeds into the player host window through `--wid` with the content `NSView` pointer
-  (64-bit) instead of the Win32 HWND. Windows keeps its exact D3D11 argument list, enforced by
-  a unit test.
-- mpv IPC uses a Unix socket inside a private per-session `mkdtemp` directory (short enough for
-  the macOS 104-byte socket-path limit) instead of a Windows named pipe.
-- mpv and FFmpeg are **not bundled**. Users install them with `brew install mpv ffmpeg`. Because
-  Finder/Dock launches do not inherit the shell `PATH`, lookup order is `MPV_PATH`/`FFMPEG_PATH`,
-  then `/opt/homebrew/bin`, then `/usr/local/bin`, then `PATH`. Missing tools produce an
-  inline Homebrew install message.
+- mpv cannot embed into another process's window on macOS (mpv documents `--wid` only for
+  X11, win32 and Android, and a child mpv given the Electron `NSView` aborts). The macOS build
+  therefore runs **libmpv inside the Electron main process**: the native Node-API module
+  `native/macos/mpv_view.mm` adds a `CAOpenGLLayer`-backed view to the player host window and
+  draws frames with mpv's render API (`vo=libmpv`, OpenGL), the approach IINA uses. A libmpv
+  crash therefore ends the whole app instead of showing the Windows "player stopped" recovery.
+- Control is unchanged: libmpv's `input-ipc-server` exposes the same JSON IPC the Windows child
+  process uses, on a Unix socket inside a private per-session `mkdtemp` directory (short enough
+  for the macOS 104-byte socket-path limit). `InProcessMpv` mirrors the `ChildProcess` events
+  the controller already handles. Windows keeps its exact D3D11 argument list and child process,
+  enforced by a unit test.
+- mpv and FFmpeg are **not bundled**. Users install them with `brew install mpv ffmpeg`. libmpv
+  is loaded at runtime (`MPV_LIBRARY_PATH`, then `/opt/homebrew/lib`, then `/usr/local/lib`),
+  never linked, so the app starts without it. Because Finder/Dock launches do not inherit the
+  shell `PATH`, FFmpeg lookup is `FFMPEG_PATH`, then `/opt/homebrew/bin`, `/usr/local/bin`,
+  then `PATH`. Missing tools produce an inline Homebrew install message.
+- `SUBTITLE_BRIDGE_RENDER_PROBE=1` adds the mean brightness of a small centre sample to the
+  periodic `mpv.renderStats` diagnostics (renderer name, frame count, render size). It is a
+  CI/test aid and never records frame content.
 - Local targets accept POSIX absolute MKV/MP4 paths; HTTP/HTTPS validation is unchanged.
 - The Stremio compatibility patch and the Windows setup-based updater are disabled on macOS:
   their IPC returns unavailable/idle results and never creates the Windows services or contacts
   the release API.
-- `npm run package:mac` (macOS arm64 only) copies Electron.app with `ditto`, renames the main
-  executable, writes Info.plist metadata and an `.icns` generated from the approved 1024px icon,
-  re-signs the bundle **ad hoc** (no Developer ID / notarization) and produces
+- `npm run package:mac` (macOS arm64 only, Homebrew `mpv` headers required) compiles the
+  native view with `clang++`, copies Electron.app with `ditto`, renames the main executable,
+  writes Info.plist metadata and an `.icns` generated from the approved 1024px icon, re-signs
+  the native module and bundle **ad hoc** (no Developer ID / notarization) and produces
   `SubtitleBridge-macos-arm64.dmg` plus a SHA-256 file.
 - The manual **Release macOS beta** workflow publishes only GitHub prereleases tagged
   `macos-v<version>-beta.<n>` with `--latest=false`. The Windows updater reads

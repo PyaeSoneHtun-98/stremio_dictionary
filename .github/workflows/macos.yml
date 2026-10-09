@@ -113,10 +113,13 @@ jobs:
           node -e '
             const fs = require("node:fs")
             const records = fs.readFileSync(process.argv[1], "utf8").trim().split("\n").map((line) => JSON.parse(line))
-            const stats = records.filter((record) => record.event === "mpv.renderStats").pop()?.details
-            if (!stats) throw new Error("No render stats were logged.")
-            console.log(`::notice title=smoke render::${JSON.stringify(stats)}`)
-            if (!(stats.frames > 0 && stats.width > 0 && stats.height > 0)) throw new Error("mpv rendered no frames.")
+            const samples = records.filter((record) => record.event === "mpv.renderStats").map((record) => record.details)
+            console.log(`::notice title=smoke render::${JSON.stringify(samples)}`)
+            const first = samples[0]
+            const stats = samples.at(-1)
+            if (samples.length < 2) throw new Error("Expected repeated render stats in probe mode.")
+            if (!(stats.width > 0 && stats.height > 0)) throw new Error("mpv rendered no sized frames.")
+            if (!(stats.frames > first.frames)) throw new Error("Video frames stopped advancing.")
             if (!(stats.meanLuma > 20)) throw new Error("Rendered frames are black.")
           ' "$log"
 
