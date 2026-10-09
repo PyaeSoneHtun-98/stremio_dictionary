@@ -8,7 +8,9 @@ The product should feel like a normal media player first. Translation and subtit
 
 ## Current platform and stack
 
-- Windows x64 is the supported target.
+- Windows x64 is the supported stable target.
+- macOS Apple Silicon (arm64) is a **beta** target (Issue #53): CI-built and smoke-tested on
+  GitHub's arm64 runners, not yet accepted on a physical Mac. See *macOS beta* below.
 - Electron provides the desktop application shell and native playback surface.
 - React + TypeScript provides the renderer UI.
 - Vite/electron-vite builds the application.
@@ -233,6 +235,32 @@ The patch must remain:
 
 This is a compatibility integration, not native/upstream Stremio support.
 
+## macOS beta
+
+Issue #53 adds an Apple Silicon build without changing Windows behavior:
+
+- mpv embeds into the player host window through `--wid` with the content `NSView` pointer
+  (64-bit) instead of the Win32 HWND. Windows keeps its exact D3D11 argument list, enforced by
+  a unit test.
+- mpv IPC uses a Unix socket inside a private per-session `mkdtemp` directory (short enough for
+  the macOS 104-byte socket-path limit) instead of a Windows named pipe.
+- mpv and FFmpeg are **not bundled**. Users install them with `brew install mpv ffmpeg`. Because
+  Finder/Dock launches do not inherit the shell `PATH`, lookup order is `MPV_PATH`/`FFMPEG_PATH`,
+  then `/opt/homebrew/bin`, then `/usr/local/bin`, then `PATH`. Missing tools produce an
+  inline Homebrew install message.
+- Local targets accept POSIX absolute MKV/MP4 paths; HTTP/HTTPS validation is unchanged.
+- The Stremio compatibility patch and the Windows setup-based updater are disabled on macOS:
+  their IPC returns unavailable/idle results and never creates the Windows services or contacts
+  the release API.
+- `npm run package:mac` (macOS arm64 only) copies Electron.app with `ditto`, renames the main
+  executable, writes Info.plist metadata and an `.icns` generated from the approved 1024px icon,
+  re-signs the bundle **ad hoc** (no Developer ID / notarization) and produces
+  `SubtitleBridge-macos-arm64.dmg` plus a SHA-256 file.
+- The manual **Release macOS beta** workflow publishes only GitHub prereleases tagged
+  `macos-v<version>-beta.<n>` with `--latest=false`. The Windows updater reads
+  `/releases/latest`, which never returns prereleases, and the Windows release workflow only
+  uses `v<version>` tags.
+
 ## Packaging and diagnostics
 
 The Windows package is produced with:
@@ -261,7 +289,8 @@ Diagnostics are intentionally small and privacy-conscious. They may record lifec
 
 ## Current product limitations
 
-- Windows x64 only.
+- Windows x64 is the only stable platform. The macOS arm64 build is an unnotarized beta without
+  Stremio one-click handoff or in-app updates, and has not been accepted on a physical Mac.
 - The first normal Windows install requires Internet access to download the pinned mpv and FFmpeg runtime archives; verified archives are cached for later upgrades.
 - The Dictionary v1.0 corpus is broad but not exhaustive; unknown words still fail cleanly offline.
 - The frozen phrase base plus extension cover 4,000 contiguous 2–5-token expressions with longest-match detection and single-word fallback. Separated-object phrasal verbs, cross-cue matching, and phrases longer than five tokens are not supported yet.

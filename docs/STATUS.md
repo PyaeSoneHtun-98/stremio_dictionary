@@ -287,6 +287,30 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
   these while continuing to reject actual duplicate stored variants and cross-owner collisions.
 - Merge and acceptance completed as recorded above. See [dictionary expansion](DICTIONARY_EXPANSION.md).
 
+## Active work — Issue #53 macOS Apple Silicon beta
+
+Branch: `feat/issue-53-macos-arm64-beta`, based on master `aa49aee`. The owner assigned the macOS
+port on 2026-10-09 and chose: Apple Silicon (arm64) only, Homebrew-installed mpv/FFmpeg (not
+bundled), ad-hoc signing (no Apple Developer account), and a GitHub **prerelease** DMG.
+The owner has no Mac; a friend may test occasionally. Until real-Mac acceptance passes, every
+macOS artifact is an untested beta and must not be described as stable.
+
+- Platform layer: NSView `--wid`, private Unix-socket IPC, Homebrew runtime lookup, POSIX local
+  paths, Homebrew install hints, Stremio/updater disabled on macOS. Windows mpv arguments are
+  pinned by a unit test. Architecture details: [PROJECT.md](PROJECT.md#macos-beta).
+- `npm run package:mac` builds an ad-hoc-signed `Subtitle Bridge.app` and
+  `SubtitleBridge-macos-arm64.dmg`; the manual **Release macOS beta** workflow publishes
+  `macos-v<version>-beta.<n>` prereleases. User notes: [releases/macos-beta.md](releases/macos-beta.md).
+- Local Windows `npm run check` passed 288 tests in 41 files, lint/typechecks, corpus gates and
+  builds (existing CSS/large-JSON lint notes only).
+- macOS CI run 37888226307 at `228cbf9` (macos-14, arm64) passed: `npm run check` on macOS,
+  `package:mac`, bundle checks (arm64, ad-hoc signature, Info.plist, no bundled mpv/FFmpeg,
+  DMG checksum) and a packaged-app smoke test that launched with a synthetic MKV, resolved
+  Homebrew mpv and logged no playback failure. Screenshot review of video/overlay rendering is
+  pending; no visual, fullscreen, subtitle-click or real-media result is claimed yet.
+- Pending: screenshot review, Windows CI on the PR, Windows regression check, Codex review,
+  real Apple Silicon acceptance (when available), and explicit publication authorization.
+
 ## Active work — Issue #87 v1.0.7 release candidate
 
 The owner authorized merging the accepted icon/stream PRs and preparing one combined candidate
