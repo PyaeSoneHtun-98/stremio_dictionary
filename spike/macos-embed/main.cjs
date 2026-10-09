@@ -27,7 +27,9 @@ const label = `${variantName}/${phase}`
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 function check(name, ok, detail) {
-  console.log(`[${label}] ${ok ? 'PASS' : 'FAIL'} ${name}${detail === undefined ? '' : ` — ${JSON.stringify(detail)}`}`)
+  const text = `${ok ? 'PASS' : 'FAIL'} ${name}${detail === undefined ? '' : ` — ${JSON.stringify(detail)}`}`
+  // Workflow-command annotations are readable through the public checks API.
+  console.log(`::${ok ? 'notice' : 'error'} title=${label}::${text.replace(/[\r\n%]/g, ' ')}`)
   if (!ok) failures.push(name)
 }
 
@@ -54,9 +56,16 @@ function mpvCommand(socketPath, command) {
     socket.on('connect', () => socket.write(`${JSON.stringify({ command })}\n`))
     socket.on('data', (chunk) => {
       buffer += chunk.toString()
-      for (const line of buffer.split('\n')) {
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) {
         if (!line.trim()) continue
-        const message = JSON.parse(line)
+        let message
+        try {
+          message = JSON.parse(line)
+        } catch {
+          continue
+        }
         if ('error' in message && !('event' in message)) {
           clearTimeout(timer)
           socket.end()

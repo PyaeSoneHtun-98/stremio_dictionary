@@ -125,6 +125,7 @@ jobs:
       - name: Smoke-test packaged playback
         run: |
           set -euo pipefail
+          trap 'echo "::error title=smoke::failed at line $LINENO: $BASH_COMMAND"' ERR
           mkdir -p smoke
           swiftc -O -o smoke/window-probe scripts/macos-window-probe.swift
           cat > smoke/subs.srt <<'SRT'
@@ -145,17 +146,19 @@ jobs:
           sleep 20
           screencapture -x smoke/player.png || true
           cat "$log"
+          echo "::notice title=smoke events::$(grep -o '"event":"[^"]*"' "$log" | cut -d'"' -f4 | sort | uniq -c | tr -s ' \n' ' ')"
+          echo "::notice title=smoke processes::$(pgrep -lf 'mpv|Subtitle Bridge' | cut -c1-60 | tr '\n' ';' || true)"
 
           kill -0 "$app_pid"
           mpv_pids="$(pgrep -x mpv)" || { echo 'mpv is not running.'; exit 1; }
           # shellcheck disable=SC2086 # one probe argument per PID
           mpv_windows="$(smoke/window-probe $mpv_pids)"
-          echo "mpv-owned windows: $mpv_windows"
+          echo "::notice title=smoke mpv windows::$mpv_windows"
           test "$mpv_windows" = '[]' || { echo 'mpv opened its own window instead of embedding.'; exit 1; }
           socket="$(find "${TMPDIR:-/tmp}" -path '*sb-mpv-*' -name 'mpv-*.sock' 2>/dev/null | head -1)"
           test -S "$socket" || { echo 'mpv IPC socket not found.'; exit 1; }
           osd="$(echo '{"command":["get_property","osd-dimensions"]}' | nc -U -w 2 "$socket" | grep '"osd-dimensions"\|"request_id"' || true)"
-          echo "osd-dimensions: $osd"
+          echo "::notice title=smoke osd::$osd"
           echo "$osd" | grep -q '"w":[1-9]' || { echo 'mpv is not rendering into a sized surface.'; exit 1; }
 
           grep -q '"mpv.spawned"' "$log"
