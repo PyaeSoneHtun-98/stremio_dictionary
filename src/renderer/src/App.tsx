@@ -37,7 +37,7 @@ export function App(): React.JSX.Element {
 
       <footer className="launcher-footer">
         <span>Subtitle Bridge</span>
-        <span>English → Burmese · Windows</span>
+        <span>English → Burmese · {window.desktop.platform === 'darwin' ? 'macOS beta' : 'Windows'}</span>
       </footer>
     </AppShell>
   )

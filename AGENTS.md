@@ -29,7 +29,7 @@ Do not rely on chat history when the repository documentation already answers a 
 
 Preserve these unless the active issue explicitly changes them:
 
-- Target platform is Windows x64.
+- Target platform is Windows x64. macOS Apple Silicon is a beta target (Issue #53) and must not regress Windows behavior.
 - Electron owns the desktop shell; React + TypeScript owns the renderer UI.
 - mpv owns video/audio playback through the Electron main process.
 - Local MKV embedded text subtitles use FFmpeg full-track extraction and normalization.

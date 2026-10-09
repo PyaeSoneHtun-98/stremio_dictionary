@@ -13,23 +13,29 @@ const STATUS_CHANNEL = 'stremio:get-handoff-status'
 const ENABLE_CHANNEL = 'stremio:enable-handoff'
 const DISABLE_CHANNEL = 'stremio:disable-handoff'
 
+const WINDOWS_ONLY_MESSAGE =
+  'Stremio integration is currently available on Windows only. Paste a stream URL below instead.'
+
 let registered = false
 
-export function registerStremioIpc(): void {
+export function registerStremioIpc(platform: NodeJS.Platform = process.platform): void {
   if (registered) {
     return
   }
 
   registered = true
-  const service = app.isPackaged
-    ? new StremioHandoffService(resolveHelperRoot(), app.getPath('exe'))
-    : null
+  // The handoff patch and its PowerShell helpers target Stremio's Windows layout only.
+  const supported = platform === 'win32'
+  const service =
+    supported && app.isPackaged
+      ? new StremioHandoffService(resolveHelperRoot(), app.getPath('exe'))
+      : null
 
   ipcMain.handle(STATUS_CHANNEL, (): StremioHandoffStatus => {
-    if (process.platform !== 'win32') {
+    if (!supported) {
       return {
         state: 'unavailable',
-        message: 'Stremio integration is currently available on Windows only.',
+        message: WINDOWS_ONLY_MESSAGE,
         canEnable: false,
         canDisable: false
       }
@@ -49,6 +55,9 @@ export function registerStremioIpc(): void {
 
   ipcMain.handle(ENABLE_CHANNEL, async (): Promise<StremioHandoffResult> => {
     diagnosticLog('stremio.handoffEnableRequested')
+    if (!supported) {
+      return { ok: false, message: WINDOWS_ONLY_MESSAGE }
+    }
     if (!service) {
       return {
         ok: false,
@@ -76,6 +85,9 @@ export function registerStremioIpc(): void {
 
   ipcMain.handle(DISABLE_CHANNEL, async (): Promise<StremioHandoffResult> => {
     diagnosticLog('stremio.handoffDisableRequested')
+    if (!supported) {
+      return { ok: false, message: WINDOWS_ONLY_MESSAGE }
+    }
     if (!service) {
       return {
         ok: false,

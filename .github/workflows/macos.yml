@@ -1,0 +1,179 @@
+name: macOS
+
+env:
+  SUBTITLE_BRIDGE_REPORT_ENDPOINT: ${{ vars.SUBTITLE_BRIDGE_REPORT_ENDPOINT || 'https://subtitle-report-service.vercel.app/api/report-dictionary' }}
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - 'feat/issue-53-**'
+
+permissions:
+  contents: read
+
+jobs:
+  package-macos:
+    runs-on: macos-14
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # libmpv headers are needed to build the native video view; the app loads libmpv at runtime.
+      - name: Install mpv and FFmpeg
+        run: brew install mpv ffmpeg
+
+      - name: Validate project on macOS
+        run: npm run check
+
+      - name: Package macOS arm64 beta
+        run: npm run package:mac
+
+      - name: Verify app bundle
+        run: |
+          set -euo pipefail
+          trap 'echo "::error title=bundle::failed at line $LINENO: $BASH_COMMAND"' ERR
+          app="release/SubtitleBridge-macos-arm64/Subtitle Bridge.app"
+          plist="$app/Contents/Info.plist"
+          native="$app/Contents/Resources/app/out/native/mpv_view.node"
+          test "$(plutil -extract CFBundleExecutable raw "$plist")" = "Subtitle Bridge"
+          test "$(plutil -extract CFBundleIdentifier raw "$plist")" = "io.github.pyaesonehtun-98.subtitlebridge"
+          test "$(plutil -extract CFBundleShortVersionString raw "$plist")" = "$(node -p "require('./package.json').version")"
+          test -f "$app/Contents/Resources/subtitle-bridge.icns"
+          grep -q 'MIT License' "$app/Contents/Resources/LICENSE.txt"
+          test -f "$app/Contents/Resources/app/out/main/index.js"
+          test ! -e "$app/Contents/Resources/default_app.asar"
+          lipo -archs "$app/Contents/MacOS/Subtitle Bridge" | grep -qx arm64
+          lipo -archs "$native" | grep -qx arm64
+          if otool -L "$native" | tail -n +2 | grep -qi libmpv; then
+            echo 'The native video view must load libmpv at runtime, not link it.'
+            exit 1
+          fi
+          codesign --verify --strict "$native"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -q 'Signature=adhoc'
+          if find "$app" \( -iname '*mpv*' -o -iname 'ffmpeg' -o -iname 'libav*' \) ! -name 'mpv_view.node' | grep .; then
+            echo 'The macOS beta must not bundle mpv or FFmpeg.'
+            exit 1
+          fi
+          hdiutil verify release/SubtitleBridge-macos-arm64.dmg
+          (cd release && shasum -a 256 -c SubtitleBridge-macos-arm64.dmg.sha256)
+
+      - name: Create synthetic test media
+        run: |
+          set -euo pipefail
+          mkdir -p smoke
+          cat > smoke/subs.srt <<'SRT'
+          1
+          00:00:00,500 --> 00:00:59,000
+          I will look it up later
+          SRT
+          ffmpeg -hide_banner -loglevel error \
+            -f lavfi -i testsrc=size=1280x720:rate=25 \
+            -f lavfi -i sine=frequency=440:sample_rate=48000 \
+            -i smoke/subs.srt -t 60 \
+            -map 0:v -map 1:a -map 2:s -c:v libx264 -pix_fmt yuv420p -c:a aac -c:s srt \
+            -metadata:s:s:0 language=eng smoke/clip.mkv
+
+      - name: Exercise native video view (resize, fullscreen, recreate)
+        timeout-minutes: 5
+        run: npx electron scripts/ci/macos-view-harness.cjs smoke/clip.mkv
+
+      - name: Smoke-test packaged playback
+        if: ${{ !cancelled() }}
+        env:
+          SUBTITLE_BRIDGE_RENDER_PROBE: '1'
+        run: |
+          set -euo pipefail
+          trap 'echo "::error title=smoke::failed at line $LINENO: $BASH_COMMAND"' ERR
+          app="$PWD/release/SubtitleBridge-macos-arm64/Subtitle Bridge.app"
+          log="$HOME/Library/Application Support/Subtitle Bridge/diagnostics/subtitle-bridge.log"
+          "$app/Contents/MacOS/Subtitle Bridge" "$PWD/smoke/clip.mkv" > smoke/app-stdout.txt 2>&1 &
+          app_pid=$!
+          sleep 25
+          screencapture -x smoke/player.png || true
+          cat "$log"
+          echo "::notice title=smoke events::$(grep -o '"event":"[^"]*"' "$log" | cut -d'"' -f4 | sort | uniq -c | tr -s ' \n' ' ')"
+          echo "::notice title=smoke mpv::$(grep '"mpv\.\(start\|spawned\|spawnFailed\|exit\|renderStats\)"' "$log" | sed 's/.*"event"/"event"/' | tr '\n' ' ' | cut -c1-900)"
+          echo "::notice title=smoke playback::$(grep '"media.loadFailed"\|"playback.failed"\|"ffmpeg\.' "$log" | sed 's/.*"event"/"event"/' | tr '\n' ' ' | cut -c1-600)"
+
+          # Ask mpv itself (same JSON IPC the app uses) whether video is decoding and rendering.
+          socket="$(find "${TMPDIR:-/tmp}" -path '*sb-mpv-*' -name 'mpv-*.sock' 2> /dev/null | head -1)"
+          mpv_ipc() { echo "$1" | nc -U -w 2 "$socket" | grep '"request_id"' | head -1 || true; }
+          luma() { ffprobe -v error -f lavfi -i "movie=$1,signalstats" -show_entries frame_tags=lavfi.signalstats.YAVG -of csv=p=0 2> /dev/null | head -1 || true; }
+          test -S "$socket" || { echo '::error title=smoke::mpv IPC socket not found.'; exit 1; }
+          first_pos="$(mpv_ipc '{"command":["get_property","time-pos"]}')"
+          sleep 2
+          second_pos="$(mpv_ipc '{"command":["get_property","time-pos"]}')"
+          echo "::notice title=smoke mpv state::time-pos $first_pos then $second_pos; vo $(mpv_ipc '{"command":["get_property","current-vo"]}'); video-params $(mpv_ipc '{"command":["get_property","video-params"]}' | cut -c1-120)"
+          mpv_ipc "{\"command\":[\"screenshot-to-file\",\"$PWD/smoke/shot-video.png\",\"video\"]}" > /dev/null
+          mpv_ipc "{\"command\":[\"screenshot-to-file\",\"$PWD/smoke/shot-window.png\",\"window\"]}" > /dev/null
+          sleep 1
+          video_luma="$(luma smoke/shot-video.png)"
+          window_luma="$(luma smoke/shot-window.png)"
+          echo "::notice title=smoke screenshots::decoded video luma $video_luma; rendered output luma $window_luma"
+          node -e '
+            const [first, second] = process.argv.slice(1, 3).map((reply) => JSON.parse(reply || "{}").data)
+            const [video, rendered] = process.argv.slice(3).map(Number)
+            if (!(second > first)) throw new Error(`Playback position did not advance: ${first} -> ${second}`)
+            if (!(video > 20)) throw new Error("Decoded video is black.")
+            if (!(rendered > 20)) throw new Error("mpv rendered black output into the macOS view.")
+          ' "$first_pos" "$second_pos" "$video_luma" "$window_luma"
+
+          kill -0 "$app_pid"
+          if pgrep -x mpv; then
+            echo '::error title=smoke::A separate mpv process is running; macOS must play in-process.'
+            exit 1
+          fi
+          grep '"mpv.spawned"' "$log" | grep -q '"source":"homebrew"'
+          grep -q '"ffmpeg.extractComplete"' "$log"
+          if grep -q '"media.loadFailed"\|"mpv.spawnFailed"\|"playback.failed"\|"ffmpeg.extractFailed"' "$log" \
+            || grep '"mpv.exit"' "$log" | grep -q '"expected":false'; then
+            echo '::error title=smoke::Packaged playback reported a failure.'
+            exit 1
+          fi
+          node -e '
+            const fs = require("node:fs")
+            const records = fs.readFileSync(process.argv[1], "utf8").trim().split("\n").map((line) => JSON.parse(line))
+            const samples = records.filter((record) => record.event === "mpv.renderStats").map((record) => record.details)
+            console.log(`::notice title=smoke render::${JSON.stringify(samples)}`)
+            const first = samples[0]
+            const stats = samples.at(-1)
+            if (samples.length < 2) throw new Error("Expected repeated render stats in probe mode.")
+            if (!(stats.width > 0 && stats.height > 0)) throw new Error("mpv rendered no sized frames.")
+            if (!(stats.frames > first.frames)) throw new Error("Video frames stopped advancing.")
+            if (!(stats.meanLuma > 20)) throw new Error("Rendered frames are black.")
+          ' "$log"
+
+          kill "$app_pid"
+          for _ in $(seq 1 30); do kill -0 "$app_pid" 2> /dev/null || break; sleep 0.5; done
+          if kill -0 "$app_pid" 2> /dev/null; then
+            echo '::error title=smoke::Subtitle Bridge did not quit within 15 seconds.'
+            exit 1
+          fi
+          # An orderly quit disposes the in-process player before the app exits.
+          echo "::notice title=smoke quit::$(grep '"mpv.inProcessDestroyed"\|"mpv.exit"' "$log" | sed 's/.*"event"/"event"/' | tr '\n' ' ')"
+          grep -q '"mpv.inProcessDestroyed"' "$log"
+
+      - name: Upload macOS beta package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: subtitle-bridge-macos-arm64
+          path: |
+            release/SubtitleBridge-macos-arm64.dmg
+            release/SubtitleBridge-macos-arm64.dmg.sha256
+            smoke/*.png
+            smoke/app-stdout.txt
+          if-no-files-found: warn

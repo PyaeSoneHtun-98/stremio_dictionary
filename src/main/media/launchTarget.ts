@@ -1,4 +1,4 @@
-import { win32 } from 'node:path'
+import { posix, win32 } from 'node:path'
 
 const MAX_TARGET_LENGTH = 16 * 1024
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i
@@ -14,7 +14,10 @@ export interface ParsedMediaTarget {
   source: MediaTargetSource
 }
 
-export function parseMediaTarget(value: string): ParsedMediaTarget {
+export function parseMediaTarget(
+  value: string,
+  platform: NodeJS.Platform = process.platform
+): ParsedMediaTarget {
   const raw = value.trim()
   if (!raw) {
     throw new Error('No media target was provided.')
@@ -50,23 +53,28 @@ export function parseMediaTarget(value: string): ParsedMediaTarget {
     throw new Error(`Unsupported media URL scheme: ${scheme}. Only HTTP/HTTPS streams are allowed.`)
   }
 
-  if (!win32.isAbsolute(raw)) {
+  const localPath = localPathModule(platform)
+  if (!localPath.isAbsolute(raw)) {
     throw new Error('The media target must be an absolute MKV/MP4 path or an HTTP/HTTPS stream URL.')
   }
 
-  if (!LOCAL_VIDEO_EXTENSIONS.has(win32.extname(raw).toLowerCase())) {
+  if (!LOCAL_VIDEO_EXTENSIONS.has(localPath.extname(raw).toLowerCase())) {
     throw new Error('Subtitle Bridge currently supports local MKV and MP4 files only.')
   }
 
   return {
     target: raw,
-    displayName: win32.basename(raw),
+    displayName: localPath.basename(raw),
     kind: 'file',
     source: 'local'
   }
 }
 
-export function findLaunchTargetArgument(argv: readonly string[]): string | null {
+export function findLaunchTargetArgument(
+  argv: readonly string[],
+  platform: NodeJS.Platform = process.platform
+): string | null {
+  const localPath = localPathModule(platform)
   for (const argument of argv) {
     const value = argument.trim()
     if (!value || value.startsWith('--')) {
@@ -77,12 +85,20 @@ export function findLaunchTargetArgument(argv: readonly string[]): string | null
       return value
     }
 
-    if (win32.isAbsolute(value) && LOCAL_VIDEO_EXTENSIONS.has(win32.extname(value).toLowerCase())) {
+    if (
+      localPath.isAbsolute(value) &&
+      LOCAL_VIDEO_EXTENSIONS.has(localPath.extname(value).toLowerCase())
+    ) {
       return value
     }
   }
 
   return null
+}
+
+// Windows keeps its existing drive/UNC path rules; macOS uses POSIX absolute paths.
+function localPathModule(platform: NodeJS.Platform): typeof win32 {
+  return platform === 'win32' ? win32 : posix
 }
 
 function requireHttpUrl(value: string): URL {

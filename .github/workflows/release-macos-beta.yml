@@ -1,0 +1,139 @@
+name: Release macOS beta
+
+env:
+  SUBTITLE_BRIDGE_REPORT_ENDPOINT: ${{ vars.SUBTITLE_BRIDGE_REPORT_ENDPOINT || 'https://subtitle-report-service.vercel.app/api/report-dictionary' }}
+
+# Manual only. Publishes a GitHub *prerelease* tagged macos-v<version>-beta.<n>. Prereleases are
+# never returned by /releases/latest, so the Windows in-app updater and the automatic Windows
+# release workflow (which only uses v<version> tags) are unaffected.
+on:
+  workflow_dispatch:
+    inputs:
+      beta:
+        description: 'Beta number (publishes macos-v<package version>-beta.<n>)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-macos-beta
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 40
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Require master
+        if: github.ref != 'refs/heads/master'
+        run: |
+          echo 'macOS beta releases must be built from master.'
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Determine release tag
+        id: release
+        env:
+          BETA: ${{ inputs.beta }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$BETA" =~ ^[1-9][0-9]{0,2}$ ]]; then
+            echo "Beta number must be a positive integer. Received: $BETA"
+            exit 1
+          fi
+          version="$(node -p "require('./package.json').version")"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "package.json version must be x.y.z. Found: $version"
+            exit 1
+          fi
+          tag="macos-v${version}-beta.${BETA}"
+          if gh release view "$tag" --repo "$REPOSITORY" > /dev/null 2>&1; then
+            echo "Release $tag already exists."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # libmpv headers are needed to build the native video view; the app loads libmpv at runtime.
+      - name: Install mpv headers
+        run: brew install mpv
+
+      - name: Validate project
+        run: npm run check
+
+      - name: Package macOS arm64 beta
+        run: npm run package:mac
+
+      - name: Verify package
+        run: |
+          set -euo pipefail
+          app="release/SubtitleBridge-macos-arm64/Subtitle Bridge.app"
+          codesign --verify --deep --strict "$app"
+          test "$(plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist")" = "${{ steps.release.outputs.version }}"
+          hdiutil verify release/SubtitleBridge-macos-arm64.dmg
+          (cd release && shasum -a 256 -c SubtitleBridge-macos-arm64.dmg.sha256)
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-beta-release
+          path: |
+            release/SubtitleBridge-macos-arm64.dmg
+            release/SubtitleBridge-macos-arm64.dmg.sha256
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-beta-release
+          path: dist-macos
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ needs.build.outputs.tag }}
+          TARGET: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          (cd dist-macos && shasum -a 256 -c SubtitleBridge-macos-arm64.dmg.sha256)
+          gh release create "$TAG" \
+            --repo "$REPOSITORY" \
+            --target "$TARGET" \
+            --title "Subtitle Bridge macOS beta ${TAG#macos-v}" \
+            --notes-file docs/releases/macos-beta.md \
+            --prerelease \
+            --latest=false \
+            dist-macos/SubtitleBridge-macos-arm64.dmg \
+            dist-macos/SubtitleBridge-macos-arm64.dmg.sha256

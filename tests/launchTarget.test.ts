@@ -26,7 +26,7 @@ describe('parseMediaTarget', () => {
     ['D:\\Movies\\Example.mkv', 'Example.mkv'],
     ['D:\\Movies\\Example.mp4', 'Example.mp4']
   ])('accepts an absolute Windows local video path %s', (target, displayName) => {
-    expect(parseMediaTarget(target)).toEqual({
+    expect(parseMediaTarget(target, 'win32')).toEqual({
       target,
       displayName,
       kind: 'file',
@@ -35,12 +35,33 @@ describe('parseMediaTarget', () => {
   })
 
   it.each([
+    ['/Users/me/Movies/Example.mkv', 'Example.mkv'],
+    ['/Volumes/External Drive/Show S01E01.MP4', 'Show S01E01.MP4']
+  ])('accepts an absolute macOS local video path %s', (target, displayName) => {
+    expect(parseMediaTarget(target, 'darwin')).toEqual({
+      target,
+      displayName,
+      kind: 'file',
+      source: 'local'
+    })
+  })
+
+  it.each([
+    ['Movies/Example.mkv', 'absolute MKV/MP4 path'],
+    ['D:\\Movies\\Example.mkv', 'absolute MKV/MP4 path'],
+    ['/Users/me/Movies/Example.avi', 'local MKV and MP4 files only'],
+    ['file:///Users/me/Movies/Example.mkv', 'Unsupported media URL scheme: file']
+  ])('rejects unsafe or unsupported macOS target %s', (value, message) => {
+    expect(() => parseMediaTarget(value, 'darwin')).toThrow(message)
+  })
+
+  it.each([
     ['ftp://example.com/video.mkv', 'Unsupported media URL scheme: ftp'],
     ['vlc://file:///C:/video.mkv', 'Unsupported media URL scheme: file'],
     ['relative/video.mkv', 'absolute MKV/MP4 path'],
     ['D:\\Movies\\Example.avi', 'local MKV and MP4 files only']
   ])('rejects unsafe or unsupported target %s', (value, message) => {
-    expect(() => parseMediaTarget(value)).toThrow(message)
+    expect(() => parseMediaTarget(value, 'win32')).toThrow(message)
   })
 })
 
@@ -59,7 +80,20 @@ describe('findLaunchTargetArgument', () => {
     'D:\\Movies\\Example.mkv',
     'D:\\Movies\\Example.mp4'
   ])('finds a supported local video launch argument %s', (target) => {
-    expect(findLaunchTargetArgument(['Subtitle Bridge.exe', target])).toBe(target)
+    expect(findLaunchTargetArgument(['Subtitle Bridge.exe', target], 'win32')).toBe(target)
+  })
+
+  it('finds a macOS local video launch argument after the app executable', () => {
+    expect(
+      findLaunchTargetArgument(
+        [
+          '/Applications/Subtitle Bridge.app/Contents/MacOS/Subtitle Bridge',
+          '-psn_0_12345',
+          '/Users/me/Movies/Example.mkv'
+        ],
+        'darwin'
+      )
+    ).toBe('/Users/me/Movies/Example.mkv')
   })
 
   it('returns null when there is no media target', () => {

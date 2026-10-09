@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { SubtitleCue } from '../../shared/media'
 import { diagnosticLog } from '../diagnostics'
-import { resolveFfmpegExecutable } from '../runtimeTools'
+import { missingRuntimeMessage, resolveFfmpegExecutable } from '../runtimeTools'
 import { parseSrtCues } from './normalize'
 
 const MAX_SUBTITLE_BYTES = 16 * 1024 * 1024
@@ -153,9 +153,7 @@ export class SubtitleExtractor {
 
 function toExtractionError(error: Error): Error {
   if ('code' in error && error.code === 'ENOENT') {
-    return new Error(
-      'FFmpeg was not found. Reinstall Subtitle Bridge to restore its managed subtitle runtime, or configure FFMPEG_PATH for development.'
-    )
+    return new Error(missingRuntimeMessage('ffmpeg'))
   }
 
   return new Error('Could not start FFmpeg. Check the configured FFmpeg executable and try again.')

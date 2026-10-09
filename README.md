@@ -97,6 +97,16 @@ URL, then select **Open stream** or press Enter. This uses the same mpv playback
 subtitle path as Stremio; an ordinary website page URL may not be playable media. Other URL
 schemes are rejected. The field clears on successful opening and no URL history is saved.
 
+## macOS beta (Apple Silicon)
+
+An unnotarized, ad-hoc-signed macOS beta for Apple Silicon is in progress
+([Issue #53](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/53)). It requires
+`brew install mpv ffmpeg`, runs libmpv inside the app to draw video into the player window, and
+does not include Stremio one-click handoff or in-app updates. It has passed CI on GitHub's
+macOS runners but has not yet been accepted on a physical Mac. See
+[docs/releases/macos-beta.md](docs/releases/macos-beta.md) and
+[docs/MACOS_BETA_ACCEPTANCE.md](docs/MACOS_BETA_ACCEPTANCE.md).
+
 ## Dictionary and phrase lookup
 
 The word dictionary combines frozen **Dictionary v1.0**, a pinned **10,000-entry extension**, targeted corrections and the remaining core supplement: **40,011 runtime headwords**. Compatibility aliases remain collision-checked. See [dictionary expansion](docs/DICTIONARY_EXPANSION.md) for provenance and acceptance status.
@@ -197,6 +207,17 @@ release\SubtitleBridge-win-x64.zip
 release\SubtitleBridge-win-x64.zip.sha256
 ```
 
+Build the macOS beta on an Apple Silicon Mac (Homebrew `mpv` provides the libmpv headers):
+
+```bash
+brew install mpv ffmpeg
+npm run build:mac-native
+npm run package:mac
+```
+
+This produces `release/SubtitleBridge-macos-arm64.dmg` and its `.sha256`. `npm run dev` on macOS
+also needs `npm run build:mac-native` once so the native video view exists.
+
 ## Architecture
 
 ```text
@@ -247,8 +268,8 @@ issue
 → confirm issue closed
 ```
 
-Future work includes macOS/Linux packaging, separated-object phrasal-verb matching, pronunciation/TTS, richer ASS/libass fidelity, broader bilingual editorial review, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support.
+Future work includes Linux packaging, a notarized stable macOS release, separated-object phrasal-verb matching, pronunciation/TTS, richer ASS/libass fidelity, broader bilingual editorial review, external Stremio subtitle addons, watched-state synchronization, and native/upstream Stremio support.
 
 ## License
 
-Subtitle Bridge, including the dictionary and phrase data in this repository, is released under the [MIT License](LICENSE). Third-party components keep their own licenses: mpv and FFmpeg (downloaded separately by the installer), Electron/Chromium, and the Inter font used in the logo artwork. See [packaging/THIRD_PARTY_NOTICES.txt](packaging/THIRD_PARTY_NOTICES.txt) and [assets/branding/licenses](assets/branding/licenses).
+Subtitle Bridge, including the dictionary and phrase data in this repository, is released under the [MIT License](LICENSE). Third-party components keep their own licenses: mpv and FFmpeg (downloaded separately by the Windows installer, or installed with Homebrew for the macOS beta), Electron/Chromium, and the Inter font used in the logo artwork. See [packaging/THIRD_PARTY_NOTICES.txt](packaging/THIRD_PARTY_NOTICES.txt) and [assets/branding/licenses](assets/branding/licenses).
