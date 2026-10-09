@@ -5,7 +5,15 @@ vi.mock('../src/main/diagnostics', () => ({ diagnosticLog: vi.fn() }))
 import { diagnosticLog } from '../src/main/diagnostics'
 import { buildLibmpvOptions, InProcessMpv, type NativeMpvView } from '../src/main/media/macosMpv'
 
-const stats = { renderer: 'Apple M1', frames: 42, width: 1920, height: 1080, meanLuma: 120 }
+const stats = {
+  renderer: 'Apple M1',
+  frames: 42,
+  width: 1920,
+  height: 1080,
+  meanLuma: 120,
+  glError: 0,
+  framebuffer: 1
+}
 
 function fakeNative(overrides: Partial<NativeMpvView> = {}): NativeMpvView {
   return {

@@ -98,6 +98,22 @@ jobs:
           echo "::notice title=smoke mpv::$(grep '"mpv\.\(start\|spawned\|spawnFailed\|exit\|renderStats\)"' "$log" | sed 's/.*"event"/"event"/' | tr '\n' ' ' | cut -c1-900)"
           echo "::notice title=smoke playback::$(grep '"media.loadFailed"\|"playback.failed"\|"ffmpeg\.' "$log" | sed 's/.*"event"/"event"/' | tr '\n' ' ' | cut -c1-600)"
 
+          # Ask mpv itself (same JSON IPC the app uses) whether video is decoding and rendering.
+          socket="$(find "${TMPDIR:-/tmp}" -path '*sb-mpv-*' -name 'mpv-*.sock' 2> /dev/null | head -1)"
+          mpv_ipc() { echo "$1" | nc -U -w 2 "$socket" | grep '"request_id"' | head -1 || true; }
+          luma() { ffprobe -v error -f lavfi -i "movie=$1,signalstats" -show_entries frame_tags=lavfi.signalstats.YAVG -of csv=p=0 2> /dev/null | head -1 || true; }
+          if [ -S "$socket" ]; then
+            first_pos="$(mpv_ipc '{"command":["get_property","time-pos"]}')"
+            sleep 2
+            echo "::notice title=smoke mpv state::time-pos $first_pos then $(mpv_ipc '{"command":["get_property","time-pos"]}'); pause $(mpv_ipc '{"command":["get_property","pause"]}'); video-params $(mpv_ipc '{"command":["get_property","video-params"]}' | cut -c1-200); vo $(mpv_ipc '{"command":["get_property","current-vo"]}')"
+            mpv_ipc "{\"command\":[\"screenshot-to-file\",\"$PWD/smoke/shot-video.png\",\"video\"]}" > /dev/null
+            shot_window="$(mpv_ipc "{\"command\":[\"screenshot-to-file\",\"$PWD/smoke/shot-window.png\",\"window\"]}")"
+            sleep 1
+            echo "::notice title=smoke screenshots::video luma $(luma smoke/shot-video.png); window luma $(luma smoke/shot-window.png); window reply $shot_window"
+          else
+            echo '::warning title=smoke::mpv IPC socket not found for diagnostics.'
+          fi
+
           kill -0 "$app_pid"
           if pgrep -x mpv; then
             echo '::error title=smoke::A separate mpv process is running; macOS must play in-process.'

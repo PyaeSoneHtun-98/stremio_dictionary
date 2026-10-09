@@ -64,6 +64,8 @@ struct Player {
   std::atomic<int> width{0};
   std::atomic<int> height{0};
   std::atomic<double> meanLuma{-1};
+  std::atomic<int> glError{0};
+  std::atomic<int> framebuffer{-1};
   bool probe = false;
   CFAbsoluteTime lastProbe = 0;
   bool destroyed = false;
@@ -214,6 +216,7 @@ void OnRenderUpdate(void *context);
       rendered = true;
 
       ++player->frames;
+      player->framebuffer = static_cast<int>(framebuffer);
       player->width = viewport[2];
       player->height = viewport[3];
       const CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
@@ -223,8 +226,13 @@ void OnRenderUpdate(void *context);
         const int sampleWidth = std::min(64, static_cast<int>(viewport[2]));
         const int sampleHeight = std::min(64, static_cast<int>(viewport[3]));
         std::vector<unsigned char> pixels(static_cast<size_t>(sampleWidth) * sampleHeight * 4);
+        while (glGetError() != GL_NO_ERROR) {
+        }
+        // mpv may leave another framebuffer bound; read back the layer's own target.
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(framebuffer));
         glReadPixels((viewport[2] - sampleWidth) / 2, (viewport[3] - sampleHeight) / 2, sampleWidth,
                      sampleHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+        player->glError = static_cast<int>(glGetError());
         double total = 0;
         for (size_t index = 0; index < pixels.size(); index += 4) {
           total += 0.299 * pixels[index] + 0.587 * pixels[index + 1] + 0.114 * pixels[index + 2];
@@ -545,6 +553,10 @@ napi_value GetRenderStats(napi_env env, napi_callback_info info) {
   napi_set_named_property(env, result, "height", value);
   napi_create_double(env, player->meanLuma.load(), &value);
   napi_set_named_property(env, result, "meanLuma", value);
+  napi_create_int32(env, player->glError.load(), &value);
+  napi_set_named_property(env, result, "glError", value);
+  napi_create_int32(env, player->framebuffer.load(), &value);
+  napi_set_named_property(env, result, "framebuffer", value);
   return result;
 }
 

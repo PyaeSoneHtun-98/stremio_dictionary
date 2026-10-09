@@ -9,6 +9,8 @@ export interface MpvRenderStats {
   width: number
   height: number
   meanLuma: number
+  glError: number
+  framebuffer: number
 }
 
 export interface NativeMpvView {
