@@ -295,14 +295,27 @@ bundled), ad-hoc signing (no Apple Developer account), and a GitHub **prerelease
 The owner has no Mac; a friend may test occasionally. Until real-Mac acceptance passes, every
 macOS artifact is an untested beta and must not be described as stable.
 
-- Platform layer: NSView `--wid`, private Unix-socket IPC, Homebrew runtime lookup, POSIX local
-  paths, Homebrew install hints, Stremio/updater disabled on macOS. Windows mpv arguments are
-  pinned by a unit test. Architecture details: [PROJECT.md](PROJECT.md#macos-beta).
-- `npm run package:mac` builds an ad-hoc-signed `Subtitle Bridge.app` and
+- Platform layer: in-process libmpv video view (owner-approved on 2026-10-09 after the child
+  `--wid` design proved unsupported, see below), private Unix-socket JSON IPC, Homebrew libmpv/
+  FFmpeg lookup, POSIX local paths, Homebrew install hints, Stremio/updater disabled on macOS.
+  Windows mpv arguments and child process are pinned by a unit test. Architecture details:
+  [PROJECT.md](PROJECT.md#macos-beta).
+- `npm run package:mac` builds the native view and an ad-hoc-signed `Subtitle Bridge.app` /
   `SubtitleBridge-macos-arm64.dmg`; the manual **Release macOS beta** workflow publishes
-  `macos-v<version>-beta.<n>` prereleases. User notes: [releases/macos-beta.md](releases/macos-beta.md).
-- Local Windows `npm run check` passed 288 tests in 41 files, lint/typechecks, corpus gates and
-  builds (existing CSS/large-JSON lint notes only).
+  `macos-v<version>-beta.<n>` prereleases (not yet run). User notes:
+  [releases/macos-beta.md](releases/macos-beta.md). Real-Mac checklist:
+  [MACOS_BETA_ACCEPTANCE.md](MACOS_BETA_ACCEPTANCE.md).
+- Local Windows `npm run check` passed 295 tests in 42 files, lint/typechecks, corpus gates and
+  builds (existing CSS/large-JSON lint notes only). Windows CI (`ci.yml`) has not run on this
+  branch yet; it runs when the PR is opened.
+- macOS CI run 37893569842 at `81a64cc` (macos-14 arm64, no GPU) passed `npm run check`,
+  packaging, bundle checks and the packaged-app smoke test with a synthetic MKV: in-process
+  Homebrew libmpv (no mpv process), `vo=libmpv`, playback position advancing in real time,
+  FFmpeg subtitle extraction, frames rendered into the native view at the host content size
+  (960x572) with **Apple Software Renderer** at roughly 5 fps, mpv's rendered-output screenshot
+  non-black (mean luma 124.9 vs 125.1 decoded) and a clean quit within 15 seconds.
+  This does not cover GPU rendering, Retina scaling, fullscreen, the subtitle overlay's
+  appearance, clicks, audio output or real media on a physical Mac.
 - **Correction:** macOS CI run 37888226307 at `228cbf9` was earlier recorded as a passing
   playback smoke test. That test only checked that mpv spawned; its log also contained an
   unexpected `mpv.exit` and `playback.failed`. It is not a playback pass.
@@ -320,7 +333,7 @@ macOS artifact is an untested beta and must not be described as stable.
   effect of mpv exiting.
 - Still valid from that run: `npm run check` on macOS, `package:mac` bundle/signature/DMG checks,
   and the Electron child overlay staying on screen with matching bounds in native fullscreen.
-- Pending: an owner decision on the macOS playback approach (see PR), Windows CI on the PR, Windows regression check, Codex review,
+- Pending: Draft PR (blocked on `gh` sign-in), Windows CI on the PR, Windows regression check, Codex review,
   real Apple Silicon acceptance (when available), and explicit publication authorization.
 
 ## Active work — Issue #87 v1.0.7 release candidate

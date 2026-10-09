@@ -102,17 +102,24 @@ jobs:
           socket="$(find "${TMPDIR:-/tmp}" -path '*sb-mpv-*' -name 'mpv-*.sock' 2> /dev/null | head -1)"
           mpv_ipc() { echo "$1" | nc -U -w 2 "$socket" | grep '"request_id"' | head -1 || true; }
           luma() { ffprobe -v error -f lavfi -i "movie=$1,signalstats" -show_entries frame_tags=lavfi.signalstats.YAVG -of csv=p=0 2> /dev/null | head -1 || true; }
-          if [ -S "$socket" ]; then
-            first_pos="$(mpv_ipc '{"command":["get_property","time-pos"]}')"
-            sleep 2
-            echo "::notice title=smoke mpv state::time-pos $first_pos then $(mpv_ipc '{"command":["get_property","time-pos"]}'); pause $(mpv_ipc '{"command":["get_property","pause"]}'); video-params $(mpv_ipc '{"command":["get_property","video-params"]}' | cut -c1-200); vo $(mpv_ipc '{"command":["get_property","current-vo"]}')"
-            mpv_ipc "{\"command\":[\"screenshot-to-file\",\"$PWD/smoke/shot-video.png\",\"video\"]}" > /dev/null
-            shot_window="$(mpv_ipc "{\"command\":[\"screenshot-to-file\",\"$PWD/smoke/shot-window.png\",\"window\"]}")"
-            sleep 1
-            echo "::notice title=smoke screenshots::video luma $(luma smoke/shot-video.png); window luma $(luma smoke/shot-window.png); window reply $shot_window"
-          else
-            echo '::warning title=smoke::mpv IPC socket not found for diagnostics.'
-          fi
+          test -S "$socket" || { echo '::error title=smoke::mpv IPC socket not found.'; exit 1; }
+          first_pos="$(mpv_ipc '{"command":["get_property","time-pos"]}')"
+          sleep 2
+          second_pos="$(mpv_ipc '{"command":["get_property","time-pos"]}')"
+          echo "::notice title=smoke mpv state::time-pos $first_pos then $second_pos; vo $(mpv_ipc '{"command":["get_property","current-vo"]}'); video-params $(mpv_ipc '{"command":["get_property","video-params"]}' | cut -c1-120)"
+          mpv_ipc "{\"command\":[\"screenshot-to-file\",\"$PWD/smoke/shot-video.png\",\"video\"]}" > /dev/null
+          mpv_ipc "{\"command\":[\"screenshot-to-file\",\"$PWD/smoke/shot-window.png\",\"window\"]}" > /dev/null
+          sleep 1
+          video_luma="$(luma smoke/shot-video.png)"
+          window_luma="$(luma smoke/shot-window.png)"
+          echo "::notice title=smoke screenshots::decoded video luma $video_luma; rendered output luma $window_luma"
+          node -e '
+            const [first, second] = process.argv.slice(1, 3).map((reply) => JSON.parse(reply || "{}").data)
+            const [video, rendered] = process.argv.slice(3).map(Number)
+            if (!(second > first)) throw new Error(`Playback position did not advance: ${first} -> ${second}`)
+            if (!(video > 20)) throw new Error("Decoded video is black.")
+            if (!(rendered > 20)) throw new Error("mpv rendered black output into the macOS view.")
+          ' "$first_pos" "$second_pos" "$video_luma" "$window_luma"
 
           kill -0 "$app_pid"
           if pgrep -x mpv; then
