@@ -303,12 +303,19 @@ macOS artifact is an untested beta and must not be described as stable.
   `macos-v<version>-beta.<n>` prereleases. User notes: [releases/macos-beta.md](releases/macos-beta.md).
 - Local Windows `npm run check` passed 288 tests in 41 files, lint/typechecks, corpus gates and
   builds (existing CSS/large-JSON lint notes only).
-- macOS CI run 37888226307 at `228cbf9` (macos-14, arm64) passed: `npm run check` on macOS,
-  `package:mac`, bundle checks (arm64, ad-hoc signature, Info.plist, no bundled mpv/FFmpeg,
-  DMG checksum) and a packaged-app smoke test that launched with a synthetic MKV, resolved
-  Homebrew mpv and logged no playback failure. Screenshot review of video/overlay rendering is
-  pending; no visual, fullscreen, subtitle-click or real-media result is claimed yet.
-- Pending: screenshot review, Windows CI on the PR, Windows regression check, Codex review,
+- **Correction:** macOS CI run 37888226307 at `228cbf9` was earlier recorded as a passing
+  playback smoke test. That test only checked that mpv spawned; its log also contained an
+  unexpected `mpv.exit` and `playback.failed`. It is not a playback pass.
+- Hardened CI run 37889103934 at `30e3dd3` (macos-14 arm64) shows Homebrew mpv aborting
+  (SIGABRT) immediately whenever it is started as a separate process with `--wid` set to the
+  Electron NSView pointer, for the default, gpu/gpu-next macvk and hwdec variants. NSView
+  pointers are process-local, so the Windows child-process embedding design cannot work on
+  macOS as-is. The darwin child-process branch must not ship.
+- Still valid from that run: `npm run check` on macOS, `package:mac` bundle/signature/DMG checks,
+  and the Electron child overlay staying on screen with matching bounds in native fullscreen.
+  An `ffmpeg.extractFailed` event was also logged; whether it is a knock-on effect is unknown,
+  so Homebrew FFmpeg extraction is not claimed to work.
+- Pending: an owner decision on the macOS playback approach (see PR), Windows CI on the PR, Windows regression check, Codex review,
   real Apple Silicon acceptance (when available), and explicit publication authorization.
 
 ## Active work — Issue #87 v1.0.7 release candidate

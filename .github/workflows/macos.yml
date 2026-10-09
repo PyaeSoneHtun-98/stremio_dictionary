@@ -14,13 +14,48 @@ permissions:
   contents: read
 
 jobs:
-  embed-spike:
+  mpv-control:
     runs-on: macos-14
-    timeout-minutes: 20
+    timeout-minutes: 15
+    steps:
+      - name: Install mpv and FFmpeg
+        run: brew install mpv ffmpeg
+
+      - name: Standalone mpv without --wid
+        run: |
+          set -uo pipefail
+          ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=25 -t 60 -pix_fmt yuv420p clip.mp4
+          for vo in null default; do
+            args=(--no-config --ao=null --keep-open=yes)
+            if [ "$vo" = null ]; then args+=(--vo=null); fi
+            mpv "${args[@]}" clip.mp4 > /dev/null 2>&1 &
+            pid=$!
+            sleep 10
+            if kill -0 "$pid" 2> /dev/null; then
+              echo "::notice title=mpv control::vo=$vo stayed running for 10s"
+              kill "$pid"
+            else
+              wait "$pid"
+              echo "::error title=mpv control::vo=$vo exited early with status $?"
+            fi
+          done
+
+      - name: mpv --wid documentation (primary source)
+        run: |
+          set -uo pipefail
+          version="$(mpv --version | head -1 | awk '{print $2}')"
+          echo "::notice title=mpv version::$version"
+          curl -fsSL "https://raw.githubusercontent.com/mpv-player/mpv/${version}/DOCS/man/options.rst" -o options.rst || exit 0
+          section="$(awk '/^``--wid=<ID>``/{found=1} found && /^``--no-window-dragging``/{exit} found' options.rst)"
+          echo "::notice title=mpv --wid docs::$(echo "$section" | grep -i -B1 -A3 'macos\|cocoa\|NSView' | tr '\n' ' ' | cut -c1-900)"
+
+  libmpv-spike:
+    runs-on: macos-14
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        variant: [default, gpu-next-macvk, gpu-macvk, default-hwdec]
+        variant: [default, gpu-next-macvk, gpu-macvk]
     env:
       SPIKE_OUT: ${{ github.workspace }}/spike-out
       SPIKE_CLIP: ${{ github.workspace }}/spike-out/clip.mp4
@@ -37,12 +72,12 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm install --no-save koffi@2.9.0
 
       - name: Install mpv and FFmpeg
-        run: |
-          brew install mpv ffmpeg
-          mpv --version
+        run: brew install mpv ffmpeg
 
       - name: Prepare clip and window probe
         run: |
@@ -50,29 +85,32 @@ jobs:
           ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc=size=1280x720:rate=25 -t 60 -pix_fmt yuv420p spike-out/clip.mp4
           swiftc -O -o spike-out/window-probe scripts/macos-window-probe.swift
 
-      - name: Embedded in window and resize
+      - name: In-process embed and resize
         if: ${{ !cancelled() }}
+        timeout-minutes: 3
         env:
           SPIKE_PHASE: embed
-        run: npx electron spike/macos-embed/main.cjs
+        run: npx electron spike/macos-libmpv/main.cjs
 
-      - name: Native fullscreen
+      - name: In-process native fullscreen
         if: ${{ !cancelled() }}
+        timeout-minutes: 3
         env:
           SPIKE_PHASE: fullscreen
-        run: npx electron spike/macos-embed/main.cjs
+        run: npx electron spike/macos-libmpv/main.cjs
 
-      - name: Simple fullscreen
+      - name: In-process destroy and recreate
         if: ${{ !cancelled() }}
+        timeout-minutes: 3
         env:
-          SPIKE_PHASE: simplefullscreen
-        run: npx electron spike/macos-embed/main.cjs
+          SPIKE_PHASE: recreate
+        run: npx electron spike/macos-libmpv/main.cjs
 
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: macos-embed-spike-${{ matrix.variant }}
+          name: macos-libmpv-spike-${{ matrix.variant }}
           path: spike-out/*.png
           if-no-files-found: warn
 
@@ -148,6 +186,12 @@ jobs:
           cat "$log"
           echo "::notice title=smoke events::$(grep -o '"event":"[^"]*"' "$log" | cut -d'"' -f4 | sort | uniq -c | tr -s ' \n' ' ')"
           echo "::notice title=smoke processes::$(pgrep -lf 'mpv|Subtitle Bridge' | cut -c1-60 | tr '\n' ';' || true)"
+          echo "::notice title=smoke ffmpeg log::$(grep '"ffmpeg\.' "$log" | sed 's/.*"event"/"event"/' | tr '\n' ' ' | cut -c1-600)"
+          if ffmpeg -v error -nostdin -i smoke/clip.mkv -map 0:2 -c:s srt -f srt pipe:1 > smoke/direct.srt 2> smoke/direct.err; then
+            echo "::notice title=smoke direct ffmpeg::ok $(wc -c < smoke/direct.srt) bytes"
+          else
+            echo "::error title=smoke direct ffmpeg::exit $? $(head -c 300 smoke/direct.err | tr '\n' ' ')"
+          fi
 
           kill -0 "$app_pid"
           mpv_pids="$(pgrep -x mpv)" || { echo 'mpv is not running.'; exit 1; }
