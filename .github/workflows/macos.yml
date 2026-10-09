@@ -51,6 +51,7 @@ jobs:
           test "$(plutil -extract CFBundleIdentifier raw "$plist")" = "io.github.pyaesonehtun-98.subtitlebridge"
           test "$(plutil -extract CFBundleShortVersionString raw "$plist")" = "$(node -p "require('./package.json').version")"
           test -f "$app/Contents/Resources/subtitle-bridge.icns"
+          grep -q 'MIT License' "$app/Contents/Resources/LICENSE.txt"
           test -f "$app/Contents/Resources/app/out/main/index.js"
           test ! -e "$app/Contents/Resources/default_app.asar"
           lipo -archs "$app/Contents/MacOS/Subtitle Bridge" | grep -qx arm64

@@ -103,6 +103,8 @@ for (const [key, type, value] of [
   execFileSync('plutil', ['-replace', key, `-${type}`, value, infoPlist], { stdio: 'inherit' })
 }
 
+copyFileSync(join(root, 'LICENSE'), join(resources, 'LICENSE.txt'))
+
 for (const file of ['LICENSE', 'LICENSES.chromium.html']) {
   const source = join(electronDist, file)
   if (existsSync(source)) {
