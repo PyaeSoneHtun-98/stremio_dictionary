@@ -81,6 +81,50 @@ describe('runtime tool resolution', () => {
       source: 'path'
     })
   })
+
+  it('finds Homebrew mpv and FFmpeg on macOS without relying on the shell PATH', () => {
+    const appleSilicon = createTemporaryDirectory()
+    const intel = createTemporaryDirectory()
+    writeFileSync(join(appleSilicon, 'mpv'), '')
+    writeFileSync(join(intel, 'mpv'), '')
+    writeFileSync(join(intel, 'ffmpeg'), '')
+    const options: RuntimeToolResolutionOptions = {
+      environment: {},
+      platform: 'darwin',
+      resourcesPath: createManagedRuntimeFixture(),
+      homebrewDirectories: [appleSilicon, intel]
+    }
+
+    expect(resolveMpvExecutable(options)).toEqual({
+      executable: join(appleSilicon, 'mpv'),
+      source: 'homebrew'
+    })
+    expect(resolveFfmpegExecutable(options)).toEqual({
+      executable: join(intel, 'ffmpeg'),
+      source: 'homebrew'
+    })
+  })
+
+  it('keeps macOS developer overrides first and falls back to PATH names', () => {
+    const homebrew = createTemporaryDirectory()
+    writeFileSync(join(homebrew, 'mpv'), '')
+
+    expect(
+      resolveMpvExecutable({
+        environment: { MPV_PATH: '/Users/dev/mpv' },
+        platform: 'darwin',
+        homebrewDirectories: [homebrew]
+      })
+    ).toEqual({ executable: '/Users/dev/mpv', source: 'environment' })
+    expect(
+      resolveFfmpegExecutable({
+        environment: {},
+        platform: 'darwin',
+        resourcesPath: null,
+        homebrewDirectories: [homebrew]
+      })
+    ).toEqual({ executable: 'ffmpeg', source: 'path' })
+  })
 })
 
 function createManagedRuntimeFixture(): string {

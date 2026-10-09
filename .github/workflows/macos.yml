@@ -1,5 +1,8 @@
 name: macOS
 
+env:
+  SUBTITLE_BRIDGE_REPORT_ENDPOINT: ${{ vars.SUBTITLE_BRIDGE_REPORT_ENDPOINT || 'https://subtitle-report-service.vercel.app/api/report-dictionary' }}
+
 on:
   pull_request:
   push:
@@ -52,4 +55,95 @@ jobs:
         with:
           name: macos-embed-spike
           path: spike-out/*.png
+          if-no-files-found: warn
+
+  package-macos:
+    runs-on: macos-14
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate project on macOS
+        run: npm run check
+
+      - name: Package macOS arm64 beta
+        run: npm run package:mac
+
+      - name: Verify app bundle
+        run: |
+          set -euo pipefail
+          app="release/SubtitleBridge-macos-arm64/Subtitle Bridge.app"
+          plist="$app/Contents/Info.plist"
+          test "$(plutil -extract CFBundleExecutable raw "$plist")" = "Subtitle Bridge"
+          test "$(plutil -extract CFBundleIdentifier raw "$plist")" = "io.github.pyaesonehtun-98.subtitlebridge"
+          test "$(plutil -extract CFBundleShortVersionString raw "$plist")" = "$(node -p "require('./package.json').version")"
+          test -f "$app/Contents/Resources/subtitle-bridge.icns"
+          test -f "$app/Contents/Resources/app/out/main/index.js"
+          test ! -e "$app/Contents/Resources/default_app.asar"
+          lipo -archs "$app/Contents/MacOS/Subtitle Bridge" | grep -qx arm64
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -q 'Signature=adhoc'
+          if find "$app" -iname 'mpv*' -o -iname 'ffmpeg' | grep .; then
+            echo 'The macOS beta must not bundle mpv or FFmpeg.'
+            exit 1
+          fi
+          hdiutil verify release/SubtitleBridge-macos-arm64.dmg
+          (cd release && shasum -a 256 -c SubtitleBridge-macos-arm64.dmg.sha256)
+
+      - name: Install mpv and FFmpeg
+        run: brew install mpv ffmpeg
+
+      - name: Smoke-test packaged playback
+        run: |
+          set -euo pipefail
+          mkdir -p smoke
+          cat > smoke/subs.srt <<'SRT'
+          1
+          00:00:00,500 --> 00:00:59,000
+          I will look it up later
+          SRT
+          ffmpeg -hide_banner -loglevel error \
+            -f lavfi -i testsrc=size=1280x720:rate=25 \
+            -f lavfi -i sine=frequency=440:sample_rate=48000 \
+            -i smoke/subs.srt -t 60 \
+            -map 0:v -map 1:a -map 2:s -c:v libx264 -pix_fmt yuv420p -c:a aac -c:s srt \
+            -metadata:s:s:0 language=eng smoke/clip.mkv
+          app="$PWD/release/SubtitleBridge-macos-arm64/Subtitle Bridge.app"
+          "$app/Contents/MacOS/Subtitle Bridge" "$PWD/smoke/clip.mkv" > smoke/app-stdout.txt 2>&1 &
+          app_pid=$!
+          sleep 20
+          screencapture -x smoke/player.png || true
+          kill -0 "$app_pid"
+          pgrep -fl 'mpv' || true
+          log="$HOME/Library/Application Support/Subtitle Bridge/diagnostics/subtitle-bridge.log"
+          cat "$log"
+          grep -q '"mpv.spawned"' "$log"
+          grep -q '"source":"homebrew"' "$log"
+          if grep -q '"media.loadFailed"\|"mpv.spawnFailed"\|"media.externalLaunchRejected"' "$log"; then
+            echo 'Packaged playback smoke test reported a failure.'
+            exit 1
+          fi
+          kill "$app_pid"
+          wait "$app_pid" || true
+
+      - name: Upload macOS beta package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: subtitle-bridge-macos-arm64
+          path: |
+            release/SubtitleBridge-macos-arm64.dmg
+            release/SubtitleBridge-macos-arm64.dmg.sha256
+            smoke/*.png
+            smoke/app-stdout.txt
           if-no-files-found: warn

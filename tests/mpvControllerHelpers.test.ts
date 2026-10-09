@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   audioTrackSelectionCommand,
+  buildMpvArguments,
+  isSupportedPlaybackPlatform,
   mpvPipePath,
+  mpvSocketPath,
   playbackStartupUserMessage,
 } from '../src/main/media/MpvController'
 
@@ -13,6 +16,59 @@ describe('mpv controller safety helpers', () => {
     expect(first).not.toBe(second)
     expect(first).toContain(`subtitle-bridge-mpv-${process.pid}-1`)
     expect(second).toContain(`subtitle-bridge-mpv-${process.pid}-2`)
+  })
+
+  it('keeps the Windows mpv embedding arguments unchanged', () => {
+    expect(
+      buildMpvArguments({
+        platform: 'win32',
+        windowId: '123456',
+        ipcPath: mpvPipePath(1),
+      })
+    ).toEqual([
+      '--no-config',
+      '--idle=yes',
+      '--keep-open=yes',
+      '--sid=no',
+      '--sub-visibility=no',
+      '--no-terminal',
+      '--no-osc',
+      '--vo=gpu',
+      '--gpu-api=d3d11',
+      '--gpu-context=d3d11',
+      '--hwdec=no',
+      '--wid=123456',
+      `--input-ipc-server=${mpvPipePath(1)}`,
+    ])
+  })
+
+  it('never passes Windows D3D11 options to mpv on macOS', () => {
+    const args = buildMpvArguments({
+      platform: 'darwin',
+      windowId: '105553116266496',
+      ipcPath: '/var/folders/x/T/sb-mpv-abc/mpv-1.sock',
+    })
+
+    expect(args.join(' ')).not.toContain('d3d11')
+    expect(args).toContain('--wid=105553116266496')
+    expect(args).toContain('--input-ipc-server=/var/folders/x/T/sb-mpv-abc/mpv-1.sock')
+  })
+
+  it('uses a unique short Unix socket per playback generation on macOS', () => {
+    const directory = '/var/folders/zz/abcdefghijklmnopqrstuvwxyz/T/sb-mpv-AbC123'
+    const first = mpvSocketPath(directory, 1)
+
+    expect(first).not.toBe(mpvSocketPath(directory, 2))
+    expect(first.endsWith('mpv-1.sock')).toBe(true)
+    // macOS limits Unix socket paths to 104 bytes including the terminator.
+    expect(Buffer.byteLength(first)).toBeLessThan(104)
+    expect(() => mpvSocketPath(directory, -1)).toThrow('Invalid mpv playback generation.')
+  })
+
+  it('supports playback on Windows and macOS only', () => {
+    expect(isSupportedPlaybackPlatform('win32')).toBe(true)
+    expect(isSupportedPlaybackPlatform('darwin')).toBe(true)
+    expect(isSupportedPlaybackPlatform('linux')).toBe(false)
   })
 
   it('does not expose raw spawn or IPC startup details to users', () => {
@@ -29,9 +85,21 @@ describe('mpv controller safety helpers', () => {
       code: 'ENOENT',
     })
 
-    expect(playbackStartupUserMessage(missing)).toBe(
+    expect(playbackStartupUserMessage(missing, 'win32')).toBe(
       'The video player runtime is missing. Reinstall Subtitle Bridge and try again.'
     )
+  })
+
+  it('tells macOS users how to install a missing mpv runtime', () => {
+    const missing = Object.assign(new Error('spawn /opt/homebrew/bin/mpv ENOENT'), {
+      code: 'ENOENT',
+    })
+
+    const message = playbackStartupUserMessage(missing, 'darwin')
+    expect(message).toBe(
+      'mpv was not found. Install it with Homebrew (brew install mpv ffmpeg), then reopen the video.'
+    )
+    expect(message).not.toContain('/opt/homebrew')
   })
 
   it('builds an mpv aid command only for a current audio track', () => {

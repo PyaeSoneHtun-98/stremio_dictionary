@@ -1,9 +1,12 @@
 import { spawn, type ChildProcess } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { createConnection, type Socket } from 'node:net'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { MediaTrack, PlaybackSnapshot, SubtitleCue } from '../../shared/media'
 import { createEmptySubtitleModel, normalizeMpvTracks } from '../../shared/media'
 import { diagnosticLog } from '../diagnostics'
-import { resolveMpvExecutable } from '../runtimeTools'
+import { missingRuntimeMessage, resolveMpvExecutable } from '../runtimeTools'
 import { SubtitleExtractor } from '../subtitles/SubtitleExtractor'
 import { findActiveCue, tokenizeSubtitleText } from '../subtitles/normalize'
 import {
@@ -45,6 +48,7 @@ export class MpvController {
   private liveSubtitleSignature: string | null = null
   private liveSubtitleCueCount = 0
   private playbackGeneration = 0
+  private ipcSocketDirectory: string | null = null
   private state: PlaybackSnapshot = {
     status: 'idle',
     filePath: null,
@@ -67,16 +71,16 @@ export class MpvController {
   }
 
   async load(mediaTarget: string, windowId: string, displayName: string): Promise<void> {
-    if (process.platform !== 'win32') {
+    if (!isSupportedPlaybackPlatform(process.platform)) {
       this.patchState({
         status: 'unavailable',
-        error: 'The playback proof of concept currently supports Windows only.'
+        error: 'Playback is currently supported on Windows and macOS only.'
       })
-      throw new Error('Windows-only playback proof of concept')
+      throw new Error('Unsupported playback platform')
     }
 
     if (!/^\d+$/.test(windowId) || windowId === '0') {
-      throw new Error('A valid Windows playback surface is required.')
+      throw new Error('A valid playback surface is required.')
     }
 
     diagnosticLog('media.loadRequested', { fileName: displayName })
@@ -266,6 +270,26 @@ export class MpvController {
     this.subtitleExtractor.dispose()
     this.subtitleExtractionVersion += 1
     this.stopMpvProcess()
+    this.removeIpcSocketDirectory()
+  }
+
+  private ipcPathFor(generation: number): string {
+    if (process.platform === 'win32') {
+      return mpvPipePath(generation)
+    }
+
+    // A private per-session directory keeps the socket unreachable by other users and short
+    // enough for the macOS sun_path limit.
+    this.ipcSocketDirectory ??= mkdtempSync(join(tmpdir(), 'sb-mpv-'))
+    return mpvSocketPath(this.ipcSocketDirectory, generation)
+  }
+
+  private removeIpcSocketDirectory(): void {
+    const directory = this.ipcSocketDirectory
+    this.ipcSocketDirectory = null
+    if (directory) {
+      rmSync(directory, { recursive: true, force: true })
+    }
   }
 
   private stopMpvProcess(): void {
@@ -299,26 +323,16 @@ export class MpvController {
     }
 
     const runtime = resolveMpvExecutable()
-    const pipePath = mpvPipePath(generation)
+    const pipePath = this.ipcPathFor(generation)
     diagnosticLog('mpv.start', { source: runtime.source })
     const child = spawn(
       runtime.executable,
-      [
-        '--no-config',
-        '--idle=yes',
-        '--keep-open=yes',
-        '--sid=no',
-        '--sub-visibility=no',
-        '--no-terminal',
-        '--no-osc',
-        '--vo=gpu',
-        '--gpu-api=d3d11',
-        '--gpu-context=d3d11',
-        '--hwdec=no',
-        ...mpvDiagnosticArguments(),
-        `--wid=${windowId}`,
-        `--input-ipc-server=${pipePath}`
-      ],
+      buildMpvArguments({
+        platform: process.platform,
+        windowId,
+        ipcPath: pipePath,
+        diagnosticArguments: mpvDiagnosticArguments()
+      }),
       {
         windowsHide: true,
         stdio: 'ignore'
@@ -946,6 +960,49 @@ function isHttpMediaTarget(value: string | null | undefined): boolean {
   }
 }
 
+export function isSupportedPlaybackPlatform(platform: NodeJS.Platform): boolean {
+  return platform === 'win32' || platform === 'darwin'
+}
+
+export interface MpvArgumentOptions {
+  platform: NodeJS.Platform
+  windowId: string
+  ipcPath: string
+  diagnosticArguments?: readonly string[]
+}
+
+export function buildMpvArguments(options: MpvArgumentOptions): string[] {
+  return [
+    '--no-config',
+    '--idle=yes',
+    '--keep-open=yes',
+    '--sid=no',
+    '--sub-visibility=no',
+    '--no-terminal',
+    '--no-osc',
+    ...mpvVideoOutputArguments(options.platform),
+    ...(options.diagnosticArguments ?? []),
+    `--wid=${options.windowId}`,
+    `--input-ipc-server=${options.ipcPath}`
+  ]
+}
+
+function mpvVideoOutputArguments(platform: NodeJS.Platform): string[] {
+  if (platform === 'win32') {
+    return ['--vo=gpu', '--gpu-api=d3d11', '--gpu-context=d3d11', '--hwdec=no']
+  }
+
+  // macOS: TODO(#53) choose from the CI embedding spike before this is reviewed.
+  return []
+}
+
+export function mpvSocketPath(directory: string, generation: number): string {
+  if (!Number.isSafeInteger(generation) || generation < 0) {
+    throw new Error('Invalid mpv playback generation.')
+  }
+  return join(directory, `mpv-${generation}.sock`)
+}
+
 export function mpvPipePath(generation: number): string {
   if (!Number.isSafeInteger(generation) || generation < 0) {
     throw new Error('Invalid mpv playback generation.')
@@ -1012,9 +1069,12 @@ function finiteNumberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-export function playbackStartupUserMessage(error: unknown): string {
+export function playbackStartupUserMessage(
+  error: unknown,
+  platform: NodeJS.Platform = process.platform
+): string {
   if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-    return 'The video player runtime is missing. Reinstall Subtitle Bridge and try again.'
+    return missingRuntimeMessage('mpv', platform)
   }
 
   return 'Could not start the video player. Reopen the video or restart Subtitle Bridge and try again.'
