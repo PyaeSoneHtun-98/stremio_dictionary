@@ -4,9 +4,9 @@
 
 Current stable `master`:
 
-`f4ea6350c8b8f3199f4398392ba55feb3d1042ae`
+`aa49aee44be29bf4f51fd6c4f2e60cd656a42a15`
 
-Public release: **v1.0.6**, source `9c86f734c719cf0bacc1c15c510f0ea958813167`.
+Public release: **v1.0.7**, source `aa49aee44be29bf4f51fd6c4f2e60cd656a42a15`.
 
 v1.0.6 fixed the real in-app updater install-directory lock. The affected Windows PC then completed the real **v1.0.5 → v1.0.6 in-app update successfully**, confirming the published hotfix outside CI.
 
@@ -151,6 +151,27 @@ Official ZIP SHA-256:
 
 Release Windows #173 passed. The real affected PC then completed the official **v1.0.5 → v1.0.6** in-app update successfully.
 
+### v1.0.7
+
+PR #88 / Issue #87 published the combined candidate: approved logo/icons, neutral charcoal theme,
+HTTP/HTTPS Stream URL entry, dictionary/phrase expansion, report flag and audio track selector.
+See [release notes](releases/v1.0.7.md).
+
+Published source:
+
+`aa49aee44be29bf4f51fd6c4f2e60cd656a42a15`
+
+Official setup SHA-256:
+
+`63bcf9e964a19bfa8cffc5852dc8c407b132cea40ea7325c4c118ea48610acfe`
+
+Official ZIP SHA-256:
+
+`c86f8d3cd793004e01cb438e725102d9995c0f73e64e613399794b9552374b67`
+
+Master push CI #618 and Release Windows #288 passed; the release was published on 2026-10-08.
+No real in-app v1.0.6 → v1.0.7 update or fresh setup installation is claimed yet.
+
 ## Updater shutdown-race fix
 
 PR #54 is merged to master, and the later v1.0.6 working-directory hotfix completed the real affected-PC updater acceptance.
@@ -287,7 +308,12 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
   these while continuing to reject actual duplicate stored variants and cross-owner collisions.
 - Merge and acceptance completed as recorded above. See [dictionary expansion](DICTIONARY_EXPANSION.md).
 
-## Active work — Issue #87 v1.0.7 release candidate
+## Completed — Issue #87 v1.0.7 release candidate
+
+PR [#88](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/88) squash-merged as
+`aa49aee44be29bf4f51fd6c4f2e60cd656a42a15`; Issue #87 is closed/completed. Master push CI #618
+and Release Windows #288 passed, publishing v1.0.7. The candidate snapshots below are historical;
+the RC hashes are local preview artifacts, not the official release assets.
 
 The owner authorized merging the accepted icon/stream PRs and preparing one combined candidate
 for final Windows testing. Branch: `codex/issue-87-v1.0.7-candidate`, based on merged master
