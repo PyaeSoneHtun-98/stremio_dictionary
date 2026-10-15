@@ -15,10 +15,22 @@ app.disableHardwareAcceleration()
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
 let mainWindow: BrowserWindow | null = null
+// macOS delivers Stremio's mpv:// links as open-url events, possibly before the app is ready.
+let pendingOpenUrl: string | null = null
+let launchHandlingReady = false
 
 if (!hasSingleInstanceLock) {
   app.quit()
 } else {
+  app.on('open-url', (event, url) => {
+    event.preventDefault()
+    if (launchHandlingReady) {
+      void handleLaunchTarget(url)
+    } else {
+      pendingOpenUrl = url
+    }
+  })
+
   app.on('second-instance', (_event, commandLine) => {
     const target = findLaunchTargetArgument(commandLine)
     if (target) {
@@ -50,7 +62,9 @@ if (!hasSingleInstanceLock) {
     registerTranslationIpc()
     registerUpdateIpc({ isPlaybackActive: isMediaPlaybackActive })
 
-    const initialLaunchTarget = findLaunchTargetArgument(process.argv)
+    const initialLaunchTarget = pendingOpenUrl ?? findLaunchTargetArgument(process.argv)
+    pendingOpenUrl = null
+    launchHandlingReady = true
     createWindow({ activateOnReady: !initialLaunchTarget })
     if (initialLaunchTarget) {
       void handleLaunchTarget(initialLaunchTarget)
@@ -125,7 +139,7 @@ function createWindow({ activateOnReady = true }: { activateOnReady?: boolean } 
 
 async function handleLaunchTarget(target: string): Promise<void> {
   diagnosticLog('media.externalLaunchRequested', {
-    source: target.toLowerCase().startsWith('vlc://') ? 'stremio-vlc' : 'direct'
+    source: launchSource(target)
   })
   const result = await openMediaTarget(target)
   if (result.error) {
@@ -146,4 +160,12 @@ function focusMainWindow(): void {
   }
   window.show()
   window.focus()
+}
+
+function launchSource(target: string): 'stremio-vlc' | 'stremio-mpv' | 'direct' {
+  const lower = target.toLowerCase()
+  if (lower.startsWith('vlc://')) {
+    return 'stremio-vlc'
+  }
+  return lower.startsWith('mpv://') ? 'stremio-mpv' : 'direct'
 }

@@ -35,10 +35,19 @@
 - Clickable English SRT/ASS/SSA subtitles with offline English → Burmese word and phrase lookup.
 - External subtitle files, subtitle delay/size/position, audio track selection, fullscreen.
 
+### Playing from Stremio
+
+1. In Subtitle Bridge, click **Enable** on the Stremio card.
+2. In Stremio, open **Settings → Player → External player** and choose **MPV**.
+3. Play any stream in Stremio. It opens in Subtitle Bridge.
+
+This does not change Stremio itself. Subtitle Bridge becomes the app that opens Stremio's MPV
+links; click **Disable** (and set Stremio's external player back to **Disabled**) to undo it.
+It needs a Stremio version that offers MPV as an external player. Otherwise use **Copy stream
+link** in Stremio and paste it into **Stream URL**.
+
 ### Not available on macOS yet
 
-- **Stremio one-click "Play in Subtitle Bridge"** is Windows-only. Paste the stream URL into
-  **Stream URL** instead.
 - **In-app updates** are Windows-only. Download new macOS betas from GitHub Releases.
 - Opening videos by dragging them onto the Dock icon; drag them onto the app window instead.
 

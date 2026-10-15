@@ -254,11 +254,13 @@ export function PlaybackProof(): React.JSX.Element {
             </div>
             <h3>Play from Stremio</h3>
             <p>
-              {stremioStatus?.state === 'enabled'
-                ? 'Handoff is ready. Choose Play in Subtitle Bridge from Stremio.'
-                : stremioStatus?.state === 'disabled'
-                  ? 'Enable once, restart Stremio, then choose Play in Subtitle Bridge.'
-                  : (stremioStatus?.message ?? 'Checking Stremio integration…')}
+              {window.desktop.platform === 'darwin'
+                ? (stremioStatus?.message ?? 'Checking Stremio integration…')
+                : stremioStatus?.state === 'enabled'
+                  ? 'Handoff is ready. Choose Play in Subtitle Bridge from Stremio.'
+                  : stremioStatus?.state === 'disabled'
+                    ? 'Enable once, restart Stremio, then choose Play in Subtitle Bridge.'
+                    : (stremioStatus?.message ?? 'Checking Stremio integration…')}
             </p>
           </div>
           <div className="stremio-actions">

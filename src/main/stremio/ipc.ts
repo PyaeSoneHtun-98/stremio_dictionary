@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import type { StremioHandoffResult, StremioHandoffStatus } from '../../shared/media'
 import { diagnosticLog } from '../diagnostics'
 import { StremioHandoffService } from './HandoffService'
+import { disableMacosStremio, enableMacosStremio, macosStremioStatus } from './macosLinkHandoff'
 import {
   developmentStremioStatus,
   packagedStremioStatus,
@@ -24,6 +25,11 @@ export function registerStremioIpc(platform: NodeJS.Platform = process.platform)
   }
 
   registered = true
+  if (platform === 'darwin') {
+    registerMacosHandlers()
+    return
+  }
+
   // The handoff patch and its PowerShell helpers target Stremio's Windows layout only.
   const supported = platform === 'win32'
   const service =
@@ -110,6 +116,44 @@ export function registerStremioIpc(platform: NodeJS.Platform = process.platform)
           'Could not disable Stremio integration safely. The current Stremio installation may not be compatible.'
       }
     }
+  })
+}
+
+// macOS: no Stremio files are touched; Subtitle Bridge becomes the handler for Stremio's MPV links.
+// Development builds stay read-only so the Electron binary is never registered as the handler.
+function registerMacosHandlers(): void {
+  ipcMain.handle(STATUS_CHANNEL, (): StremioHandoffStatus =>
+    app.isPackaged ? macosStremioStatus(app) : developmentStremioStatus()
+  )
+
+  ipcMain.handle(ENABLE_CHANNEL, (): StremioHandoffResult => {
+    diagnosticLog('stremio.handoffEnableRequested')
+    if (!app.isPackaged) {
+      return {
+        ok: false,
+        message: 'Install the packaged Subtitle Bridge app before enabling Stremio integration.'
+      }
+    }
+    const result = enableMacosStremio(app)
+    diagnosticLog(result.ok ? 'stremio.handoffEnableSucceeded' : 'stremio.handoffEnableFailed', {
+      mode: 'mpv-link'
+    })
+    return result
+  })
+
+  ipcMain.handle(DISABLE_CHANNEL, (): StremioHandoffResult => {
+    diagnosticLog('stremio.handoffDisableRequested')
+    if (!app.isPackaged) {
+      return {
+        ok: false,
+        message: 'Stremio integration can be changed from the packaged Subtitle Bridge app.'
+      }
+    }
+    const result = disableMacosStremio(app)
+    diagnosticLog(result.ok ? 'stremio.handoffDisableSucceeded' : 'stremio.handoffDisableFailed', {
+      mode: 'mpv-link'
+    })
+    return result
   })
 }
 

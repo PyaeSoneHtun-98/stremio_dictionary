@@ -260,9 +260,15 @@ Issue #53 adds an Apple Silicon build without changing Windows behavior:
   periodic `mpv.renderStats` diagnostics (renderer name, frame count, render size). It is a
   CI/test aid and never records frame content.
 - Local targets accept POSIX absolute MKV/MP4 paths; HTTP/HTTPS validation is unchanged.
-- The Stremio compatibility patch and the Windows setup-based updater are disabled on macOS:
-  their IPC returns unavailable/idle results and never creates the Windows services or contacts
-  the release API.
+- The Windows Stremio `server.js` patch and the setup-based updater are disabled on macOS; their
+  IPC never creates the Windows services, and the updater never contacts the release API.
+- Stremio on macOS (Issue #95) needs no patch. Stremio's macOS external-player option **MPV**
+  (stremio-web `EXTERNAL_PLAYERS`) opens `mpv://<stream URL>` (stremio-core deep links).
+  Subtitle Bridge declares the `mpv` scheme in its Info.plist. The Stremio card's Enable/Disable
+  calls Electron `setAsDefaultProtocolClient` / `removeAsDefaultProtocolClient('mpv')`, and the
+  status comes from `isDefaultProtocolClient`. `open-url` events (including cold start) are
+  unwrapped like `vlc://` and validated as HTTP/HTTPS. The `iina` scheme is not claimed.
+  Patching Stremio's signed macOS bundle would break its code signature.
 - `npm run package:mac` (macOS arm64 only, Homebrew `mpv` headers required) compiles the
   native view with `clang++`, copies Electron.app with `ditto`, renames the main executable,
   writes Info.plist metadata and an `.icns` generated from the approved 1024px icon, re-signs
@@ -302,7 +308,8 @@ Diagnostics are intentionally small and privacy-conscious. They may record lifec
 ## Current product limitations
 
 - Windows x64 is the only stable platform. The macOS arm64 build is an unnotarized beta without
-  Stremio one-click handoff or in-app updates. Owner-reported acceptance covers one MacBook Air M1
+  in-app updates. Stremio handoff uses Stremio's MPV external-player link and needs a Stremio
+  version that offers it. Owner-reported acceptance covers one MacBook Air M1
   (macOS Tahoe 26.6.2); other Macs, external displays and 4K are not tested.
 - The first normal Windows install requires Internet access to download the pinned mpv and FFmpeg runtime archives; verified archives are cached for later upgrades.
 - The Dictionary v1.0 corpus is broad but not exhaustive; unknown words still fail cleanly offline.

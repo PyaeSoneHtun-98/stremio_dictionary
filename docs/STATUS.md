@@ -308,7 +308,32 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
   these while continuing to reject actual duplicate stored variants and cross-owner collisions.
 - Merge and acceptance completed as recorded above. See [dictionary expansion](DICTIONARY_EXPANSION.md).
 
-## Active work — Issue #53 macOS Apple Silicon beta
+## Active work — Issue #95 macOS Stremio handoff via mpv:// links
+
+Branch: `feat/issue-95-macos-stremio-mpv-link`. The owner chose this approach on 2026-10-15. It
+replaces patching Stremio, which on macOS would break Stremio's code signature.
+
+- Source research (stremio-web `src/common/CONSTANTS.js`, stremio-core `src/deep_links/mod.rs`):
+  Stremio's macOS external-player choices are MPV and IINA. MPV opens `mpv://{url}`, and IINA opens
+  `iina://weblink?url=…`.
+- Subtitle Bridge declares the `mpv` scheme (Info.plist `CFBundleURLTypes`) and handles `open-url`,
+  including cold start. `mpv://` targets unwrap to validated HTTP/HTTPS URLs (percent-encoded and
+  "http//" forms are repaired; non-HTTP schemes are rejected). The Stremio card on macOS
+  enables/disables Subtitle Bridge as the default `mpv://` handler. Windows behavior is unchanged.
+- Testing: unit tests cover parsing, status and enable/disable failure paths. macOS CI opens
+  `mpv://` links to a local HTTP server in the packaged app, from cold start and while running.
+- Not tested: real Stremio on a physical Mac, or which Stremio macOS versions offer MPV.
+  Checklist item 13 covers it when a Mac with Stremio is available.
+
+## Completed — Issue #53 macOS Apple Silicon beta
+
+PR [#89](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/89) squash-merged as
+`c9ebb0d` on 2026-10-15; Issue #53 is closed/completed. The owner-authorized **Release macOS
+beta** workflow (run 38709945988) published pre-release
+[macos-v1.0.7-beta.2](https://github.com/PyaeSoneHtun-98/stremio_dictionary/releases/tag/macos-v1.0.7-beta.2)
+from `c9ebb0d`, not marked latest. `beta.1` is retitled as superseded. The installer self-test
+flake seen during review is tracked separately as Issue #94. The snapshots below are historical.
+
 
 Branch: `feat/issue-53-macos-arm64-beta`, based on master `aa49aee`. The owner assigned the macOS
 port on 2026-10-09 and chose: Apple Silicon (arm64) only, Homebrew-installed mpv/FFmpeg (not
@@ -397,8 +422,7 @@ beta and must not be described as stable.
 - Codex re-review of `8d0925097a81727e4870b719aadb4548a3a2b9a4` resolved the P2 and P3 with no new
   P1/P2/P3 and approved the code. Windows `validate`/`package-windows` and macOS `package-macos`
   were green on that head. This record is a documentation-only follow-up.
-- The owner authorized squash merge on 2026-10-15. Publishing a macOS beta with the fix through
-  **Release macOS beta** needs separate owner authorization.
+- The owner authorized squash merge on 2026-10-15 and then publication of beta.2 (recorded above).
 
 ## Completed — Issue #87 v1.0.7 release candidate
 

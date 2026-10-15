@@ -23,6 +23,39 @@ describe('parseMediaTarget', () => {
   })
 
   it.each([
+    'mpv://http://127.0.0.1:11470/abc/0?foo=bar',
+    'mpv://http%3A%2F%2F127.0.0.1%3A11470%2Fabc%2F0%3Ffoo%3Dbar',
+    'mpv://http//127.0.0.1:11470/abc/0?foo=bar',
+    'MPV://http://127.0.0.1:11470/abc/0?foo=bar'
+  ])('unwraps the macOS Stremio MPV external-player link %s', (wrapped) => {
+    expect(parseMediaTarget(wrapped, 'darwin')).toEqual({
+      target: 'http://127.0.0.1:11470/abc/0?foo=bar',
+      displayName: 'Stremio stream',
+      kind: 'network',
+      source: 'stremio-mpv'
+    })
+  })
+
+  it('keeps a remote HTTPS stream from an MPV link unchanged', () => {
+    expect(parseMediaTarget('mpv://https://cdn.example.com/v.mkv?sig=a%2Bb', 'darwin')).toEqual({
+      target: 'https://cdn.example.com/v.mkv?sig=a%2Bb',
+      displayName: 'Network stream (cdn.example.com)',
+      kind: 'network',
+      source: 'stremio-mpv'
+    })
+  })
+
+  it.each([
+    ['mpv://file:///Users/me/secret.mkv', 'Unsupported media URL scheme: file'],
+    ['mpv:///Users/me/movie.mkv', 'media stream URL is invalid'],
+    ['mpv://mpv://http://127.0.0.1/a', 'Unsupported media URL scheme: mpv'],
+    ['mpv://javascript:alert(1)', 'Unsupported media URL scheme: javascript'],
+    ['mpv://http%3A%2F%2F%E0%A4%A', 'media stream URL is invalid']
+  ])('rejects unsafe MPV link %s', (value, message) => {
+    expect(() => parseMediaTarget(value, 'darwin')).toThrow(message)
+  })
+
+  it.each([
     ['D:\\Movies\\Example.mkv', 'Example.mkv'],
     ['D:\\Movies\\Example.mp4', 'Example.mp4']
   ])('accepts an absolute Windows local video path %s', (target, displayName) => {

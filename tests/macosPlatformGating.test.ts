@@ -4,9 +4,18 @@ const mock = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   serviceCreated: vi.fn(),
   fetch: vi.fn(),
+  defaultSchemes: new Set<string>(),
 }))
 vi.mock('electron', () => ({
-  app: { getVersion: () => '1.0.7', getPath: () => '/tmp', isPackaged: true, getAppPath: () => '/tmp' },
+  app: {
+    getVersion: () => '1.0.7',
+    getPath: () => '/tmp',
+    isPackaged: true,
+    getAppPath: () => '/tmp',
+    isDefaultProtocolClient: (scheme: string) => mock.defaultSchemes.has(scheme),
+    setAsDefaultProtocolClient: (scheme: string) => mock.defaultSchemes.add(scheme) !== undefined,
+    removeAsDefaultProtocolClient: (scheme: string) => mock.defaultSchemes.delete(scheme),
+  },
   BrowserWindow: { getAllWindows: () => [] },
   ipcMain: {
     handle: (name: string, callback: (...args: unknown[]) => unknown) => mock.handlers.set(name, callback),
@@ -51,19 +60,28 @@ afterEach(() => {
   mock.handlers.clear()
   mock.serviceCreated.mockReset()
   mock.fetch.mockReset()
+  mock.defaultSchemes.clear()
 })
 
 describe('macOS platform gating', () => {
-  it('reports Stremio handoff unavailable and never creates the Windows helper service', async () => {
+  it('uses the mpv:// link handler for Stremio and never creates the Windows helper service', async () => {
     registerStremioIpc('darwin')
 
     expect(invoke('stremio:get-handoff-status')).toMatchObject({
-      state: 'unavailable',
-      canEnable: false,
+      state: 'disabled',
+      canEnable: true,
       canDisable: false,
     })
-    expect(await invoke('stremio:enable-handoff')).toMatchObject({ ok: false })
-    expect(await invoke('stremio:disable-handoff')).toMatchObject({ ok: false })
+    expect(await invoke('stremio:enable-handoff')).toMatchObject({ ok: true })
+    expect(mock.defaultSchemes.has('mpv')).toBe(true)
+    expect(invoke('stremio:get-handoff-status')).toMatchObject({
+      state: 'enabled',
+      canEnable: false,
+      canDisable: true,
+    })
+    expect(await invoke('stremio:disable-handoff')).toMatchObject({ ok: true })
+    expect(mock.defaultSchemes.has('mpv')).toBe(false)
+    expect(mock.defaultSchemes.has('iina')).toBe(false)
     expect(mock.serviceCreated).not.toHaveBeenCalled()
   })
 

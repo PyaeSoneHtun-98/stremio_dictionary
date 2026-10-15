@@ -36,7 +36,7 @@ Clean up).
 
 | # | Check | Expected |
 | --- | --- | --- |
-| 1 | App opens | Launcher shows "English → Burmese · macOS beta" in the footer; Stremio card says Windows-only; no update banner. |
+| 1 | App opens | Launcher shows "English → Burmese · macOS beta" in the footer; Stremio card shows Enable; no update banner. |
 | 2 | Open a local MKV with English SRT/ASS subtitles | Video and audio play inside the player window (no separate mpv window or Dock icon). |
 | 3 | Subtitles | English subtitle line appears above the video; clicking a word shows the Burmese card; a phrase (e.g. "look it up") resolves as a phrase. |
 | 4 | Controls | Play/pause (click and Space), seek, volume, speed, audio track, subtitle delay/size/position all work. |
@@ -49,6 +49,7 @@ Clean up).
 | 10 | Quit | Cmd+Q quits within a few seconds; Activity Monitor shows no leftover Subtitle Bridge or mpv process. |
 | 11 | Retina / external display (if available) | Video is sharp, not blurry; moving the window between displays keeps video visible. |
 | 12 | Missing mpv (optional) | With mpv uninstalled (`brew uninstall mpv`), opening a video shows the `brew install mpv ffmpeg` message instead of crashing. |
+| 13 | Stremio (if installed) | Click **Enable** on the Stremio card. In Stremio, set Settings → Player → External player to **MPV** and note which options exist. Play a stream: it opens in Subtitle Bridge with clickable subtitles. Then click **Disable**. |
 
 If something fails, note the step and send
 `~/Library/Application Support/Subtitle Bridge/diagnostics/subtitle-bridge.log`
