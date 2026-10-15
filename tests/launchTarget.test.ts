@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { findLaunchTargetArgument, parseMediaTarget } from '../src/main/media/launchTarget'
+import { normalizeStreamUrl } from '../src/shared/streamUrl'
 
 describe('parseMediaTarget', () => {
   it('accepts raw HTTP and HTTPS stream URLs without rewriting them', () => {
@@ -36,6 +37,12 @@ describe('parseMediaTarget', () => {
     })
   })
 
+  it('passes an MPV link only when the Stream URL validator accepts the exact target', () => {
+    const signed = 'https://cdn.example.com/v.mkv?X-Amz-Signature=ab%2Fcd%3D&Expires=1'
+    expect(parseMediaTarget(`mpv://${signed}`, 'darwin').target).toBe(signed)
+    expect(normalizeStreamUrl(signed)).toBe(signed)
+  })
+
   it('keeps a remote HTTPS stream from an MPV link unchanged', () => {
     expect(parseMediaTarget('mpv://https://cdn.example.com/v.mkv?sig=a%2Bb', 'darwin')).toEqual({
       target: 'https://cdn.example.com/v.mkv?sig=a%2Bb',
@@ -50,7 +57,14 @@ describe('parseMediaTarget', () => {
     ['mpv:///Users/me/movie.mkv', 'media stream URL is invalid'],
     ['mpv://mpv://http://127.0.0.1/a', 'Unsupported media URL scheme: mpv'],
     ['mpv://javascript:alert(1)', 'Unsupported media URL scheme: javascript'],
-    ['mpv://http%3A%2F%2F%E0%A4%A', 'media stream URL is invalid']
+    ['mpv://http%3A%2F%2F%E0%A4%A', 'media stream URL is invalid'],
+    ['mpv://https%3A%2F%2Fmedia.example%2Fa%0Aprivate', 'media stream URL is invalid'],
+    ['mpv://https%3A%2F%2Fmedia.example%2Fa%00b', 'media stream URL is invalid'],
+    ['mpv://https%3A%2F%2Fmedia.example%2Fa%20b', 'media stream URL is invalid'],
+    ['mpv://https://media.example/a\\b', 'media stream URL is invalid'],
+    ['mpv://https:media.example/a', 'media stream URL is invalid'],
+    ['mpv://https%3Amedia.example%2Fa', 'media stream URL is invalid'],
+    [`mpv://https://media.example/${'a'.repeat(17_000)}`, 'too long to open safely']
   ])('rejects unsafe MPV link %s', (value, message) => {
     expect(() => parseMediaTarget(value, 'darwin')).toThrow(message)
   })

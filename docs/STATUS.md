@@ -322,6 +322,11 @@ replaces patching Stremio, which on macOS would break Stremio's code signature.
   enables/disables Subtitle Bridge as the default `mpv://` handler. Windows behavior is unchanged.
 - Testing: unit tests cover parsing, status and enable/disable failure paths. macOS CI opens
   `mpv://` links to a local HTTP server in the packaged app, from cold start and while running.
+- Codex review of `601d948`: no P1/P3. P2: an unwrapped `mpv://` target was only checked with
+  `new URL()`, which silently drops characters such as a decoded newline, while the original text
+  still reached mpv. Fixed: unwrapped targets must also pass the Stream URL field's
+  `normalizeStreamUrl`, which rejects control characters, whitespace, backslashes, malformed
+  prefixes and over-long input, and the exact accepted spelling is kept. Regression cases added.
 - Not tested: real Stremio on a physical Mac, or which Stremio macOS versions offer MPV.
   Checklist item 13 covers it when a Mac with Stremio is available.
 
