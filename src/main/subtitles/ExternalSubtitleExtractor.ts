@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { SubtitleCue } from '../../shared/media'
 import { diagnosticLog } from '../diagnostics'
-import { resolveFfmpegExecutable } from '../runtimeTools'
+import { missingRuntimeMessage, resolveFfmpegExecutable } from '../runtimeTools'
 import type { ExternalSubtitleFormat } from './externalSubtitle'
 import { parseSrtCues } from './normalize'
 
@@ -155,9 +155,7 @@ export class ExternalSubtitleExtractor {
 
 function toExtractionError(error: Error): Error {
   if ('code' in error && error.code === 'ENOENT') {
-    return new Error(
-      'FFmpeg was not found. Reinstall Subtitle Bridge to restore its managed subtitle runtime, or configure FFMPEG_PATH for development.'
-    )
+    return new Error(missingRuntimeMessage('ffmpeg'))
   }
 
   return new Error('Could not start FFmpeg. Check the configured FFmpeg executable and try again.')

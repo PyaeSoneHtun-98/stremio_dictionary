@@ -308,6 +308,98 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
   these while continuing to reject actual duplicate stored variants and cross-owner collisions.
 - Merge and acceptance completed as recorded above. See [dictionary expansion](DICTIONARY_EXPANSION.md).
 
+## Active work — Issue #53 macOS Apple Silicon beta
+
+Branch: `feat/issue-53-macos-arm64-beta`, based on master `aa49aee`. The owner assigned the macOS
+port on 2026-10-09 and chose: Apple Silicon (arm64) only, Homebrew-installed mpv/FFmpeg (not
+bundled), ad-hoc signing (no Apple Developer account), and a GitHub **prerelease** DMG.
+The owner has no Mac; a friend tested on their Mac (results below). The macOS build remains a
+beta and must not be described as stable.
+
+- Platform layer: in-process libmpv video view (owner-approved on 2026-10-09 after the child
+  `--wid` design proved unsupported, see below), private Unix-socket JSON IPC, Homebrew libmpv/
+  FFmpeg lookup, POSIX local paths, Homebrew install hints, Stremio/updater disabled on macOS.
+  Windows mpv arguments and child process are pinned by a unit test. Architecture details:
+  [PROJECT.md](PROJECT.md#macos-beta).
+- `npm run package:mac` builds the native view and an ad-hoc-signed `Subtitle Bridge.app` /
+  `SubtitleBridge-macos-arm64.dmg`; the manual **Release macOS beta** workflow publishes
+  `macos-v<version>-beta.<n>` prereleases (not yet run). User notes:
+  [releases/macos-beta.md](releases/macos-beta.md). Real-Mac checklist:
+  [MACOS_BETA_ACCEPTANCE.md](MACOS_BETA_ACCEPTANCE.md).
+- Local Windows `npm run check` passed 295 tests in 42 files, lint/typechecks, corpus gates and
+  builds (existing CSS/large-JSON lint notes only). Windows CI (`ci.yml`) has not run on this
+  branch yet; it runs when the PR is opened.
+- macOS CI run 37893569842 at `81a64cc` (macos-14 arm64, no GPU) passed `npm run check`,
+  packaging, bundle checks and the packaged-app smoke test with a synthetic MKV: in-process
+  Homebrew libmpv (no mpv process), `vo=libmpv`, playback position advancing in real time,
+  FFmpeg subtitle extraction, frames rendered into the native view at the host content size
+  (960x572) with **Apple Software Renderer** at roughly 5 fps, mpv's rendered-output screenshot
+  non-black (mean luma 124.9 vs 125.1 decoded) and a clean quit within 15 seconds.
+- macOS CI run 37894905400 at `c64728d` passed the same gates plus the native-view harness
+  (22 checks, 0 failures): render size matches the window and follows resize, native
+  fullscreen fills the display with the overlay window visible and matching, size restored
+  after fullscreen, frames keep advancing, three create/destroy cycles with prompt destroy and
+  closed IPC; the GL context is created once and reused. The packaged app's quit disposed the
+  in-process player (`mpv.inProcessDestroyed` ~145 ms, expected `mpv.exit`).
+  This does not cover GPU rendering, Retina scaling, the subtitle overlay's
+  appearance, clicks, audio output or real media on a physical Mac.
+- **Correction:** macOS CI run 37888226307 at `228cbf9` was earlier recorded as a passing
+  playback smoke test. That test only checked that mpv spawned; its log also contained an
+  unexpected `mpv.exit` and `playback.failed`. It is not a playback pass.
+- Hardened CI run 37889103934 at `30e3dd3` (macos-14 arm64): Homebrew mpv v0.41.0 aborted
+  (SIGABRT) immediately when started as a child process with `--wid` set to the Electron
+  NSView pointer, for every video-output variant tried. The mpv v0.41.0 manual documents
+  `--wid` only for X11, win32 and Android, not macOS, so the Windows child-process embedding
+  design is unsupported on macOS. The darwin child-process branch must not ship.
+- Control run 37889687224 at `4ffa179`: standalone mpv with `--vo=null` ran normally, but
+  standalone mpv with its default video output (its own window, no `--wid`) also aborted, and
+  in-process libmpv loaded/initialized/accepted `loadfile` before the process died at video-output
+  start. GitHub's macOS runner therefore cannot verify mpv video rendering in any mode tried;
+  rendering can only be verified on a physical Mac. Homebrew FFmpeg extracted the synthetic
+  MKV's SRT track directly; the app's `ffmpeg.extractFailed`/cancelled event was a knock-on
+  effect of mpv exiting.
+- Still valid from that run: `npm run check` on macOS, `package:mac` bundle/signature/DMG checks,
+  and the Electron child overlay staying on screen with matching bounds in native fullscreen.
+- Draft PR [#89](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/89) is open. Windows
+  CI (`validate`, `package-windows`) and macOS CI passed on it at `3119e75`. An automated Windows
+  smoke on the owner's PC with a `package:win` build of that head (portable copy, installed app's
+  16 hash-matched managed runtimes, `MPV_PATH`/`FFMPEG_PATH` cleared) launched a synthetic MKV:
+  managed mpv spawned, FFmpeg extracted the subtitle track, the file loaded, closing the player
+  stopped mpv and closing the launcher quit cleanly. Video appearance and clicking were not observed.
+- On 2026-10-15 the owner authorized pre-release
+  [macos-v1.0.7-beta.1](https://github.com/PyaeSoneHtun-98/stremio_dictionary/releases/tag/macos-v1.0.7-beta.1)
+  (`46d8c25`, DMG from green macOS CI run 37950329299, not marked latest; `/releases/latest`
+  remains `v1.0.7`) so a friend's Mac could download it directly.
+- **Real Apple Silicon acceptance, owner-reported, 2026-10-15:** MacBook Air M1 (A2337, built-in
+  Retina display), macOS Tahoe 26.6.2. Passed:
+  - DMG install and Gatekeeper first launch;
+  - the missing-runtime message before Homebrew mpv/FFmpeg were installed;
+  - local MKV video and audio; clickable subtitles with the Burmese card and phrase lookup;
+  - controls; 1080p smoothness while clicking words; resize; fullscreen and back;
+  - external `.srt` via the picker and drag-and-drop; a stream URL;
+  - reopening the player twice; Cmd+Q leaving no Subtitle Bridge/mpv process.
+
+  The first `brew install` hit `Connection reset by peer` from `ghcr.io` on the local network and
+  succeeded on retry. Not tested: external/second display, 4K. No independent observation is claimed.
+- Owner Windows manual regression of this branch passed on 2026-10-15: local MKV with clickable
+  subtitles, a stream URL, and closing/reopening the player, using the portable test build of
+  `3119e75`. There are no `src/` changes between `3119e75` and `922c458`.
+- Codex review of `922c458` found no P1. P2: the native view reported startup before mpv's render
+  context existed, because it was created lazily on Core Animation's first draw, and a GL or
+  render-context failure still looked like a successful start. Fixed: `createPlayer` now creates
+  the GL and render contexts synchronously and throws `EMPV` (with cleanup) on failure. The macOS
+  CI harness now forces a renderer failure, checks the renderer is ready when `createPlayer`
+  returns, and loads media as soon as the IPC socket accepts. P3: stale acceptance wording,
+  reconciled here.
+- The real-Mac results above were for `macos-v1.0.7-beta.1` (`46d8c25`), before this native
+  startup change. On 2026-10-15 the owner **waived** a real-Mac re-check of the fix, relying on
+  macOS CI. The fix is therefore CI-verified only on the software renderer, not on a physical Mac.
+- Codex re-review of `8d0925097a81727e4870b719aadb4548a3a2b9a4` resolved the P2 and P3 with no new
+  P1/P2/P3 and approved the code. Windows `validate`/`package-windows` and macOS `package-macos`
+  were green on that head. This record is a documentation-only follow-up.
+- The owner authorized squash merge on 2026-10-15. Publishing a macOS beta with the fix through
+  **Release macOS beta** needs separate owner authorization.
+
 ## Completed — Issue #87 v1.0.7 release candidate
 
 PR [#88](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/88) squash-merged as

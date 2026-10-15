@@ -16,12 +16,15 @@ const GET_UPDATE_STATE_CHANNEL = 'update:get-state'
 const CHECK_UPDATE_CHANNEL = 'update:check'
 const DOWNLOAD_UPDATE_CHANNEL = 'update:download'
 const INSTALL_UPDATE_CHANNEL = 'update:install'
+const UNSUPPORTED_PLATFORM_ERROR =
+  'In-app updates are available on Windows only. Download new macOS builds from GitHub Releases.'
 
 let service: UpdateService | null = null
 let registered = false
 
 export interface RegisterUpdateIpcOptions {
   isPlaybackActive: () => boolean
+  platform?: NodeJS.Platform
 }
 
 export function registerUpdateIpc(options: RegisterUpdateIpcOptions): void {
@@ -30,6 +33,11 @@ export function registerUpdateIpc(options: RegisterUpdateIpcOptions): void {
   }
 
   registered = true
+  if ((options.platform ?? process.platform) !== 'win32') {
+    registerUnsupportedPlatformHandlers()
+    return
+  }
+
   service = new UpdateService({
     currentVersion: app.getVersion(),
     updatesRoot: join(app.getPath('userData'), 'updates'),
@@ -52,6 +60,31 @@ export function registerUpdateIpc(options: RegisterUpdateIpcOptions): void {
   )
 
   service.start()
+}
+
+// The updater downloads and launches the Windows setup executable. Other platforms stay idle,
+// which keeps the renderer's update strip hidden, and never contact the release API.
+function registerUnsupportedPlatformHandlers(): void {
+  const snapshot: UpdateSnapshot = {
+    status: 'idle',
+    currentVersion: app.getVersion(),
+    latestVersion: null,
+    releaseName: null,
+    releaseNotes: null,
+    publishedAt: null,
+    downloadPercent: null,
+    error: null,
+    checkedAt: null,
+  }
+  const unsupported = async (): Promise<UpdateActionResult> => ({
+    ok: false,
+    error: UNSUPPORTED_PLATFORM_ERROR,
+  })
+
+  ipcMain.handle(GET_UPDATE_STATE_CHANNEL, (): UpdateSnapshot => ({ ...snapshot }))
+  ipcMain.handle(CHECK_UPDATE_CHANNEL, async (): Promise<UpdateSnapshot> => ({ ...snapshot }))
+  ipcMain.handle(DOWNLOAD_UPDATE_CHANNEL, unsupported)
+  ipcMain.handle(INSTALL_UPDATE_CHANNEL, unsupported)
 }
 
 export function disposeUpdateIpc(): void {

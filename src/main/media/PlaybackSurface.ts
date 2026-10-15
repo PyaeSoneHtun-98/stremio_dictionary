@@ -17,7 +17,7 @@ export class PlaybackSurface {
       !this.overlayWindow.isDestroyed()
     ) {
       this.focus()
-      return getWin32WindowId(this.hostWindow)
+      return getMpvWindowId(this.hostWindow)
     }
 
     if (this.hostWindow || this.overlayWindow) {
@@ -107,7 +107,7 @@ export class PlaybackSurface {
 
     this.focus()
 
-    return getWin32WindowId(hostWindow)
+    return getMpvWindowId(hostWindow)
   }
 
   focus(): void {
@@ -189,16 +189,28 @@ async function loadOverlayRenderer(window: BrowserWindow): Promise<void> {
   })
 }
 
-function getWin32WindowId(window: BaseWindow): string {
-  if (process.platform !== 'win32') {
-    throw new Error('The playback surface currently supports Windows only.')
+function getMpvWindowId(window: BaseWindow): string {
+  return nativeHandleToMpvWindowId(window.getNativeWindowHandle(), process.platform)
+}
+
+export function nativeHandleToMpvWindowId(handle: Buffer, platform: NodeJS.Platform): string {
+  if (platform === 'win32') {
+    if (handle.byteLength < 4) {
+      throw new Error('Electron returned an invalid native window handle.')
+    }
+
+    // mpv's win32 --wid contract expects HWND cast to uint32_t.
+    return handle.readUInt32LE(0).toString()
   }
 
-  const handle = window.getNativeWindowHandle()
-  if (handle.byteLength < 4) {
-    throw new Error('Electron returned an invalid native window handle.')
+  if (platform === 'darwin') {
+    if (handle.byteLength < 8) {
+      throw new Error('Electron returned an invalid native window handle.')
+    }
+
+    // On macOS Electron returns the window's content NSView pointer; mpv's --wid takes it as int64.
+    return handle.readBigUInt64LE(0).toString()
   }
 
-  // mpv's win32 --wid contract expects HWND cast to uint32_t.
-  return handle.readUInt32LE(0).toString()
+  throw new Error('The playback surface currently supports Windows and macOS only.')
 }
