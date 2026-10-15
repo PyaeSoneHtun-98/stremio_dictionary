@@ -313,8 +313,8 @@ Merged PR: [#80](https://github.com/PyaeSoneHtun-98/stremio_dictionary/pull/80).
 Branch: `feat/issue-53-macos-arm64-beta`, based on master `aa49aee`. The owner assigned the macOS
 port on 2026-10-09 and chose: Apple Silicon (arm64) only, Homebrew-installed mpv/FFmpeg (not
 bundled), ad-hoc signing (no Apple Developer account), and a GitHub **prerelease** DMG.
-The owner has no Mac; a friend may test occasionally. Until real-Mac acceptance passes, every
-macOS artifact is an untested beta and must not be described as stable.
+The owner has no Mac; a friend tested on their Mac (results below). The macOS build remains a
+beta and must not be described as stable.
 
 - Platform layer: in-process libmpv video view (owner-approved on 2026-10-09 after the child
   `--wid` design proved unsupported, see below), private Unix-socket JSON IPC, Homebrew libmpv/
@@ -381,7 +381,21 @@ macOS artifact is an untested beta and must not be described as stable.
 
   The first `brew install` hit `Connection reset by peer` from `ghcr.io` on the local network and
   succeeded on retry. Not tested: external/second display, 4K. No independent observation is claimed.
-- Pending: owner Windows visual check of this branch, Codex review, and authorization to merge.
+- Owner Windows manual regression of this branch passed on 2026-10-15: local MKV with clickable
+  subtitles, a stream URL, and closing/reopening the player, using the portable test build of
+  `3119e75`. There are no `src/` changes between `3119e75` and `922c458`.
+- Codex review of `922c458` found no P1. P2: the native view reported startup before mpv's render
+  context existed, because it was created lazily on Core Animation's first draw, and a GL or
+  render-context failure still looked like a successful start. Fixed: `createPlayer` now creates
+  the GL and render contexts synchronously and throws `EMPV` (with cleanup) on failure. The macOS
+  CI harness now forces a renderer failure, checks the renderer is ready when `createPlayer`
+  returns, and loads media as soon as the IPC socket accepts. P3: stale acceptance wording,
+  reconciled here.
+- The real-Mac results above were for `macos-v1.0.7-beta.1` (`46d8c25`), before this native
+  startup change. Repeating a short real-Mac startup check (open a video, close/reopen twice,
+  quit) on a build with the fix is recommended.
+- Pending: CI and a re-review of the fix head, the repeated real-Mac startup check (or an
+  explicit owner decision to skip it), then owner authorization to merge.
 
 ## Completed — Issue #87 v1.0.7 release candidate
 

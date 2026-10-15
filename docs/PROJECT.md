@@ -10,7 +10,8 @@ The product should feel like a normal media player first. Translation and subtit
 
 - Windows x64 is the supported stable target.
 - macOS Apple Silicon (arm64) is a **beta** target (Issue #53): CI-built and smoke-tested on
-  GitHub's arm64 runners, not yet accepted on a physical Mac. See *macOS beta* below.
+  GitHub's arm64 runners and owner-reported acceptance on one physical Mac (MacBook Air M1,
+  macOS Tahoe 26.6.2; external display and 4K not tested). See *macOS beta* below.
 - Electron provides the desktop application shell and native playback surface.
 - React + TypeScript provides the renderer UI.
 - Vite/electron-vite builds the application.
@@ -301,7 +302,8 @@ Diagnostics are intentionally small and privacy-conscious. They may record lifec
 ## Current product limitations
 
 - Windows x64 is the only stable platform. The macOS arm64 build is an unnotarized beta without
-  Stremio one-click handoff or in-app updates, and has not been accepted on a physical Mac.
+  Stremio one-click handoff or in-app updates. Owner-reported acceptance covers one MacBook Air M1
+  (macOS Tahoe 26.6.2); other Macs, external displays and 4K are not tested.
 - The first normal Windows install requires Internet access to download the pinned mpv and FFmpeg runtime archives; verified archives are cached for later upgrades.
 - The Dictionary v1.0 corpus is broad but not exhaustive; unknown words still fail cleanly offline.
 - The frozen phrase base plus extension cover 4,000 contiguous 2–5-token expressions with longest-match detection and single-word fallback. Separated-object phrasal verbs, cross-cue matching, and phrases longer than five tokens are not supported yet.

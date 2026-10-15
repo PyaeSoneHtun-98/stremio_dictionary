@@ -109,10 +109,8 @@ async function run() {
 
   const viewId = host.getNativeWindowHandle().readBigUInt64LE(0).toString()
   const socketDirectory = mkdtempSync(join(tmpdir(), 'sb-harness-'))
-
-  for (let cycle = 1; cycle <= 3; cycle += 1) {
-    const socketPath = join(socketDirectory, `mpv-${cycle}.sock`)
-    const player = native.createPlayer(
+  const createPlayer = (socketPath) =>
+    native.createPlayer(
       libmpvPath(),
       viewId,
       [
@@ -126,8 +124,38 @@ async function run() {
       ],
       false
     )
-    await sleep(300)
-    const loaded = await mpvCommand(socketPath, ['loadfile', clip, 'replace'])
+
+  // A renderer failure must surface as a startup error, not a "started" black player.
+  process.env.SUBTITLE_BRIDGE_TEST_FORCE_RENDER_FAILURE = '1'
+  let forcedError = null
+  try {
+    const unexpected = createPlayer(join(socketDirectory, 'mpv-forced.sock'))
+    native.destroyPlayer(unexpected)
+  } catch (error) {
+    forcedError = error
+  } finally {
+    delete process.env.SUBTITLE_BRIDGE_TEST_FORCE_RENDER_FAILURE
+  }
+  check('forced renderer failure rejects startup', forcedError?.code === 'EMPV', {
+    code: forcedError?.code,
+    message: forcedError?.message
+  })
+
+  for (let cycle = 1; cycle <= 3; cycle += 1) {
+    const socketPath = join(socketDirectory, `mpv-${cycle}.sock`)
+    const player = createPlayer(socketPath)
+    const ready = native.getRenderStats(player)
+    check(
+      `cycle ${cycle}: renderer ready when createPlayer returns`,
+      ready.renderer !== 'pending' && !ready.renderer.includes('failed'),
+      ready
+    )
+    // Load immediately, as soon as the IPC socket accepts, with no head start for the renderer.
+    let loaded = { error: 'not attempted' }
+    for (let attempt = 0; attempt < 40 && loaded.error !== 'success'; attempt += 1) {
+      loaded = await mpvCommand(socketPath, ['loadfile', clip, 'replace'])
+      if (loaded.error !== 'success') await sleep(25)
+    }
     check(`cycle ${cycle}: loadfile`, loaded.error === 'success', loaded)
     await sleep(4000)
     const stats = native.getRenderStats(player)

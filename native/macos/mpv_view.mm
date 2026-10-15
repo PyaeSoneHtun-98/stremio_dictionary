@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdlib>
+#include <cstring>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -121,6 +122,8 @@ void OnRenderUpdate(void *context);
 @interface SBVideoLayer : CAOpenGLLayer
 @property(nonatomic, assign) sbmpv::Player *player;
 - (void)createRenderContext;
+- (BOOL)ensureContextForPixelFormat:(CGLPixelFormatObj)pixelFormat;
+- (BOOL)prepareRenderer;
 @end
 
 // Core Animation may ask for a pixel format and context again (display or GPU change, sleep and
@@ -178,18 +181,49 @@ void OnRenderUpdate(void *context);
     ++player->contextRequests;
   }
 
-  if (!_context) {
-    if (CGLCreateContext(_pixelFormat ?: pixelFormat, nullptr, &_context) != kCGLNoError) {
-      _context = nullptr;
-    }
-    if (!_context) {
-      return [super copyCGLContextForPixelFormat:pixelFormat];
-    }
-    GLint swapInterval = 1;
-    CGLSetParameter(_context, kCGLCPSwapInterval, &swapInterval);
-    [self createRenderContext];
+  if (![self ensureContextForPixelFormat:pixelFormat]) {
+    return [super copyCGLContextForPixelFormat:pixelFormat];
   }
+  [self createRenderContext];
   return CGLRetainContext(_context);
+}
+
+- (BOOL)ensureContextForPixelFormat:(CGLPixelFormatObj)pixelFormat {
+  if (_context) {
+    return YES;
+  }
+  if (!_pixelFormat && !pixelFormat) {
+    CGLPixelFormatObj chosen = [self copyCGLPixelFormatForDisplayMask:0];
+    if (chosen) {
+      CGLReleasePixelFormat(chosen);
+    }
+  }
+  CGLPixelFormatObj format = _pixelFormat ?: pixelFormat;
+  if (!format || CGLCreateContext(format, nullptr, &_context) != kCGLNoError) {
+    _context = nullptr;
+    return NO;
+  }
+  GLint swapInterval = 1;
+  CGLSetParameter(_context, kCGLCPSwapInterval, &swapInterval);
+  return YES;
+}
+
+// mpv needs the render context before playback starts, so the player creates it synchronously
+// instead of waiting for Core Animation's first draw. Returns NO when GL or mpv rendering fails.
+- (BOOL)prepareRenderer {
+  if (![self ensureContextForPixelFormat:nullptr]) {
+    if (self.player) {
+      self.player->renderer = "gl-context-failed";
+    }
+    return NO;
+  }
+  [self createRenderContext];
+  sbmpv::Player *player = self.player;
+  if (!player) {
+    return NO;
+  }
+  std::lock_guard<std::mutex> lock(player->renderLock);
+  return player->render != nullptr;
 }
 
 - (void)createRenderContext {
@@ -203,6 +237,14 @@ void OnRenderUpdate(void *context);
     return;
   }
 
+  // Test-only failure injection, used by the macOS CI harness.
+  const char *forceFailure = getenv("SUBTITLE_BRIDGE_TEST_FORCE_RENDER_FAILURE");
+  if (forceFailure && strcmp(forceFailure, "1") == 0) {
+    player->renderer = "render-context-failed";
+    return;
+  }
+
+  CGLContextObj previous = CGLGetCurrentContext();
   CGLContextObj context = _context;
   CGLSetCurrentContext(context);
 
@@ -217,6 +259,7 @@ void OnRenderUpdate(void *context);
   if (sbmpv::g_api.renderCreate(&player->render, player->mpv, params) < 0) {
     player->render = nullptr;
     player->renderer = "render-context-failed";
+    CGLSetCurrentContext(previous);
     return;
   }
 
@@ -225,6 +268,7 @@ void OnRenderUpdate(void *context);
   player->renderer = name ? reinterpret_cast<const char *>(name) : "unknown";
   sbmpv::g_api.renderSetUpdateCallback(player->render, sbmpv::OnRenderUpdate,
                                        (__bridge void *)self);
+  CGLSetCurrentContext(previous);
 }
 
 - (void)drawInCGLContext:(CGLContextObj)context
@@ -530,6 +574,15 @@ napi_value CreatePlayer(napi_env env, napi_callback_info info) {
   layer.contentsScale = scale > 0 ? scale : 1;
   player->view = view;
   player->layer = layer;
+
+  // Do not report a started player until mpv can render; otherwise a fast loadfile could reach
+  // video initialization first, and a GL failure would look like a successful start.
+  if (![layer prepareRenderer]) {
+    Destroy(player);
+    delete player;
+    return ThrowError(env, "EMPV", "The video renderer could not start.");
+  }
+
   // Topmost inside the host: the host has no other content (its background is drawn by Electron
   // underneath), and the interactive subtitle overlay is a separate child window above it.
   [host addSubview:view positioned:NSWindowAbove relativeTo:nil];
