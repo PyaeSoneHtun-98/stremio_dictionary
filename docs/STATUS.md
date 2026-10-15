@@ -392,10 +392,13 @@ beta and must not be described as stable.
   returns, and loads media as soon as the IPC socket accepts. P3: stale acceptance wording,
   reconciled here.
 - The real-Mac results above were for `macos-v1.0.7-beta.1` (`46d8c25`), before this native
-  startup change. Repeating a short real-Mac startup check (open a video, close/reopen twice,
-  quit) on a build with the fix is recommended.
-- Pending: CI and a re-review of the fix head, the repeated real-Mac startup check (or an
-  explicit owner decision to skip it), then owner authorization to merge.
+  startup change. On 2026-10-15 the owner **waived** a real-Mac re-check of the fix, relying on
+  macOS CI. The fix is therefore CI-verified only on the software renderer, not on a physical Mac.
+- Codex re-review of `8d0925097a81727e4870b719aadb4548a3a2b9a4` resolved the P2 and P3 with no new
+  P1/P2/P3 and approved the code. Windows `validate`/`package-windows` and macOS `package-macos`
+  were green on that head. This record is a documentation-only follow-up.
+- The owner authorized squash merge on 2026-10-15. Publishing a macOS beta with the fix through
+  **Release macOS beta** needs separate owner authorization.
 
 ## Completed — Issue #87 v1.0.7 release candidate
 
