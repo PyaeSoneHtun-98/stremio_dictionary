@@ -103,7 +103,7 @@ An unnotarized, ad-hoc-signed macOS beta for Apple Silicon is in progress
 ([Issue #53](https://github.com/PyaeSoneHtun-98/stremio_dictionary/issues/53)). It requires
 `brew install mpv ffmpeg`, runs libmpv inside the app to draw video into the player window, and
 does not include Stremio one-click handoff or in-app updates. It has passed CI on GitHub's
-macOS runners but has not yet been accepted on a physical Mac. See
+macOS runners and an owner-reported checklist on a MacBook Air M1 (macOS Tahoe 26.6.2). See
 [docs/releases/macos-beta.md](docs/releases/macos-beta.md) and
 [docs/MACOS_BETA_ACCEPTANCE.md](docs/MACOS_BETA_ACCEPTANCE.md).
 

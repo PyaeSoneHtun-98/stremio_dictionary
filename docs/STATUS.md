@@ -366,9 +366,22 @@ macOS artifact is an untested beta and must not be described as stable.
   16 hash-matched managed runtimes, `MPV_PATH`/`FFMPEG_PATH` cleared) launched a synthetic MKV:
   managed mpv spawned, FFmpeg extracted the subtitle track, the file loaded, closing the player
   stopped mpv and closing the launcher quit cleanly. Video appearance and clicking were not observed.
-- Pending: owner Windows visual check, Codex review, real Apple Silicon acceptance (owner has no
-  Mac; a friend may test using [MACOS_BETA_ACCEPTANCE.md](MACOS_BETA_ACCEPTANCE.md)), and explicit
-  publication authorization.
+- On 2026-10-15 the owner authorized pre-release
+  [macos-v1.0.7-beta.1](https://github.com/PyaeSoneHtun-98/stremio_dictionary/releases/tag/macos-v1.0.7-beta.1)
+  (`46d8c25`, DMG from green macOS CI run 37950329299, not marked latest; `/releases/latest`
+  remains `v1.0.7`) so a friend's Mac could download it directly.
+- **Real Apple Silicon acceptance, owner-reported, 2026-10-15:** MacBook Air M1 (A2337, built-in
+  Retina display), macOS Tahoe 26.6.2. Passed:
+  - DMG install and Gatekeeper first launch;
+  - the missing-runtime message before Homebrew mpv/FFmpeg were installed;
+  - local MKV video and audio; clickable subtitles with the Burmese card and phrase lookup;
+  - controls; 1080p smoothness while clicking words; resize; fullscreen and back;
+  - external `.srt` via the picker and drag-and-drop; a stream URL;
+  - reopening the player twice; Cmd+Q leaving no Subtitle Bridge/mpv process.
+
+  The first `brew install` hit `Connection reset by peer` from `ghcr.io` on the local network and
+  succeeded on retry. Not tested: external/second display, 4K. No independent observation is claimed.
+- Pending: owner Windows visual check of this branch, Codex review, and authorization to merge.
 
 ## Completed — Issue #87 v1.0.7 release candidate
 

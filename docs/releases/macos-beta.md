@@ -1,7 +1,7 @@
 ## Subtitle Bridge for macOS — beta
 
-> **Beta, not yet tested on a real Mac.** This build is produced and smoke-tested on GitHub's
-> Apple Silicon macOS runners only. Please report anything that does not work.
+> **Beta.** Built and smoke-tested on GitHub's Apple Silicon runners and checked on one real Mac
+> (MacBook Air M1, macOS Tahoe 26.6.2). Not notarized. Please report anything that does not work.
 
 ### Requirements
 
@@ -12,7 +12,10 @@
   brew install mpv ffmpeg
   ```
 
-  Subtitle Bridge finds them in Homebrew's standard location automatically.
+  Subtitle Bridge finds them in Homebrew's standard location automatically. If a download fails
+  with "Connection reset by peer", run the command again (Homebrew keeps what it already
+  downloaded); `HOMEBREW_CURL_RETRIES=5 brew install mpv ffmpeg` retries automatically, and a
+  different network or VPN helps if the failure repeats.
 
 ### Install
 
