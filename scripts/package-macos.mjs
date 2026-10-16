@@ -103,6 +103,22 @@ for (const [key, type, value] of [
   execFileSync('plutil', ['-replace', key, `-${type}`, value, infoPlist], { stdio: 'inherit' })
 }
 
+// Stremio's macOS "MPV" external player opens mpv:// links (Issue #95). Declaring the scheme lets
+// the user make Subtitle Bridge its default handler from the Stremio card; Stremio is not modified.
+execFileSync(
+  'plutil',
+  [
+    '-replace',
+    'CFBundleURLTypes',
+    '-json',
+    JSON.stringify([
+      { CFBundleURLName: 'Stremio MPV external player link', CFBundleURLSchemes: ['mpv'] }
+    ]),
+    infoPlist
+  ],
+  { stdio: 'inherit' }
+)
+
 copyFileSync(join(root, 'LICENSE'), join(resources, 'LICENSE.txt'))
 
 for (const file of ['LICENSE', 'LICENSES.chromium.html']) {

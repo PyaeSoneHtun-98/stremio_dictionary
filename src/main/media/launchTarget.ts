@@ -1,11 +1,12 @@
 import { posix, win32 } from 'node:path'
+import { normalizeStreamUrl } from '../../shared/streamUrl'
 
 const MAX_TARGET_LENGTH = 16 * 1024
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i
 const LOCAL_VIDEO_EXTENSIONS = new Set(['.mkv', '.mp4'])
 
 export type MediaTargetKind = 'file' | 'network'
-export type MediaTargetSource = 'local' | 'http' | 'stremio-vlc'
+export type MediaTargetSource = 'local' | 'http' | 'stremio-vlc' | 'stremio-mpv'
 
 export interface ParsedMediaTarget {
   target: string
@@ -35,6 +36,24 @@ export function parseMediaTarget(
       displayName: networkDisplayName(url),
       kind: 'network',
       source: 'stremio-vlc'
+    }
+  }
+
+  if (/^mpv:\/\//i.test(raw)) {
+    const unwrapped = unwrapMpvLink(raw.slice(raw.indexOf('://') + 3))
+    const url = requireHttpUrl(unwrapped)
+    // Any app or page can open mpv:// links, so apply the same strict rules as the Stream URL
+    // field: new URL() silently drops characters (for example a decoded newline) that would
+    // otherwise still reach mpv in the target string.
+    const target = normalizeStreamUrl(unwrapped)
+    if (!target) {
+      throw new Error('The media stream URL is invalid.')
+    }
+    return {
+      target,
+      displayName: networkDisplayName(url),
+      kind: 'network',
+      source: 'stremio-mpv'
     }
   }
 
@@ -94,6 +113,20 @@ export function findLaunchTargetArgument(
   }
 
   return null
+}
+
+// Stremio's macOS "MPV" external player opens `mpv://<stream URL>` with the URL appended as-is.
+// Also accept a percent-encoded URL, or one whose scheme colon was dropped ("http//"), as some
+// link handlers rewrite it; the result is still validated as HTTP/HTTPS by the caller.
+function unwrapMpvLink(value: string): string {
+  if (/^https?%3A/i.test(value)) {
+    try {
+      return decodeURIComponent(value)
+    } catch {
+      throw new Error('The media stream URL is invalid.')
+    }
+  }
+  return value.replace(/^(https?)\/\/(?!\/)/i, '$1://')
 }
 
 // Windows keeps its existing drive/UNC path rules; macOS uses POSIX absolute paths.

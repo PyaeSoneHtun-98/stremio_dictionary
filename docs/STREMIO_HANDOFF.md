@@ -129,3 +129,19 @@ Not included yet:
 ## Compatibility warning
 
 The one-click menu integration modifies Stremio's installed `server.js`. It is deliberately opt-in and reversible, but Stremio updates can overwrite the patch. The helper validates a specific known external-player structure and fails closed when that structure or the patch markers are not recognized. Because this is still a compatibility patch against Stremio internals rather than a supported extension API, a future Stremio release may require updating the helper before it can be enabled again.
+
+## macOS (Issue #95)
+
+The Windows `server.js` patch is not used on macOS. Stremio's macOS app is code-signed by Apple, and editing files inside it would break that signature. macOS instead uses a link Stremio already opens:
+
+- In current Stremio desktop builds, **Settings → Player → External player** offers **MPV** on macOS (stremio-web `EXTERNAL_PLAYERS`).
+- With MPV selected, Stremio opens `mpv://<stream URL>` (stremio-core `deep_links`).
+- Subtitle Bridge declares the `mpv` URL scheme. The Stremio card's **Enable** makes Subtitle Bridge the default `mpv://` handler, and **Disable** removes it.
+- The link is unwrapped like the Windows `vlc://` path and must contain an HTTP/HTTPS stream URL. Anything else is rejected.
+
+To use it: click **Enable** in Subtitle Bridge, choose **MPV** in Stremio's external-player setting, then play a stream. To undo it: click **Disable** and set Stremio's external player back to **Disabled**.
+
+Limits:
+- It needs a Stremio version that offers MPV as an external player.
+- While enabled, any app that opens an `mpv://` link opens Subtitle Bridge. A browser asks for confirmation before opening such a link.
+- The `iina://` scheme is not claimed, so IINA keeps working.
